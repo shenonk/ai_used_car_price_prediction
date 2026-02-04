@@ -1,0 +1,11 @@
+ai_used_car_price_prediction/
+│
+├── frontend/
+├── backend/
+├── ml/
+├── docs/
+│   ├── PID.pdf
+│   └── architecture.png
+│
+├── README.md
+└── .gitignore

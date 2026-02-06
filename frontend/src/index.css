@@ -1,3 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+.input {
+  @apply bg-[#020617] border border-gray-600 text-white p-3 rounded-lg w-full outline-none focus:border-blue-500;
+}

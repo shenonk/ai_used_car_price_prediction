@@ -95,7 +95,11 @@ function Analytics() {
       {/* Title */}
       <div className="mb-8 animate-fade-in">
         <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-          <span className="icon-box icon-box-amber">📈</span>
+          <span className="icon-box icon-box-amber">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            </svg>
+          </span>
           Analytics Dashboard
         </h1>
         <p className="text-slate-400">
@@ -107,7 +111,10 @@ function Analytics() {
       <div className="card p-6 mb-8 animate-fade-in animate-delay-100">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <span>📉</span> Vehicle Depreciation Analysis
+            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+            </svg>
+            Vehicle Depreciation Analysis
           </h2>
           <select className="input w-auto text-sm py-2">
             <option>Toyota Aqua 2020</option>
@@ -123,7 +130,9 @@ function Analytics() {
 
         <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">📊</span>
+            <svg className="w-6 h-6 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
             <div>
               <p className="font-semibold text-white">
                 Average Depreciation Rate: <span className="text-amber-400">8.5% per year</span>
@@ -140,7 +149,10 @@ function Analytics() {
       <div className="card p-6 animate-fade-in animate-delay-200">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <span>📋</span> Prediction History
+            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+            Prediction History
           </h2>
 
           <div className="flex gap-3">
@@ -182,7 +194,10 @@ function Analytics() {
                   <td className="text-blue-400 font-semibold">LKR {item.price}</td>
                   <td>
                     <span className="badge badge-success">
-                      ✓ Completed
+                      <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Completed
                     </span>
                   </td>
                 </tr>

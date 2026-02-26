@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ============================================
-   🎨 PREMIUM DESIGN SYSTEM
+   PREMIUM DESIGN SYSTEM
    AI Used Car Price Prediction
    ============================================ */
 
@@ -39,7 +39,7 @@ body {
 }
 
 /* ============================================
-   📦 COMPONENT CLASSES
+   COMPONENT CLASSES
    ============================================ */
 
 /* Form Inputs */
@@ -60,7 +60,7 @@ body {
 }
 
 /* ============================================
-   🔘 BUTTONS
+   BUTTONS
    ============================================ */
 
 .btn-primary {
@@ -94,12 +94,19 @@ body {
 }
 
 @keyframes gradient-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
+
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 /* ============================================
-   🃏 CARDS
+   CARDS
    ============================================ */
 
 .card {
@@ -150,7 +157,7 @@ body {
 }
 
 /* ============================================
-   ✨ ANIMATIONS
+   ANIMATIONS
    ============================================ */
 
 @keyframes fade-in {
@@ -158,6 +165,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -169,6 +177,7 @@ body {
     opacity: 0;
     transform: translateY(30px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -176,17 +185,27 @@ body {
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
   }
+
   50% {
     box-shadow: 0 0 40px rgba(59, 130, 246, 0.5);
   }
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 .animate-fade-in {
@@ -206,14 +225,28 @@ body {
 }
 
 /* Staggered animations */
-.animate-delay-100 { animation-delay: 100ms; }
-.animate-delay-200 { animation-delay: 200ms; }
-.animate-delay-300 { animation-delay: 300ms; }
-.animate-delay-400 { animation-delay: 400ms; }
-.animate-delay-500 { animation-delay: 500ms; }
+.animate-delay-100 {
+  animation-delay: 100ms;
+}
+
+.animate-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animate-delay-300 {
+  animation-delay: 300ms;
+}
+
+.animate-delay-400 {
+  animation-delay: 400ms;
+}
+
+.animate-delay-500 {
+  animation-delay: 500ms;
+}
 
 /* ============================================
-   🌟 SPECIAL EFFECTS
+   SPECIAL EFFECTS
    ============================================ */
 
 .gradient-text {
@@ -249,7 +282,7 @@ body {
 }
 
 /* ============================================
-   📊 TABLE STYLES
+   TABLE STYLES
    ============================================ */
 
 .table-modern {
@@ -277,7 +310,7 @@ body {
 }
 
 /* ============================================
-   🏷️ BADGES & TAGS
+   BADGES & TAGS
    ============================================ */
 
 .badge {
@@ -301,11 +334,11 @@ body {
 }
 
 /* ============================================
-   🔲 ICON CONTAINERS
+   ICON CONTAINERS
    ============================================ */
 
 .icon-box {
-  @apply flex items-center justify-center w-12 h-12 rounded-xl text-xl;
+  @apply flex items-center justify-center w-12 h-12 rounded-xl;
   @apply transition-transform duration-300;
 }
 
@@ -334,7 +367,7 @@ body {
 }
 
 /* ============================================
-   📱 SCROLLBAR STYLING
+   SCROLLBAR STYLING
    ============================================ */
 
 ::-webkit-scrollbar {
@@ -356,7 +389,7 @@ body {
 }
 
 /* ============================================
-   🎯 NAVIGATION
+   NAVIGATION
    ============================================ */
 
 .nav-link {
@@ -373,7 +406,7 @@ body {
 }
 
 .nav-link .nav-icon {
-  @apply text-xl transition-transform duration-300;
+  @apply transition-transform duration-300;
 }
 
 .nav-link:hover .nav-icon {
@@ -381,7 +414,7 @@ body {
 }
 
 /* ============================================
-   📈 CHART CONTAINERS
+   CHART CONTAINERS
    ============================================ */
 
 .chart-container {
@@ -389,7 +422,7 @@ body {
 }
 
 /* ============================================
-   🔔 NOTIFICATION ITEMS
+   NOTIFICATION ITEMS
    ============================================ */
 
 .notification-item {

@@ -1,4 +1,48 @@
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
+
 function PriceCheck() {
+  const navigate = useNavigate()
+  const [form, setForm] = useState({
+    brand: "",
+    model: "",
+    year: "",
+    mileage: "",
+    fuel: "",
+    transmission: "",
+    condition: "",
+  })
+  const [errors, setErrors] = useState({})
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleChange = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: "" }))
+  }
+
+  const validate = () => {
+    const errs = {}
+    if (!form.brand.trim()) errs.brand = "Brand is required"
+    if (!form.model.trim()) errs.model = "Model is required"
+    if (!form.year) errs.year = "Year is required"
+    if (!form.fuel) errs.fuel = "Select a fuel type"
+    if (!form.transmission) errs.transmission = "Select a transmission"
+    return errs
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const errs = validate()
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs)
+      return
+    }
+    setIsLoading(true)
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    setIsLoading(false)
+    navigate("/results", { state: { vehicle: form } })
+  }
+
   return (
     <div className="min-h-screen bg-[#0f172a] p-8">
 
@@ -34,76 +78,135 @@ function PriceCheck() {
           </div>
 
           {/* Form Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <form onSubmit={handleSubmit}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-            {/* Brand */}
-            <div className="animate-fade-in animate-delay-100">
-              <label className="label">Brand</label>
-              <input className="input" placeholder="e.g., Toyota, Honda, Nissan" />
+              {/* Brand */}
+              <div className="animate-fade-in animate-delay-100">
+                <label className="label">Brand *</label>
+                <input
+                  className={`input ${errors.brand ? 'border-rose-500/50' : ''}`}
+                  placeholder="e.g., Toyota, Honda, Nissan"
+                  value={form.brand}
+                  onChange={(e) => handleChange('brand', e.target.value)}
+                />
+                {errors.brand && <p className="text-rose-400 text-xs mt-1">{errors.brand}</p>}
+              </div>
+
+              {/* Model */}
+              <div className="animate-fade-in animate-delay-200">
+                <label className="label">Model *</label>
+                <input
+                  className={`input ${errors.model ? 'border-rose-500/50' : ''}`}
+                  placeholder="e.g., Aqua, Vezel, Swift"
+                  value={form.model}
+                  onChange={(e) => handleChange('model', e.target.value)}
+                />
+                {errors.model && <p className="text-rose-400 text-xs mt-1">{errors.model}</p>}
+              </div>
+
+              {/* Year */}
+              <div className="animate-fade-in animate-delay-200">
+                <label className="label">Manufacture Year *</label>
+                <input
+                  className={`input ${errors.year ? 'border-rose-500/50' : ''}`}
+                  type="number"
+                  placeholder="e.g., 2020"
+                  min="1990"
+                  max="2025"
+                  value={form.year}
+                  onChange={(e) => handleChange('year', e.target.value)}
+                />
+                {errors.year && <p className="text-rose-400 text-xs mt-1">{errors.year}</p>}
+              </div>
+
+              {/* Mileage */}
+              <div className="animate-fade-in animate-delay-300">
+                <label className="label">Mileage (km)</label>
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="e.g., 50000"
+                  value={form.mileage}
+                  onChange={(e) => handleChange('mileage', e.target.value)}
+                />
+              </div>
+
+              {/* Fuel Type */}
+              <div className="animate-fade-in animate-delay-300">
+                <label className="label">Fuel Type *</label>
+                <select
+                  className={`input ${errors.fuel ? 'border-rose-500/50' : ''}`}
+                  value={form.fuel}
+                  onChange={(e) => handleChange('fuel', e.target.value)}
+                >
+                  <option value="">Select fuel type</option>
+                  <option value="petrol">Petrol</option>
+                  <option value="hybrid">Hybrid</option>
+                  <option value="diesel">Diesel</option>
+                  <option value="electric">Electric</option>
+                </select>
+                {errors.fuel && <p className="text-rose-400 text-xs mt-1">{errors.fuel}</p>}
+              </div>
+
+              {/* Transmission */}
+              <div className="animate-fade-in animate-delay-400">
+                <label className="label">Transmission *</label>
+                <select
+                  className={`input ${errors.transmission ? 'border-rose-500/50' : ''}`}
+                  value={form.transmission}
+                  onChange={(e) => handleChange('transmission', e.target.value)}
+                >
+                  <option value="">Select transmission</option>
+                  <option value="automatic">Automatic</option>
+                  <option value="manual">Manual</option>
+                </select>
+                {errors.transmission && <p className="text-rose-400 text-xs mt-1">{errors.transmission}</p>}
+              </div>
+
+              {/* Condition - Full Width */}
+              <div className="md:col-span-2 animate-fade-in animate-delay-400">
+                <label className="label">Vehicle Condition</label>
+                <select
+                  className="input"
+                  value={form.condition}
+                  onChange={(e) => handleChange('condition', e.target.value)}
+                >
+                  <option value="">Select condition</option>
+                  <option value="excellent">Excellent - Like new</option>
+                  <option value="good">Good - Minor wear</option>
+                  <option value="average">Average - Normal wear</option>
+                </select>
+              </div>
+
             </div>
 
-            {/* Model */}
-            <div className="animate-fade-in animate-delay-200">
-              <label className="label">Model</label>
-              <input className="input" placeholder="e.g., Aqua, Vezel, Swift" />
+            {/* Submit Button */}
+            <div className="mt-8 animate-fade-in animate-delay-500">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full btn-primary py-4 text-lg flex items-center justify-center gap-3 group disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Analyzing vehicle data...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Predict Car Price</span>
+                    <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </>
+                )}
+              </button>
             </div>
-
-            {/* Year */}
-            <div className="animate-fade-in animate-delay-200">
-              <label className="label">Manufacture Year</label>
-              <input className="input" type="number" placeholder="e.g., 2020" min="1990" max="2025" />
-            </div>
-
-            {/* Mileage */}
-            <div className="animate-fade-in animate-delay-300">
-              <label className="label">Mileage (km)</label>
-              <input className="input" type="number" placeholder="e.g., 50000" />
-            </div>
-
-            {/* Fuel Type */}
-            <div className="animate-fade-in animate-delay-300">
-              <label className="label">Fuel Type</label>
-              <select className="input">
-                <option value="">Select fuel type</option>
-                <option value="petrol">Petrol</option>
-                <option value="hybrid">Hybrid</option>
-                <option value="diesel">Diesel</option>
-                <option value="electric">Electric</option>
-              </select>
-            </div>
-
-            {/* Transmission */}
-            <div className="animate-fade-in animate-delay-400">
-              <label className="label">Transmission</label>
-              <select className="input">
-                <option value="">Select transmission</option>
-                <option value="automatic">Automatic</option>
-                <option value="manual">Manual</option>
-              </select>
-            </div>
-
-            {/* Condition - Full Width */}
-            <div className="md:col-span-2 animate-fade-in animate-delay-400">
-              <label className="label">Vehicle Condition</label>
-              <select className="input">
-                <option value="">Select condition</option>
-                <option value="excellent">Excellent - Like new</option>
-                <option value="good">Good - Minor wear</option>
-                <option value="average">Average - Normal wear</option>
-              </select>
-            </div>
-
-          </div>
-
-          {/* Submit Button */}
-          <div className="mt-8 animate-fade-in animate-delay-500">
-            <button className="w-full btn-primary py-4 text-lg flex items-center justify-center gap-3 group">
-              <span>Predict Car Price</span>
-              <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-              </svg>
-            </button>
-          </div>
+          </form>
 
           {/* Info Note */}
           <div className="mt-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 animate-fade-in animate-delay-500">

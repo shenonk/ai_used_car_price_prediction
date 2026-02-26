@@ -9,25 +9,10 @@ function Results() {
   const location = useLocation();
   const navigate = useNavigate();
   const vehicle = location.state?.vehicle || null;
+  const predictedPrice = location.state?.predictedPrice || 4500000;
   const [alertSet, setAlertSet] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-  // Generate a mock predicted price based on vehicle data
-  const generatePrice = () => {
-    if (!vehicle) return 4500000;
-    const basePrices = {
-      toyota: 5000000, honda: 5500000, nissan: 4800000, suzuki: 3500000,
-      bmw: 8000000, benz: 9000000, mitsubishi: 4500000
-    };
-    const base = basePrices[vehicle.brand?.toLowerCase()] || 4500000;
-    const yearFactor = Math.max(0.5, 1 - ((2025 - (parseInt(vehicle.year) || 2020)) * 0.06));
-    const mileageFactor = vehicle.mileage ? Math.max(0.7, 1 - (parseInt(vehicle.mileage) / 500000)) : 0.95;
-    const fuelFactor = vehicle.fuel === 'hybrid' ? 1.15 : vehicle.fuel === 'electric' ? 1.2 : 1;
-    const conditionFactor = vehicle.condition === 'excellent' ? 1.1 : vehicle.condition === 'average' ? 0.85 : 1;
-    return Math.round(base * yearFactor * mileageFactor * fuelFactor * conditionFactor / 10000) * 10000;
-  };
-
-  const predictedPrice = generatePrice();
   const formattedPrice = predictedPrice.toLocaleString('en-LK');
 
   const pieData = [
@@ -65,6 +50,7 @@ function Results() {
       `Brand:        ${vehicle?.brand || 'N/A'}`,
       `Model:        ${vehicle?.model || 'N/A'}`,
       `Year:         ${vehicle?.year || 'N/A'}`,
+      `Engine:       ${vehicle?.engine ? vehicle.engine + ' cc' : 'N/A'}`,
       `Mileage:      ${vehicle?.mileage ? vehicle.mileage + ' km' : 'N/A'}`,
       `Fuel Type:    ${vehicle?.fuel || 'N/A'}`,
       `Transmission: ${vehicle?.transmission || 'N/A'}`,
@@ -137,7 +123,7 @@ function Results() {
           </div>
           {vehicle && (
             <p className="text-white/80 text-sm mb-6">
-              {vehicle.brand} {vehicle.model} • {vehicle.year} • {vehicle.fuel} • {vehicle.transmission}
+              {vehicle.brand} {vehicle.model} • {vehicle.year} • {vehicle.engine}cc • {vehicle.fuel} • {vehicle.transmission}
             </p>
           )}
           {!vehicle && <p className="text-white/80 text-sm mb-6">Based on your vehicle specifications</p>}

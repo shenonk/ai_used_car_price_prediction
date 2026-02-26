@@ -7,6 +7,7 @@ function PriceCheck() {
     brand: "",
     model: "",
     year: "",
+    engine: "",
     mileage: "",
     fuel: "",
     transmission: "",
@@ -25,6 +26,7 @@ function PriceCheck() {
     if (!form.brand.trim()) errs.brand = "Brand is required"
     if (!form.model.trim()) errs.model = "Model is required"
     if (!form.year) errs.year = "Year is required"
+    if (!form.engine) errs.engine = "Engine capacity is required"
     if (!form.fuel) errs.fuel = "Select a fuel type"
     if (!form.transmission) errs.transmission = "Select a transmission"
     return errs
@@ -37,10 +39,43 @@ function PriceCheck() {
       setErrors(errs)
       return
     }
+
     setIsLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    setIsLoading(false)
-    navigate("/results", { state: { vehicle: form } })
+
+    try {
+      const response = await fetch("http://localhost:5000/api/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          brand: form.brand,
+          model: form.model,
+          year: parseInt(form.year),
+          engine: parseInt(form.engine),
+          mileage: parseInt(form.mileage) || 0,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setIsLoading(false)
+
+      navigate("/results", {
+        state: {
+          vehicle: form,
+          predictedPrice: data.predicted_price,
+        },
+      })
+    } catch (error) {
+      setIsLoading(false)
+      if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+        alert("Server not connected. Please make sure the backend is running at http://localhost:5000")
+      } else {
+        alert("Prediction failed: " + error.message)
+      }
+    }
   }
 
   return (
@@ -118,6 +153,19 @@ function PriceCheck() {
                   onChange={(e) => handleChange('year', e.target.value)}
                 />
                 {errors.year && <p className="text-rose-400 text-xs mt-1">{errors.year}</p>}
+              </div>
+
+              {/* Engine Capacity */}
+              <div className="animate-fade-in animate-delay-300">
+                <label className="label">Engine Capacity (cc) *</label>
+                <input
+                  className={`input ${errors.engine ? 'border-rose-500/50' : ''}`}
+                  type="number"
+                  placeholder="e.g., 1500"
+                  value={form.engine}
+                  onChange={(e) => handleChange('engine', e.target.value)}
+                />
+                {errors.engine && <p className="text-rose-400 text-xs mt-1">{errors.engine}</p>}
               </div>
 
               {/* Mileage */}

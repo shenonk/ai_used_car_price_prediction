@@ -4,6 +4,7 @@ import MainLayout from "./layout/MainLayout";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import PriceCheck from "./pages/PriceCheck";
 import Results from "./pages/Results";
@@ -19,6 +20,7 @@ function App() {
         {/* STANDALONE PAGES - no layout */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* MAIN LAYOUT WRAP */}
         <Route path="/" element={<MainLayout />}>

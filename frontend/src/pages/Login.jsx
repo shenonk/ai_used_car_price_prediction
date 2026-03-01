@@ -81,7 +81,7 @@ function Login() {
 
             {/* Email Field */}
             <div className="space-y-2">
-              <label className="label">Email Address</label>
+              <label className="label text-center">Email Address</label>
               <div className="relative group">
                 <input
                   type="email"
@@ -101,7 +101,7 @@ function Login() {
 
             {/* Password Field */}
             <div className="space-y-2">
-              <label className="label">Password</label>
+              <label className="label text-center">Password</label>
               <div className="relative group">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -144,9 +144,9 @@ function Login() {
                 />
                 <span className="text-slate-400 group-hover:text-slate-300 transition-colors">Remember me</span>
               </label>
-              <a href="#" className="text-blue-400 hover:text-blue-300 transition-colors">
+              <Link to="/forgot-password" className="text-blue-400 hover:text-blue-300 transition-colors">
                 Forgot password?
-              </a>
+              </Link>
             </div>
 
             {/* Login Button */}

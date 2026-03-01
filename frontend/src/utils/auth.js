@@ -50,3 +50,15 @@ export function getCurrentUser() {
     const session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
     return session ? session.email : null;
 }
+
+export function resetPassword(email, newPassword) {
+    initDefaults();
+    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const userIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+    if (userIndex === -1) {
+        return { success: false, error: 'No account found with this email.' };
+    }
+    users[userIndex].password = newPassword;
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    return { success: true };
+}

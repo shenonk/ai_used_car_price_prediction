@@ -88,7 +88,7 @@ function Register() {
 
                         {/* Email */}
                         <div className="space-y-2">
-                            <label className="label">Email Address</label>
+                            <label className="label text-center">Email Address</label>
                             <div className="relative group">
                                 <input
                                     type="email"
@@ -108,7 +108,7 @@ function Register() {
 
                         {/* Password */}
                         <div className="space-y-2">
-                            <label className="label">Password</label>
+                            <label className="label text-center">Password</label>
                             <div className="relative group">
                                 <input
                                     type={showPassword ? "text" : "password"}
@@ -144,7 +144,7 @@ function Register() {
 
                         {/* Confirm Password */}
                         <div className="space-y-2">
-                            <label className="label">Confirm Password</label>
+                            <label className="label text-center">Confirm Password</label>
                             <div className="relative group">
                                 <input
                                     type={showPassword ? "text" : "password"}

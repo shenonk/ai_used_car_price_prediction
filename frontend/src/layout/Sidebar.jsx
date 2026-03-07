@@ -18,6 +18,7 @@ function Sidebar() {
           <Link to="/" className="p-3 rounded-lg hover:bg-gray-800">Dashboard</Link>
           <Link to="/price" className="p-3 rounded-lg hover:bg-gray-800">Price Check</Link>
           <Link to="/results" className="p-3 rounded-lg hover:bg-gray-800">Results</Link>
+          <Link to="/financing" className="p-3 rounded-lg hover:bg-gray-800">Financing</Link>
           <Link to="/analytics" className="p-3 rounded-lg hover:bg-gray-800">Analytics</Link>
           <Link to="/notifications" className="p-3 rounded-lg hover:bg-gray-800">Notifications</Link>
 

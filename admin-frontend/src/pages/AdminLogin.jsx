@@ -54,7 +54,7 @@ function AdminLogin() {
 
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <img src={logo} alt="AutoValueLK" className="h-16 object-contain mb-5 mx-auto animate-[pulse-soft_2s_ease-in-out_infinite]" />
+                    <img src={logo} alt="AutoValueLK" className="h-10 object-contain mb-5 mx-auto animate-[pulse-soft_2s_ease-in-out_infinite]" />
                     <h1 className="text-2xl font-bold text-white mb-1">Admin Login</h1>
                     <p className="text-gray-500 text-sm">AutoValueLK Control Panel</p>
                 </div>

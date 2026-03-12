@@ -98,7 +98,7 @@ function MainLayout() {
         {/* Logo Section */}
         <div className="p-6 border-b border-slate-700/50">
           <div className="flex items-center gap-3">
-            <img src={logo} alt="AutoValueLK" className="h-14 object-contain" />
+            <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
             <div>
               <h1 className="text-lg font-bold text-white">AutoValueLK</h1>
               <p className="text-xs text-slate-500">Sri Lankan Market</p>

@@ -60,7 +60,7 @@ function Register() {
 
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <img src={logo} alt="AutoValueLK" className="h-24 object-contain mb-6 mx-auto animate-pulse-glow" />
+                    <img src={logo} alt="AutoValueLK" className="h-12 object-contain mb-6 mx-auto animate-pulse-glow" />
                     <h1 className="text-3xl font-bold text-white mb-2">
                         Create Your <span className="gradient-text">Account</span>
                     </h1>

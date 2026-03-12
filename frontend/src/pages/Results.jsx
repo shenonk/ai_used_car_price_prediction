@@ -41,7 +41,7 @@ function Results() {
 
     const content = [
       "═══════════════════════════════════════════",
-      "        CARPRICE AI — PRICE REPORT         ",
+      "        AUTOVALUELK — PRICE REPORT         ",
       "═══════════════════════════════════════════",
       "",
       `Generated: ${new Date().toLocaleString()}`,
@@ -64,7 +64,7 @@ function Results() {
       ...loanPlans.map(p => `${p.years} Years @ ${p.interest}  →  LKR ${p.monthly}/month  (Total: LKR ${p.total})`),
       "",
       "═══════════════════════════════════════════",
-      "        © 2026 CarPrice AI                 ",
+      "        © 2026 AutoValueLK                 ",
       "═══════════════════════════════════════════",
     ].join("\n");
 
@@ -72,7 +72,7 @@ function Results() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `CarPriceAI_Report_${vehicle?.brand || 'Vehicle'}_${vehicle?.model || ''}.txt`;
+    a.download = `AutoValueLK_Report_${vehicle?.brand || 'Vehicle'}_${vehicle?.model || ''}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

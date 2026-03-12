@@ -379,7 +379,7 @@ function ForgotPassword() {
                         Secured with 256-bit encryption
                     </p>
                     <p className="text-slate-600 text-xs">
-                        © 2026 CarPrice AI. All rights reserved.
+                        © 2026 AutoValueLK. All rights reserved.
                     </p>
                 </div>
 

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { register } from "../utils/auth"
+import logo from "../assets/logo/autovaluelk-logo.png"
 
 function Register() {
     const navigate = useNavigate()
@@ -59,16 +60,12 @@ function Register() {
 
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 mb-6 shadow-lg shadow-emerald-500/30 animate-pulse-glow">
-                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                        </svg>
-                    </div>
+                    <img src={logo} alt="AutoValueLK" className="h-24 object-contain mb-6 mx-auto animate-pulse-glow" />
                     <h1 className="text-3xl font-bold text-white mb-2">
                         Create Your <span className="gradient-text">Account</span>
                     </h1>
                     <p className="text-slate-400">
-                        Join CarPrice AI and start predicting car prices
+                        Join AutoValueLK and start predicting car prices
                     </p>
                 </div>
 
@@ -200,7 +197,7 @@ function Register() {
                 {/* Footer */}
                 <div className="text-center mt-6">
                     <p className="text-slate-600 text-xs">
-                        © 2026 CarPrice AI. All rights reserved.
+                        © 2026 AutoValueLK. All rights reserved.
                     </p>
                 </div>
 

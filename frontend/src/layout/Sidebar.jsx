@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-
+import logo from "../../assets/logo/autovaluelk-logo.png"
 function Sidebar() {
   return (
     <div className="w-64 h-screen bg-[#020617] border-r border-gray-800 text-gray-300 fixed flex flex-col justify-between">
@@ -7,10 +7,15 @@ function Sidebar() {
       {/* Top */}
       <div>
         <div className="p-6 border-b border-gray-800">
-          <h1 className="text-xl font-semibold text-white">
-            AI Car Analytics
-          </h1>
-          <p className="text-xs text-gray-500">Prediction System</p>
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="AutoValueLK" className="h-14 object-contain" />
+            <div>
+              <h1 className="text-xl font-semibold text-white">
+                AutoValueLK
+              </h1>
+              <p className="text-xs text-gray-500">Sri Lankan Market</p>
+            </div>
+          </div>
         </div>
 
         <nav className="flex flex-col p-4 gap-2 text-sm">

@@ -53,7 +53,7 @@ function Login() {
 
         {/* Logo & Branding */}
         <div className="text-center mb-8">
-          <img src={logo} alt="AutoValueLK" className="h-24 object-contain mb-6 mx-auto animate-pulse-glow" />
+          <img src={logo} alt="AutoValueLK" className="h-12 object-contain mb-6 mx-auto animate-pulse-glow" />
           <h1 className="text-3xl font-bold text-white mb-2">
             Welcome to <span className="gradient-text">AutoValueLK</span>
           </h1>

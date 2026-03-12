@@ -8,7 +8,7 @@ function Sidebar() {
       <div>
         <div className="p-6 border-b border-gray-800">
           <div className="flex items-center gap-3">
-            <img src={logo} alt="AutoValueLK" className="h-14 object-contain" />
+            <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
             <div>
               <h1 className="text-xl font-semibold text-white">
                 AutoValueLK

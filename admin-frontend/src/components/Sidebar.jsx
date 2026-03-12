@@ -84,7 +84,7 @@ function Sidebar() {
                 {/* Logo */}
                 <div className="p-6 border-b border-gray-800">
                     <div className="flex items-center gap-3">
-                        <img src={logo} alt="AutoValueLK" className="h-10 object-contain" />
+                        <img src={logo} alt="AutoValueLK" className="h-7 object-contain" />
                         <div>
                             <h2 className="text-sm font-bold text-white tracking-tight">AutoValueLK</h2>
                             <p className="text-xs text-gray-500">Sri Lankan Market</p>

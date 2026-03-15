@@ -11,6 +11,7 @@ import Results from "./pages/Results";
 import Analytics from "./pages/Analytics";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
+import VehicleFinancingOptions from "./pages/VehicleFinancingOptions";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="analytics" element={<Analytics />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="financing" element={<VehicleFinancingOptions />} />
         </Route>
 
       </Routes>

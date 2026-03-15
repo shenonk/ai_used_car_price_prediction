@@ -4,6 +4,10 @@ import {
   PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer
 } from "recharts";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { getCurrentUser } from "../utils/auth";
+import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png";
 
 function Results() {
   const location = useLocation();
@@ -37,47 +41,120 @@ function Results() {
 
   const handleDownloadPDF = async () => {
     setDownloading(true);
-    await new Promise(r => setTimeout(r, 800));
+    try {
+      // Simulate slight delay for UX
+      await new Promise(r => setTimeout(r, 600));
 
-    const content = [
-      "═══════════════════════════════════════════",
-      "        CARPRICE AI — PRICE REPORT         ",
-      "═══════════════════════════════════════════",
-      "",
-      `Generated: ${new Date().toLocaleString()}`,
-      "",
-      "─── VEHICLE DETAILS ───",
-      `Brand:        ${vehicle?.brand || 'N/A'}`,
-      `Model:        ${vehicle?.model || 'N/A'}`,
-      `Year:         ${vehicle?.year || 'N/A'}`,
-      `Engine:       ${vehicle?.engine ? vehicle.engine + ' cc' : 'N/A'}`,
-      `Mileage:      ${vehicle?.mileage ? vehicle.mileage + ' km' : 'N/A'}`,
-      `Fuel Type:    ${vehicle?.fuel || 'N/A'}`,
-      `Transmission: ${vehicle?.transmission || 'N/A'}`,
-      `Condition:    ${vehicle?.condition || 'N/A'}`,
-      "",
-      "─── PREDICTED PRICE ───",
-      `Estimated Market Value:  LKR ${formattedPrice}`,
-      `Accuracy:               ±5%`,
-      "",
-      "─── LOAN OPTIONS ───",
-      ...loanPlans.map(p => `${p.years} Years @ ${p.interest}  →  LKR ${p.monthly}/month  (Total: LKR ${p.total})`),
-      "",
-      "═══════════════════════════════════════════",
-      "        © 2026 CarPrice AI                 ",
-      "═══════════════════════════════════════════",
-    ].join("\n");
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const userEmail = getCurrentUser() || "Guest User";
 
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `CarPriceAI_Report_${vehicle?.brand || 'Vehicle'}_${vehicle?.model || ''}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setDownloading(false);
+      // 1. Draw Logo
+      // Try to load the image. Adjust logo dimensions based on the aspect ratio (roughly square now).
+      const logoImg = new Image();
+      logoImg.src = logoUrl;
+      
+      // We'll wait until the image is loaded (or if it's already complete)
+      await new Promise((resolve) => {
+        if (logoImg.complete) resolve();
+        else {
+          logoImg.onload = resolve;
+          logoImg.onerror = resolve; // Continue even if logo fails
+        }
+      });
+
+      if (logoImg.complete && logoImg.naturalWidth > 0) {
+        doc.addImage(logoImg, 'PNG', pageWidth / 2 - 15, 10, 30, 30);
+      }
+
+      // 2. Header Texts
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text("AutoValueLK", pageWidth / 2, 48, { align: "center" });
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(14);
+      doc.setTextColor(100, 116, 139); // slate-500
+      doc.text("Vehicle Price Prediction Report", pageWidth / 2, 56, { align: "center" });
+
+      // 3. Document Meta Info
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 70);
+      doc.text(`Requested By: ${userEmail}`, 14, 76);
+
+      // 4. Vehicle Details Table
+      autoTable(doc, {
+        startY: 85,
+        theme: 'grid',
+        headStyles: { fillColor: [59, 130, 246] }, // blue-500
+        head: [['Vehicle Specifications', 'Details']],
+        body: [
+          ['Brand', vehicle?.brand || 'N/A'],
+          ['Model', vehicle?.model || 'N/A'],
+          ['Manufacture Year', vehicle?.year || 'N/A'],
+          ['Engine Capacity', vehicle?.engine ? `${vehicle.engine} cc` : 'N/A'],
+          ['Mileage', vehicle?.mileage ? `${vehicle.mileage} km` : 'N/A'],
+          ['Fuel Type', vehicle?.fuel || 'N/A'],
+          ['Transmission', vehicle?.transmission || 'N/A'],
+          ['Condition', vehicle?.condition || 'N/A'],
+        ],
+      });
+
+      // 5. Predicted Price Block
+      const currentY = doc.lastAutoTable.finalY + 15;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(15, 23, 42);
+      doc.text("Estimated Market Value", 14, currentY);
+
+      doc.setFontSize(28);
+      doc.setTextColor(16, 185, 129); // emerald-500
+      doc.text(`LKR ${formattedPrice}`, 14, currentY + 12);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.setFont("helvetica", "italic");
+      doc.text("* Prediction accuracy is approximately ±5%", 14, currentY + 20);
+
+      // 6. Loan Options Table
+      autoTable(doc, {
+        startY: currentY + 30,
+        theme: 'striped',
+        headStyles: { fillColor: [15, 23, 42] }, // slate-900
+        head: [['Loan Duration', 'Interest Rate', 'Monthly Payment', 'Total Amount']],
+        body: loanPlans.map(p => [
+          `${p.years} Years${p.recommended ? ' (Recommended)' : ''}`,
+          p.interest,
+          `LKR ${p.monthly}`,
+          `LKR ${p.total}`
+        ]),
+      });
+
+      // 7. Footer
+      const totalPages = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184); // slate-400
+        doc.text(
+          "© 2026 AutoValueLK. All rights reserved. This report is machine-generated.",
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
+      }
+
+      // Download PDF
+      doc.save(`AutoValueLK_${vehicle?.brand || 'Report'}_${vehicle?.model || ''}.pdf`);
+
+    } catch (err) {
+      console.error("PDF generation failed", err);
+      alert("Failed to generate PDF report.");
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleSetAlert = () => {

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import logo from '../../assets/logo/autovaluelk-logo.png';
 
 /**
  * AdminLogin — email + password form with JWT authentication.
@@ -53,13 +54,9 @@ function AdminLogin() {
 
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 mb-5 shadow-lg shadow-blue-500/25 animate-[pulse-soft_2s_ease-in-out_infinite]">
-                        <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                        </svg>
-                    </div>
+                    <img src={logo} alt="AutoValueLK" className="h-10 object-contain mb-5 mx-auto animate-[pulse-soft_2s_ease-in-out_infinite]" />
                     <h1 className="text-2xl font-bold text-white mb-1">Admin Login</h1>
-                    <p className="text-gray-500 text-sm">CarPrice AI Control Panel</p>
+                    <p className="text-gray-500 text-sm">AutoValueLK Control Panel</p>
                 </div>
 
                 {/* Form */}
@@ -168,7 +165,7 @@ function AdminLogin() {
 
                 {/* Footer */}
                 <p className="text-center mt-6 text-gray-600 text-xs">
-                    © 2026 CarPrice AI. Admin Access Only.
+                    © 2026 AutoValueLK. Admin Access Only.
                 </p>
             </div>
         </div>

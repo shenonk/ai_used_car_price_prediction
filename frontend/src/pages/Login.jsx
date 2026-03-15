@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { login } from "../utils/auth"
+import logo from "../assets/logo/autovaluelk-logo.png"
 
 function Login() {
   const navigate = useNavigate()
@@ -52,16 +53,12 @@ function Login() {
 
         {/* Logo & Branding */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-500 mb-6 shadow-lg shadow-blue-500/30 animate-pulse-glow">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17h8M8 17v-4m8 4v-4m-8 0h8m-8 0l-2-4h12l-2 4M6 13l-2-4h16l-2 4" />
-            </svg>
-          </div>
+          <img src={logo} alt="AutoValueLK" className="h-12 object-contain mb-6 mx-auto animate-pulse-glow" />
           <h1 className="text-3xl font-bold text-white mb-2">
-            Welcome to <span className="gradient-text">CarPrice AI</span>
+            Welcome to <span className="gradient-text">AutoValueLK</span>
           </h1>
           <p className="text-slate-400">
-            Sri Lanka's #1 AI-powered car price prediction system
+            AI-Powered Vehicle Price Prediction for Sri Lanka
           </p>
         </div>
 
@@ -222,7 +219,7 @@ function Login() {
             Secured with 256-bit encryption
           </p>
           <p className="text-slate-600 text-xs">
-            © 2026 CarPrice AI. All rights reserved.
+            © 2026 AutoValueLK. All rights reserved.
           </p>
         </div>
 

@@ -59,8 +59,8 @@ function Dashboard() {
   return (
     <div className="min-h-screen bg-[#0f172a] p-8">
       <div className="mb-8 animate-fade-in">
-        <h1 className="text-3xl font-bold text-white mb-2">Welcome to <span className="gradient-text">CarPrice AI</span></h1>
-        <p className="text-slate-400">Sri Lankan market intelligence dashboard • Real-time analytics</p>
+        <h1 className="text-3xl font-bold text-white mb-2">Welcome to <span className="gradient-text">AutoValueLK</span></h1>
+        <p className="text-slate-400">AI-Powered Vehicle Price Prediction for Sri Lanka</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

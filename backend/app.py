@@ -1,43 +1,25 @@
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import jwt
-import datetime
 from functools import wraps
+from supabase import create_client, Client
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Allow frontend at localhost:5173 to call this API
+CORS(app)
 
 # ============================================
-# JWT CONFIG
+# SUPABASE CONFIG
 # ============================================
-JWT_SECRET = 'carprice-ai-admin-secret-key-2026'
-
-# Admin credentials (email: admin@gmail.com, password: admin1234)
-ADMIN_EMAIL = 'admin@gmail.com'
-ADMIN_PASSWORD = 'admin1234'
+url: str = os.environ.get("SUPABASE_URL", "")
+key: str = os.environ.get("SUPABASE_KEY", "")
+supabase: Client = create_client(url, key)
 
 # ============================================
-# IN-MEMORY DATA STORES
-# ============================================
-# Prediction counter
-prediction_count = 0
-
-# Loan rate config
-loan_rate = {
-    "interest_rate": 12.5,
-    "min_down_payment": 20,
-    "max_duration": 60
-}
-
-# Notifications list
-notifications = [
-    {"id": 1, "title": "System Online", "message": "CarPrice AI system is running.", "active": True, "created_at": "2026-03-01"},
-]
-next_notification_id = 2
-
-
-# ============================================
-# JWT HELPER — verify token from Authorization header
+# AUTH HELPER — verify Supabase session token
 # ============================================
 def token_required(f):
     @wraps(f)
@@ -49,12 +31,15 @@ def token_required(f):
                 token = auth_header.split(' ')[1]
         if not token:
             return jsonify({"error": "Token is missing"}), 401
+        
         try:
-            jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
-        except jwt.ExpiredSignatureError:
-            return jsonify({"error": "Token has expired"}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({"error": "Invalid token"}), 401
+            # Verify the token via Supabase
+            user = supabase.auth.get_user(token)
+            if not user:
+                return jsonify({"error": "Invalid or expired token"}), 401
+        except Exception as e:
+            return jsonify({"error": str(e)}), 401
+            
         return f(*args, **kwargs)
     return decorated
 
@@ -63,11 +48,6 @@ def token_required(f):
 # PRICE PREDICTION
 # ============================================
 def predict_price(brand, model, year, engine, mileage):
-    """
-    Mock AI prediction model.
-    Uses brand base prices, year depreciation, engine size, and mileage
-    to generate a realistic predicted price in LKR.
-    """
     brand_prices = {
         "toyota": 5200000, "honda": 5500000, "nissan": 4800000,
         "suzuki": 3500000, "mitsubishi": 4500000, "bmw": 8500000,
@@ -107,7 +87,6 @@ def predict_price(brand, model, year, engine, mileage):
 
 @app.route("/api/predict", methods=["POST"])
 def predict():
-    global prediction_count
     try:
         data = request.get_json()
         if not data:
@@ -123,7 +102,16 @@ def predict():
             return jsonify({"error": "Brand and model are required"}), 400
 
         predicted_price = predict_price(brand, model, int(year), int(engine), int(mileage))
-        prediction_count += 1
+        
+        # Save prediction to Supabase
+        supabase.table("predictions").insert({
+            "brand": brand,
+            "model": model,
+            "year": int(year),
+            "engine": int(engine),
+            "mileage": int(mileage),
+            "predicted_price": predicted_price
+        }).execute()
 
         return jsonify({"predicted_price": predicted_price})
 
@@ -133,7 +121,7 @@ def predict():
 
 @app.route("/api/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "message": "CarPrice AI Backend is running"})
+    return jsonify({"status": "ok", "message": "CarPrice AI Backend is running with Supabase"})
 
 
 # ============================================
@@ -150,36 +138,52 @@ def admin_login():
     email = data.get("email", "").strip().lower()
     password = data.get("password", "")
 
-    if email != ADMIN_EMAIL or password != ADMIN_PASSWORD:
-        return jsonify({"error": "Invalid email or password."}), 401
-
-    # Generate JWT token (expires in 24 hours)
-    token = jwt.encode({
-        "email": email,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=24)
-    }, JWT_SECRET, algorithm="HS256")
-
-    return jsonify({"token": token, "message": "Login successful"})
+    try:
+        # Perform Supabase Admin Login
+        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        if res.user:
+            return jsonify({"token": res.session.access_token, "message": "Admin login successful"})
+        else:
+            return jsonify({"error": "Invalid email or password."}), 401
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
 
 
 # --- Dashboard Stats ---
 @app.route("/api/admin/stats", methods=["GET"])
 @token_required
 def admin_stats():
-    return jsonify({
-        "total_predictions": prediction_count,
-        "r2_score": 0.9234,
-        "mae": 285000,
-        "last_training_date": "2026-02-28",
-        "active_loan_rate": loan_rate["interest_rate"]
-    })
+    try:
+        # Fetch stats from Supabase
+        pred_res = supabase.table("predictions").select("id", count="exact").execute()
+        total_predictions = pred_res.count if pred_res.count is not None else 0
+        
+        loan_res = supabase.table("loan_rates").select("interest_rate").order("created_at", desc=True).limit(1).execute()
+        current_rate = loan_res.data[0]["interest_rate"] if loan_res.data else 12.5
+
+        return jsonify({
+            "total_predictions": total_predictions,
+            "r2_score": 0.9234,
+            "mae": 285000,
+            "last_training_date": "2026-02-28",
+            "active_loan_rate": current_rate
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # --- Loan Rate: Get ---
 @app.route("/api/admin/loan-rate", methods=["GET"])
 @token_required
 def get_loan_rate():
-    return jsonify(loan_rate)
+    try:
+        res = supabase.table("loan_rates").select("*").order("created_at", desc=True).limit(1).execute()
+        if res.data:
+            return jsonify(res.data[0])
+        else:
+            return jsonify({"interest_rate": 12.5, "min_down_payment": 20, "max_duration": 60})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # --- Loan Rate: Update ---
@@ -190,52 +194,60 @@ def update_loan_rate():
     if not data:
         return jsonify({"error": "No data provided"}), 400
 
-    loan_rate["interest_rate"] = data.get("interest_rate", loan_rate["interest_rate"])
-    loan_rate["min_down_payment"] = data.get("min_down_payment", loan_rate["min_down_payment"])
-    loan_rate["max_duration"] = data.get("max_duration", loan_rate["max_duration"])
+    new_rate = {
+        "interest_rate": data.get("interest_rate"),
+        "min_down_payment": data.get("min_down_payment"),
+        "max_duration": data.get("max_duration")
+    }
 
-    return jsonify({"message": "Loan rate updated successfully", **loan_rate})
+    try:
+        supabase.table("loan_rates").insert(new_rate).execute()
+        return jsonify({"message": "Loan rate updated successfully", **new_rate})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # --- Notifications: List ---
 @app.route("/api/admin/notifications", methods=["GET"])
 @token_required
 def get_notifications():
-    return jsonify({"notifications": notifications})
+    try:
+        res = supabase.table("notifications").select("*").order("created_at", desc=True).execute()
+        return jsonify({"notifications": res.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # --- Notifications: Create ---
 @app.route("/api/admin/create-notification", methods=["POST"])
 @token_required
 def create_notification():
-    global next_notification_id
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided"}), 400
 
     notif = {
-        "id": next_notification_id,
         "title": data.get("title", ""),
         "message": data.get("message", ""),
-        "active": data.get("active", True),
-        "created_at": datetime.datetime.utcnow().strftime("%Y-%m-%d")
+        "active": data.get("active", True)
     }
-    next_notification_id += 1
-    notifications.append(notif)
-
-    return jsonify({"message": "Notification created", "notification": notif}), 201
+    
+    try:
+        res = supabase.table("notifications").insert(notif).execute()
+        return jsonify({"message": "Notification created", "notification": res.data[0]}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # --- Notifications: Delete ---
 @app.route("/api/admin/delete-notification/<int:notif_id>", methods=["DELETE"])
 @token_required
 def delete_notification(notif_id):
-    global notifications
-    original_len = len(notifications)
-    notifications = [n for n in notifications if n["id"] != notif_id]
-    if len(notifications) == original_len:
-        return jsonify({"error": "Notification not found"}), 404
-    return jsonify({"message": "Notification deleted"})
+    try:
+        supabase.table("notifications").delete().eq("id", notif_id).execute()
+        return jsonify({"message": "Notification deleted"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ============================================
@@ -243,8 +255,7 @@ def delete_notification(notif_id):
 # ============================================
 if __name__ == "__main__":
     print("=" * 50)
-    print("  CarPrice AI Backend Server")
+    print("  CarPrice AI Backend Server (Supabase version)")
     print("  Running at http://localhost:5000")
-    print("  Admin: admin@gmail.com / admin1234")
     print("=" * 50)
     app.run(debug=True, port=5000)

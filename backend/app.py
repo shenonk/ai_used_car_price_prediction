@@ -4,6 +4,8 @@ from flask_cors import CORS
 from functools import wraps
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import psycopg2
+from decimal import Decimal
 
 # Load environment variables
 load_dotenv()
@@ -35,6 +37,56 @@ except Exception as e:
     print(f"\nFailed to initialize Supabase client: {e}")
     # We continue to let Flask start, but API calls will fail until fixed
     supabase = None
+
+# ============================================
+# DIRECT POSTGRESQL CONNECTION (bypasses PostgREST)
+# ============================================
+db_password = os.environ.get("SUPABASE_DB_PASSWORD", "")
+# Extract project ref from URL (e.g. "bwsxujswqbfifsjizxrb" from "https://bwsxujswqbfifsjizxrb.supabase.co")
+project_ref = url.replace("https://", "").split(".")[0] if url else ""
+DB_HOST = f"db.{project_ref}.supabase.co"
+DB_PORT = 5432
+DB_NAME = "postgres"
+DB_USER = "postgres"
+
+def get_db_connection():
+    """Get a direct PostgreSQL connection to the Supabase database."""
+    return psycopg2.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=db_password,
+        sslmode="require",
+        connect_timeout=5
+    )
+
+def save_prediction_to_db(brand, model, year, engine, mileage, predicted_price):
+    """Save a prediction directly to the PostgreSQL database."""
+    if not db_password or db_password == "your_database_password_here":
+        print("[WARN] SUPABASE_DB_PASSWORD not set in .env - skipping DB save", flush=True)
+        return False
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            """INSERT INTO predictions (brand, model, year, engine, mileage, predicted_price)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (brand, model, int(year), int(engine), int(mileage), Decimal(str(predicted_price)))
+        )
+        conn.commit()
+        cur.close()
+        print(f"[OK] Prediction saved: {brand} {model} {year} - LKR {predicted_price:,}", flush=True)
+        return True
+    except Exception as e:
+        print(f"[FAIL] DB save error: {e}", flush=True)
+        return False
+    finally:
+        if conn:
+            conn.close()
+
 
 # ============================================
 # AUTH HELPER — verify Supabase session token
@@ -121,19 +173,8 @@ def predict():
 
         predicted_price = predict_price(brand, model, int(year), int(engine), int(mileage))
         
-        # Save prediction to Supabase
-        try:
-            supabase.table("predictions").insert({
-                "brand": brand,
-                "model": model,
-                "year": int(year),
-                "engine": int(engine),
-                "mileage": int(mileage),
-                "predicted_price": predicted_price
-            }).execute()
-        except Exception as db_err:
-            print(f"Warning: Failed to log prediction to Supabase: {db_err}")
-            # We don't return 500 here because the prediction itself is successful
+        # Save prediction to database (direct PostgreSQL connection)
+        save_prediction_to_db(brand, model, int(year), int(engine), int(mileage), predicted_price)
 
         return jsonify({"predicted_price": predicted_price})
 

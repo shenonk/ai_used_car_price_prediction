@@ -46,7 +46,7 @@ function ForgotPassword() {
         setIsLoading(true)
         await new Promise(resolve => setTimeout(resolve, 1000))
 
-        const result = resetPassword(email, newPassword)
+        const result = await resetPassword(email, newPassword)
         setIsLoading(false)
 
         if (result.success) {

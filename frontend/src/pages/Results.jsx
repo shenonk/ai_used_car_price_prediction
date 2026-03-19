@@ -47,7 +47,7 @@ function Results() {
 
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      const userEmail = getCurrentUser() || "Guest User";
+      const userEmail = (await getCurrentUser()) || "Guest User";
 
       // 1. Draw Logo
       // Try to load the image. Adjust logo dimensions based on the aspect ratio (roughly square now).

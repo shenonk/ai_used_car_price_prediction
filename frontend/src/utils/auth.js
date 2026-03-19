@@ -1,64 +1,63 @@
-// Auth utility — localStorage-based authentication
-// Default admin: admin@gmail.com / 1234
+import { supabase } from './supabaseClient';
 
-const USERS_KEY = 'carpriceai_users';
-const SESSION_KEY = 'carpriceai_session';
+// Auth utility — Supabase-based authentication
 
-// Initialize default admin account if none exist
-function initDefaults() {
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    if (users.length === 0) {
-        users.push({ email: 'admin@gmail.com', password: '1234' });
-        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+export async function register(email, password) {
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+    });
+
+    if (error) {
+        return { success: false, error: error.message };
     }
+    return { success: true, user: data.user };
 }
 
-export function register(email, password) {
-    initDefaults();
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const exists = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (exists) {
-        return { success: false, error: 'An account with this email already exists.' };
+export async function login(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+    });
+
+    if (error) {
+        return { success: false, error: error.message };
     }
-    users.push({ email, password });
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    return { success: true, user: data.user, session: data.session };
+}
+
+export async function logout() {
+    await supabase.auth.signOut();
+}
+
+export async function isLoggedIn() {
+    const { data: { session } } = await supabase.auth.getSession();
+    return !!session;
+}
+
+export async function getCurrentUser() {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user ? user.email : null;
+}
+
+export async function resetPassword(email) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + '/reset-password',
+    });
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
     return { success: true };
 }
 
-export function login(email, password) {
-    initDefaults();
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const user = users.find(
-        u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (!user) {
-        return { success: false, error: 'Invalid email or password.' };
+export async function updatePassword(newPassword) {
+    const { error } = await supabase.auth.updateUser({
+        password: newPassword
+    });
+
+    if (error) {
+        return { success: false, error: error.message };
     }
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ email: user.email, loggedInAt: Date.now() }));
-    return { success: true };
-}
-
-export function logout() {
-    localStorage.removeItem(SESSION_KEY);
-}
-
-export function isLoggedIn() {
-    return !!localStorage.getItem(SESSION_KEY);
-}
-
-export function getCurrentUser() {
-    const session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-    return session ? session.email : null;
-}
-
-export function resetPassword(email, newPassword) {
-    initDefaults();
-    const users = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const userIndex = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-    if (userIndex === -1) {
-        return { success: false, error: 'No account found with this email.' };
-    }
-    users[userIndex].password = newPassword;
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
     return { success: true };
 }

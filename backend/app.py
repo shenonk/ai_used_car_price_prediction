@@ -16,7 +16,25 @@ CORS(app)
 # ============================================
 url: str = os.environ.get("SUPABASE_URL", "")
 key: str = os.environ.get("SUPABASE_KEY", "")
-supabase: Client = create_client(url, key)
+
+if not url or url == "your_supabase_url_here":
+    print("\n" + "!"*50)
+    print("  CRITICAL ERROR: SUPABASE_URL is missing or placeholder!")
+    print("  Please update backend/.env with your real Supabase URL.")
+    print("!"*50 + "\n")
+
+if not key or key == "your_supabase_service_role_key_here":
+    print("\n" + "!"*50)
+    print("  CRITICAL ERROR: SUPABASE_KEY is missing or placeholder!")
+    print("  Please update backend/.env with your real Supabase Service Role Key.")
+    print("!"*50 + "\n")
+
+try:
+    supabase: Client = create_client(url, key)
+except Exception as e:
+    print(f"\nFailed to initialize Supabase client: {e}")
+    # We continue to let Flask start, but API calls will fail until fixed
+    supabase = None
 
 # ============================================
 # AUTH HELPER — verify Supabase session token
@@ -104,14 +122,18 @@ def predict():
         predicted_price = predict_price(brand, model, int(year), int(engine), int(mileage))
         
         # Save prediction to Supabase
-        supabase.table("predictions").insert({
-            "brand": brand,
-            "model": model,
-            "year": int(year),
-            "engine": int(engine),
-            "mileage": int(mileage),
-            "predicted_price": predicted_price
-        }).execute()
+        try:
+            supabase.table("predictions").insert({
+                "brand": brand,
+                "model": model,
+                "year": int(year),
+                "engine": int(engine),
+                "mileage": int(mileage),
+                "predicted_price": predicted_price
+            }).execute()
+        except Exception as db_err:
+            print(f"Warning: Failed to log prediction to Supabase: {db_err}")
+            # We don't return 500 here because the prediction itself is successful
 
         return jsonify({"predicted_price": predicted_price})
 

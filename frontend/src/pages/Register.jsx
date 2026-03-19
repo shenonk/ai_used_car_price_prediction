@@ -28,7 +28,7 @@ function Register() {
         setIsLoading(true)
         await new Promise(resolve => setTimeout(resolve, 1000))
 
-        const result = register(email, password)
+        const result = await register(email, password)
         setIsLoading(false)
 
         if (result.success) {

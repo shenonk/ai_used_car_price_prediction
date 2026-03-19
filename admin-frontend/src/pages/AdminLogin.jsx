@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-import logo from '../../assets/logo/autovaluelk-logo.png';
+import logo from '../assets/logo/autovaluelk-logo.png';
 
 /**
  * AdminLogin — email + password form with JWT authentication.

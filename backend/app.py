@@ -230,59 +230,14 @@ def admin_login():
     password = data.get("password", "")
 
     try:
-        # Step 1: Authenticate via Supabase Auth
+        # Perform Supabase Admin Login
         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-        if not res.user:
+        if res.user:
+            return jsonify({"token": res.session.access_token, "message": "Admin login successful"})
+        else:
             return jsonify({"error": "Invalid email or password."}), 401
-
-        # Step 2: Verify admin role in admin_users table
-        admin = get_admin_by_email(email)
-        if not admin:
-            return jsonify({"error": "Access denied. You are not registered as an admin."}), 403
-
-        if admin["role"] != "admin":
-            return jsonify({"error": "Access denied. Insufficient permissions."}), 403
-
-        print(f"[OK] Admin login: {email} ({admin['full_name']})", flush=True)
-        return jsonify({
-            "token": res.session.access_token,
-            "message": "Admin login successful",
-            "admin": {
-                "email": admin["email"],
-                "full_name": admin["full_name"],
-                "role": admin["role"]
-            }
-        })
     except Exception as e:
         return jsonify({"error": str(e)}), 401
-
-
-# --- Admin Profile ---
-@app.route("/api/admin/profile", methods=["GET"])
-@token_required
-def admin_profile():
-    """Return the logged-in admin's details from admin_users table."""
-    try:
-        # Extract email from the Supabase token
-        token = request.headers['Authorization'].split(' ')[1]
-        user = supabase.auth.get_user(token)
-        if not user or not user.user:
-            return jsonify({"error": "Invalid token"}), 401
-
-        email = user.user.email
-        admin = get_admin_by_email(email)
-        if not admin:
-            return jsonify({"error": "Admin profile not found"}), 404
-
-        return jsonify({
-            "id": admin["id"],
-            "email": admin["email"],
-            "full_name": admin["full_name"],
-            "role": admin["role"],
-            "created_at": admin["created_at"]
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 # --- Dashboard Stats ---

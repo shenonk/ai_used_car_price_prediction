@@ -87,6 +87,34 @@ def save_prediction_to_db(brand, model, year, engine, mileage, predicted_price):
         if conn:
             conn.close()
 
+def get_admin_by_email(email):
+    """Look up an admin user by email from the admin_users table."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, email, full_name, role, created_at FROM admin_users WHERE email = %s",
+            (email.lower().strip(),)
+        )
+        row = cur.fetchone()
+        cur.close()
+        if row:
+            return {
+                "id": row[0],
+                "email": row[1],
+                "full_name": row[2],
+                "role": row[3],
+                "created_at": str(row[4])
+            }
+        return None
+    except Exception as e:
+        print(f"[FAIL] Admin lookup error: {e}", flush=True)
+        return None
+    finally:
+        if conn:
+            conn.close()
+
 
 # ============================================
 # AUTH HELPER — verify Supabase session token
@@ -202,14 +230,59 @@ def admin_login():
     password = data.get("password", "")
 
     try:
-        # Perform Supabase Admin Login
+        # Step 1: Authenticate via Supabase Auth
         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-        if res.user:
-            return jsonify({"token": res.session.access_token, "message": "Admin login successful"})
-        else:
+        if not res.user:
             return jsonify({"error": "Invalid email or password."}), 401
+
+        # Step 2: Verify admin role in admin_users table
+        admin = get_admin_by_email(email)
+        if not admin:
+            return jsonify({"error": "Access denied. You are not registered as an admin."}), 403
+
+        if admin["role"] != "admin":
+            return jsonify({"error": "Access denied. Insufficient permissions."}), 403
+
+        print(f"[OK] Admin login: {email} ({admin['full_name']})", flush=True)
+        return jsonify({
+            "token": res.session.access_token,
+            "message": "Admin login successful",
+            "admin": {
+                "email": admin["email"],
+                "full_name": admin["full_name"],
+                "role": admin["role"]
+            }
+        })
     except Exception as e:
         return jsonify({"error": str(e)}), 401
+
+
+# --- Admin Profile ---
+@app.route("/api/admin/profile", methods=["GET"])
+@token_required
+def admin_profile():
+    """Return the logged-in admin's details from admin_users table."""
+    try:
+        # Extract email from the Supabase token
+        token = request.headers['Authorization'].split(' ')[1]
+        user = supabase.auth.get_user(token)
+        if not user or not user.user:
+            return jsonify({"error": "Invalid token"}), 401
+
+        email = user.user.email
+        admin = get_admin_by_email(email)
+        if not admin:
+            return jsonify({"error": "Admin profile not found"}), 404
+
+        return jsonify({
+            "id": admin["id"],
+            "email": admin["email"],
+            "full_name": admin["full_name"],
+            "role": admin["role"],
+            "created_at": admin["created_at"]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # --- Dashboard Stats ---

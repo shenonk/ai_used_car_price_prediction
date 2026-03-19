@@ -1,6 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import logo from '../../assets/logo/autovaluelk-logo.png';
+import logo from '../assets/logo/autovaluelk-logo.png';
 
 /**
  * Sidebar — Admin navigation with responsive mobile menu.

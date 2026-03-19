@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { isLoggedIn, logout, getCurrentUser } from "../utils/auth";
 import logo from "../assets/logo/autovaluelk-logo.png";
@@ -5,8 +6,20 @@ import logo from "../assets/logo/autovaluelk-logo.png";
 function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const loggedIn = isLoggedIn();
-  const userEmail = getCurrentUser();
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [userEmail, setUserEmail] = useState(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const isLogged = await isLoggedIn();
+      setLoggedIn(isLogged);
+      if (isLogged) {
+        const email = await getCurrentUser();
+        setUserEmail(email);
+      }
+    };
+    checkAuth();
+  }, [location.pathname]); // Re-check on navigation
 
   const navItems = [
     {

@@ -17,7 +17,7 @@ function Login() {
     setIsLoading(true)
     await new Promise(resolve => setTimeout(resolve, 1000))
 
-    const result = login(email, password)
+    const result = await login(email, password)
     setIsLoading(false)
 
     if (result.success) {

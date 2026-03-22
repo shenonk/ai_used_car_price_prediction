@@ -341,6 +341,37 @@ def delete_notification(notif_id):
         return jsonify({"error": str(e)}), 500
 
 
+# --- Notifications: Update ---
+@app.route("/api/admin/update-notification/<int:notif_id>", methods=["PUT"])
+@token_required
+def update_notification(notif_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    notif = {
+        "title": data.get("title", ""),
+        "message": data.get("message", ""),
+        "active": data.get("active", True)
+    }
+    
+    try:
+        res = supabase.table("notifications").update(notif).eq("id", notif_id).execute()
+        return jsonify({"message": "Notification updated", "notification": res.data[0] if res.data else None})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# --- Public Notifications: List ---
+@app.route("/api/notifications", methods=["GET"])
+def get_public_notifications():
+    try:
+        res = supabase.table("notifications").select("*").eq("active", True).order("created_at", desc=True).execute()
+        return jsonify({"notifications": res.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ============================================
 # RUN SERVER
 # ============================================

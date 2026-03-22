@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 
 /**
- * Notifications — Create, view, and delete admin notifications.
+ * Notifications — Create, view, update and delete admin notifications.
  * GET    /api/admin/notifications
  * POST   /api/admin/create-notification
+ * PUT    /api/admin/update-notification/:id
  * DELETE /api/admin/delete-notification/:id
  */
 function Notifications() {
@@ -18,6 +19,9 @@ function Notifications() {
     const [title, setTitle] = useState('');
     const [message, setMessage] = useState('');
     const [active, setActive] = useState(true);
+    
+    // Edit state
+    const [editingId, setEditingId] = useState(null);
 
     useEffect(() => {
         fetchNotifications();
@@ -40,25 +44,45 @@ function Notifications() {
         }
     };
 
-    const handleCreate = async (e) => {
+    const handleCreateOrUpdate = async (e) => {
         e.preventDefault();
         setError('');
         setSuccess('');
         setSaving(true);
 
         try {
-            await api.post('/api/admin/create-notification', { title, message, active });
-            setSuccess('Notification created successfully!');
+            if (editingId) {
+                await api.put(`/api/admin/update-notification/${editingId}`, { title, message, active });
+                setSuccess('Notification updated successfully!');
+            } else {
+                await api.post('/api/admin/create-notification', { title, message, active });
+                setSuccess('Notification created successfully!');
+            }
             setTitle('');
             setMessage('');
             setActive(true);
+            setEditingId(null);
             fetchNotifications();
         } catch (err) {
-            setError(err.response?.data?.error || 'Failed to create notification.');
+            setError(err.response?.data?.error || (editingId ? 'Failed to update notification.' : 'Failed to create notification.'));
         } finally {
             setSaving(false);
             setTimeout(() => setSuccess(''), 4000);
         }
+    };
+
+    const handleEdit = (notification) => {
+        setEditingId(notification.id);
+        setTitle(notification.title);
+        setMessage(notification.message);
+        setActive(notification.active);
+    };
+    
+    const handleCancelEdit = () => {
+        setEditingId(null);
+        setTitle('');
+        setMessage('');
+        setActive(true);
     };
 
     const handleDelete = async (id) => {
@@ -68,6 +92,7 @@ function Notifications() {
             await api.delete(`/api/admin/delete-notification/${id}`);
             setNotifications(notifications.filter((n) => n.id !== id));
             setSuccess('Notification deleted.');
+            if (editingId === id) handleCancelEdit();
             setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to delete notification.');
@@ -113,16 +138,22 @@ function Notifications() {
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
-                {/* Create Form */}
+                {/* Create/Edit Form */}
                 <div className="xl:col-span-1 bg-gray-900/60 border border-gray-800 rounded-2xl p-6 h-fit">
                     <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Create Notification
+                        {editingId ? (
+                            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                        ) : (
+                            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v16m8-8H4" />
+                            </svg>
+                        )}
+                        {editingId ? 'Edit Notification' : 'Create Notification'}
                     </h2>
 
-                    <form onSubmit={handleCreate} className="space-y-4">
+                    <form onSubmit={handleCreateOrUpdate} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-400 mb-2">Title</label>
                             <input
@@ -164,32 +195,52 @@ function Notifications() {
                             </button>
                         </div>
 
-                        <button
-                            type="submit"
-                            disabled={saving}
-                            className="w-full py-3 rounded-xl font-semibold text-white text-sm
-                bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg shadow-blue-500/25
-                hover:shadow-blue-500/40 hover:-translate-y-0.5
-                disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0
-                transition-all duration-200 flex items-center justify-center gap-2"
-                        >
-                            {saving ? (
-                                <>
-                                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                    </svg>
-                                    Creating...
-                                </>
-                            ) : (
-                                <>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                    Create Notification
-                                </>
+                        <div className="pt-2 flex flex-col gap-2">
+                            <button
+                                type="submit"
+                                disabled={saving}
+                                className={`w-full py-3 rounded-xl font-semibold text-white text-sm
+                    shadow-lg transition-all duration-200 flex items-center justify-center gap-2
+                    disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 ${
+                        editingId ? 'bg-gradient-to-r from-amber-500 to-amber-600 shadow-amber-500/25 hover:shadow-amber-500/40 hover:-translate-y-0.5' 
+                        : 'bg-gradient-to-r from-blue-500 to-blue-600 shadow-blue-500/25 hover:shadow-blue-500/40 hover:-translate-y-0.5'
+                    }`}
+                            >
+                                {saving ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        {editingId ? (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                        )}
+                                        {editingId ? 'Update Notification' : 'Create Notification'}
+                                    </>
+                                )}
+                            </button>
+                            {editingId && (
+                                <button
+                                    type="button"
+                                    disabled={saving}
+                                    onClick={handleCancelEdit}
+                                    className="w-full py-3 rounded-xl font-semibold text-gray-300 text-sm
+                        bg-gray-800 hover:bg-gray-700 transition-colors duration-200"
+                                >
+                                    Cancel
+                                </button>
                             )}
-                        </button>
+                        </div>
                     </form>
                 </div>
 
@@ -236,10 +287,20 @@ function Notifications() {
                                                     {n.active ? 'Active' : 'Inactive'}
                                                 </span>
                                             </td>
-                                            <td className="py-3.5 px-4 text-right">
+                                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                                <button
+                                                    onClick={() => handleEdit(n)}
+                                                    className="text-gray-500 hover:text-amber-400 transition-colors p-1.5 rounded-lg hover:bg-amber-500/10 mr-1"
+                                                    title="Edit"
+                                                >
+                                                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                    </svg>
+                                                </button>
                                                 <button
                                                     onClick={() => handleDelete(n.id)}
                                                     className="text-gray-500 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-500/10"
+                                                    title="Delete"
                                                 >
                                                     <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

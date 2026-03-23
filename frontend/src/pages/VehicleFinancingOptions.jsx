@@ -502,13 +502,15 @@ function VehicleFinancingOptions() {
                         <tbody>
                             {filteredInstitutions.map((inst) => {
                                 const instMonthlyRate = inst.interestRate / 100 / 12;
-                                const instLoan = predictedPrice * (1 - inst.minDownPayment / 100);
+                                const actualDownPayment = Math.max(downPaymentPercent, inst.minDownPayment);
+                                const instLoan = predictedPrice * (1 - actualDownPayment / 100);
+                                const actualTenure = Math.min(tenure, inst.maxTenure);
                                 const instEmi = inst.category === "Draft"
                                     ? Math.round((instLoan * (inst.interestRate / 100)) / 12)
                                     : Math.round(
-                                    (instLoan * instMonthlyRate * Math.pow(1 + instMonthlyRate, 36)) /
-                                    (Math.pow(1 + instMonthlyRate, 36) - 1)
-                                );
+                                        (instLoan * instMonthlyRate * Math.pow(1 + instMonthlyRate, actualTenure)) /
+                                        (Math.pow(1 + instMonthlyRate, actualTenure) - 1)
+                                    );
                                 const colors = colorMap[inst.color];
                                 const isSelected = selectedInstitution?.id === inst.id;
 
@@ -536,7 +538,7 @@ function VehicleFinancingOptions() {
                                         <td className="text-slate-300">{inst.minDownPayment}%</td>
                                         <td>
                                             <span className="font-semibold text-white">LKR {instEmi.toLocaleString("en-LK")}</span>
-                                            <p className="text-xs text-slate-500">for 36 months</p>
+                                            <p className="text-xs text-slate-500">for {actualTenure} months</p>
                                         </td>
                                     </tr>
                                 );
@@ -545,7 +547,7 @@ function VehicleFinancingOptions() {
                     </table>
                 </div>
                 <p className="text-xs text-slate-600 mt-4">
-                    * Estimated monthly payment based on minimum down payment and 36-month tenure. Actual rates may vary.
+                    * Estimated monthly payment based on down payment ({downPaymentPercent}%) and tenure ({tenure} months), adjusted for institution limits.
                 </p>
             </div>
 

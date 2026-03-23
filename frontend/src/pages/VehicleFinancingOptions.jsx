@@ -71,7 +71,7 @@ const institutions = [
         type: "Auto Draft",
         category: "Draft",
         interestRate: 21.0,
-        maxTenure: 60,
+        maxTenure: 12,
         minDownPayment: 10,
         logo: "💸",
         color: "amber",
@@ -82,7 +82,7 @@ const institutions = [
         type: "Power Draft",
         category: "Draft",
         interestRate: 19.5,
-        maxTenure: 60,
+        maxTenure: 12,
         minDownPayment: 10,
         logo: "💸",
         color: "rose",
@@ -93,7 +93,7 @@ const institutions = [
         type: "Turbo-Draft",
         category: "Draft",
         interestRate: 16.5,
-        maxTenure: 60,
+        maxTenure: 12,
         minDownPayment: 10,
         logo: "💸",
         color: "emerald",
@@ -104,7 +104,7 @@ const institutions = [
         type: "Smart Draft",
         category: "Draft",
         interestRate: 18.0,
-        maxTenure: 60,
+        maxTenure: 12,
         minDownPayment: 10,
         logo: "💸",
         color: "blue",
@@ -115,7 +115,7 @@ const institutions = [
         type: "Quick Draft",
         category: "Draft",
         interestRate: 20.5,
-        maxTenure: 60,
+        maxTenure: 12,
         minDownPayment: 10,
         logo: "💸",
         color: "cyan",
@@ -471,6 +471,12 @@ function VehicleFinancingOptions() {
                         </div>
                         <span className="text-lg font-bold text-blue-400">LKR {totalInterest.toLocaleString("en-LK")}</span>
                     </div>
+
+                    {financingType === "draft" && (
+                        <p className="text-xs text-slate-400 mt-4 text-center">
+                            (facility can be renewed for another 12 months)
+                        </p>
+                    )}
                 </div>
             )}
 

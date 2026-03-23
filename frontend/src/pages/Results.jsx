@@ -294,9 +294,17 @@ function Results() {
       {/* BUTTONS */}
       <div className="flex flex-col sm:flex-row gap-4 mt-6 animate-fade-in animate-delay-400">
         <button
+          onClick={() => navigate('/financing', { state: { vehicle, predictedPrice } })}
+          className="flex-1 btn-primary py-4 flex items-center justify-center gap-2 rounded-xl font-semibold shadow-lg shadow-blue-500/20"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          View Financing Options
+        </button>
+
+        <button
           onClick={handleDownloadPDF}
           disabled={downloading}
-          className="flex-1 btn-primary py-4 flex items-center justify-center gap-2 disabled:opacity-70"
+          className="flex-1 py-4 flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-300 btn-secondary disabled:opacity-70"
         >
           {downloading ? (
             <>
@@ -314,7 +322,7 @@ function Results() {
         <button
           onClick={handleSetAlert}
           disabled={alertSet}
-          className={`flex-1 py-4 flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-300 ${alertSet ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400' : 'btn-secondary bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30'}`}
+          className={`flex-1 py-4 flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-300 ${alertSet ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400' : 'bg-amber-500/20 border border-amber-500/50 text-amber-400 hover:bg-amber-500/30'}`}
         >
           {alertSet ? (
             <>

@@ -65,6 +65,61 @@ const institutions = [
         logo: "🏦",
         color: "purple",
     },
+    {
+        id: 7,
+        name: "Vallibel Finance",
+        type: "Auto Draft",
+        category: "Draft",
+        interestRate: 21.0,
+        maxTenure: 60,
+        minDownPayment: 10,
+        logo: "💸",
+        color: "amber",
+    },
+    {
+        id: 8,
+        name: "LB Finance",
+        type: "Power Draft",
+        category: "Draft",
+        interestRate: 19.5,
+        maxTenure: 60,
+        minDownPayment: 10,
+        logo: "💸",
+        color: "rose",
+    },
+    {
+        id: 9,
+        name: "Union Bank",
+        type: "Turbo-Draft",
+        category: "Draft",
+        interestRate: 16.5,
+        maxTenure: 60,
+        minDownPayment: 10,
+        logo: "💸",
+        color: "emerald",
+    },
+    {
+        id: 10,
+        name: "CDB",
+        type: "Smart Draft",
+        category: "Draft",
+        interestRate: 18.0,
+        maxTenure: 60,
+        minDownPayment: 10,
+        logo: "💸",
+        color: "blue",
+    },
+    {
+        id: 11,
+        name: "Singer Finance",
+        type: "Quick Draft",
+        category: "Draft",
+        interestRate: 20.5,
+        maxTenure: 60,
+        minDownPayment: 10,
+        logo: "💸",
+        color: "cyan",
+    },
 ];
 
 // ============================================
@@ -89,19 +144,20 @@ function VehicleFinancingOptions() {
     const loanAmount = predictedPrice - downPayment;
     const interestRate = selectedInstitution?.interestRate || 8.5;
     const monthlyRate = interestRate / 100 / 12;
-    const emi =
-        monthlyRate > 0
+    const emi = financingType === "draft"
+        ? Math.round((loanAmount * (interestRate / 100)) / 12)
+        : monthlyRate > 0
             ? Math.round(
                 (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, tenure)) /
                 (Math.pow(1 + monthlyRate, tenure) - 1)
             )
             : Math.round(loanAmount / tenure);
-    const totalPayable = emi * tenure;
+    const totalPayable = financingType === "draft" ? (emi * tenure) + loanAmount : emi * tenure;
     const totalInterest = totalPayable - loanAmount;
 
     // Filter institutions by financing type
     const filteredInstitutions = institutions.filter((inst) =>
-        financingType === "loan" ? inst.type === "Bank" : inst.type === "Leasing"
+        financingType === "loan" ? inst.type === "Bank" : financingType === "leasing" ? inst.type === "Leasing" : inst.category === "Draft"
     );
 
     // Color maps for institution cards
@@ -187,7 +243,7 @@ function VehicleFinancingOptions() {
                     </svg>
                     Select Financing Type
                 </h2>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <button
                         onClick={() => { setFinancingType("loan"); setSelectedInstitution(null); }}
                         className={`p-5 rounded-xl border-2 transition-all duration-300 text-left ${financingType === "loan"
@@ -244,6 +300,34 @@ function VehicleFinancingOptions() {
                             </div>
                         )}
                     </button>
+                    <button
+                        onClick={() => { setFinancingType("draft"); setSelectedInstitution(null); }}
+                        className={`p-5 rounded-xl border-2 transition-all duration-300 text-left ${financingType === "draft"
+                                ? "border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10"
+                                : "border-slate-700 bg-slate-800/30 hover:border-slate-600"
+                            }`}
+                    >
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${financingType === "draft" ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-700 text-slate-400"
+                                }`}>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p className={`font-semibold ${financingType === "draft" ? "text-emerald-400" : "text-white"}`}>Vehicle Draft</p>
+                                <p className="text-xs text-slate-400">Flexible credit line against your vehicle. Pay interest monthly, principal at maturity.</p>
+                            </div>
+                        </div>
+                        {financingType === "draft" && (
+                            <div className="mt-2 flex items-center gap-1 text-xs text-emerald-400">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Selected
+                            </div>
+                        )}
+                    </button>
                 </div>
             </div>
 
@@ -255,7 +339,7 @@ function VehicleFinancingOptions() {
                     <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
-                    {financingType === "loan" ? "Select a Bank" : "Select a Leasing Company"}
+                    {financingType === "loan" ? "Select a Bank" : financingType === "leasing" ? "Select a Leasing Company" : "Select a Draft Provider"}
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredInstitutions.map((inst) => {
@@ -315,7 +399,7 @@ function VehicleFinancingOptions() {
                         <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                         </svg>
-                        {financingType === "loan" ? "Loan" : "Leasing"} Calculation — {selectedInstitution.name}
+                        {financingType === "loan" ? "Loan" : financingType === "leasing" ? "Leasing" : "Draft"} Calculation — {selectedInstitution.name}
                     </h2>
 
                     {/* Sliders */}
@@ -400,7 +484,7 @@ function VehicleFinancingOptions() {
                     </svg>
                     Financing Comparison
                     <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full ml-auto font-normal">
-                        {financingType === "loan" ? "Banks" : "Leasing Companies"}
+                        {financingType === "loan" ? "Banks" : financingType === "leasing" ? "Leasing Companies" : "Draft Providers"}
                     </span>
                 </h2>
 
@@ -419,7 +503,9 @@ function VehicleFinancingOptions() {
                             {filteredInstitutions.map((inst) => {
                                 const instMonthlyRate = inst.interestRate / 100 / 12;
                                 const instLoan = predictedPrice * (1 - inst.minDownPayment / 100);
-                                const instEmi = Math.round(
+                                const instEmi = inst.category === "Draft"
+                                    ? Math.round((instLoan * (inst.interestRate / 100)) / 12)
+                                    : Math.round(
                                     (instLoan * instMonthlyRate * Math.pow(1 + instMonthlyRate, 36)) /
                                     (Math.pow(1 + instMonthlyRate, 36) - 1)
                                 );

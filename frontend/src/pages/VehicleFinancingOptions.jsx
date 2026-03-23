@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { getCurrentUser } from "../utils/auth";
+import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png";
 
 // ============================================
 // MOCK DATA — Sri Lankan financial institutions
@@ -138,6 +142,7 @@ function VehicleFinancingOptions() {
     const [selectedInstitution, setSelectedInstitution] = useState(null);
     const [downPaymentPercent, setDownPaymentPercent] = useState(20);
     const [tenure, setTenure] = useState(36); // months
+    const [downloading, setDownloading] = useState(false);
 
     // Derived calculations
     const downPayment = Math.round(predictedPrice * (downPaymentPercent / 100));
@@ -168,6 +173,149 @@ function VehicleFinancingOptions() {
         amber: { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400", hover: "hover:border-amber-500/60" },
         rose: { bg: "bg-rose-500/10", border: "border-rose-500/30", text: "text-rose-400", hover: "hover:border-rose-500/60" },
         purple: { bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-400", hover: "hover:border-purple-500/60" },
+    };
+
+    const handleDownloadPDF = async () => {
+        setDownloading(true);
+        try {
+            await new Promise((r) => setTimeout(r, 600));
+
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const userEmail = (await getCurrentUser()) || "Guest User";
+
+            // 1. Draw Logo
+            const logoImg = new Image();
+            logoImg.src = logoUrl;
+
+            await new Promise((resolve) => {
+                if (logoImg.complete) resolve();
+                else {
+                    logoImg.onload = resolve;
+                    logoImg.onerror = resolve; // Continue even if logo fails
+                }
+            });
+
+            if (logoImg.complete && logoImg.naturalWidth > 0) {
+                doc.addImage(logoImg, "PNG", pageWidth / 2 - 15, 10, 30, 30);
+            }
+
+            // 2. Header Texts
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(22);
+            doc.setTextColor(15, 23, 42); // slate-900
+            doc.text("AutoValueLK", pageWidth / 2, 48, { align: "center" });
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(14);
+            doc.setTextColor(100, 116, 139); // slate-500
+            doc.text("Vehicle Financing Report", pageWidth / 2, 56, { align: "center" });
+
+            // 3. Document Meta Info
+            doc.setFontSize(10);
+            doc.setTextColor(71, 85, 105);
+            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 70);
+            doc.text(`Requested By: ${userEmail}`, 14, 76);
+
+            // 4. Vehicle Details Table
+            autoTable(doc, {
+                startY: 85,
+                theme: "grid",
+                headStyles: { fillColor: [59, 130, 246] }, // blue-500
+                head: [["Vehicle Details", "Information"]],
+                body: [
+                    ["Brand & Model", vehicle ? `${vehicle.brand} ${vehicle.model}` : "N/A"],
+                    ["Manufacture Year", vehicle?.year || "N/A"],
+                    ["Predicted Price", `LKR ${formattedPrice}`],
+                ],
+            });
+
+            let currentY = doc.lastAutoTable.finalY + 15;
+
+            // 5. Selected Plan
+            if (selectedInstitution) {
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(16);
+                doc.setTextColor(15, 23, 42);
+                doc.text("Selected Financing Plan", 14, currentY);
+
+                autoTable(doc, {
+                    startY: currentY + 8,
+                    theme: "striped",
+                    headStyles: { fillColor: [16, 185, 129] }, // emerald-500
+                    head: [["Detail", "Value"]],
+                    body: [
+                        ["Financing Type", financingType === "loan" ? "Vehicle Loan" : financingType === "leasing" ? "Vehicle Leasing" : "Vehicle Draft"],
+                        ["Institution", selectedInstitution.name],
+                        ["Interest Rate", `${interestRate}%`],
+                        ["Down Payment", `LKR ${downPayment.toLocaleString("en-LK")} (${downPaymentPercent}%)`],
+                        ["Loan Amount", `LKR ${loanAmount.toLocaleString("en-LK")}`],
+                        ["Tenure", `${tenure} months`],
+                        ["Monthly Installment", `LKR ${emi.toLocaleString("en-LK")}`],
+                        ["Total Payable", `LKR ${totalPayable.toLocaleString("en-LK")}`],
+                        ["Total Interest Payable", `LKR ${totalInterest.toLocaleString("en-LK")}`],
+                    ],
+                });
+
+                currentY = doc.lastAutoTable.finalY + 15;
+            }
+
+            // 6. Comparison Table
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(14);
+            doc.setTextColor(15, 23, 42);
+            doc.text(`Other ${financingType === 'loan' ? 'Banks' : financingType === 'leasing' ? 'Leasing Companies' : 'Draft Providers'} Compared`, 14, currentY);
+
+            const comparisonData = filteredInstitutions.map((inst) => {
+                const instMonthlyRate = inst.interestRate / 100 / 12;
+                const actualDownPayment = Math.max(downPaymentPercent, inst.minDownPayment);
+                const instLoan = predictedPrice * (1 - actualDownPayment / 100);
+                const actualTenure = Math.min(tenure, inst.maxTenure);
+                const instEmi = inst.category === "Draft"
+                    ? Math.round((instLoan * (inst.interestRate / 100)) / 12)
+                    : Math.round(
+                        (instLoan * instMonthlyRate * Math.pow(1 + instMonthlyRate, actualTenure)) /
+                        (Math.pow(1 + instMonthlyRate, actualTenure) - 1)
+                    );
+                return [
+                    inst.name,
+                    `${inst.interestRate}%`,
+                    `${actualTenure} months`,
+                    `${inst.minDownPayment}%`,
+                    `LKR ${instEmi.toLocaleString("en-LK")}`
+                ];
+            });
+
+            autoTable(doc, {
+                startY: currentY + 8,
+                theme: "striped",
+                headStyles: { fillColor: [15, 23, 42] },
+                head: [["Institution", "Rate", "Tenure", "Min Down", "Est. Monthly"]],
+                body: comparisonData,
+            });
+
+            // 7. Footer
+            const totalPages = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(148, 163, 184); // slate-400
+                doc.text(
+                    "© 2026 AutoValueLK. All rights reserved. This report is machine-generated.",
+                    pageWidth / 2,
+                    doc.internal.pageSize.getHeight() - 10,
+                    { align: "center" }
+                );
+            }
+
+            // Download PDF
+            doc.save(`AutoValueLK_Financing_${vehicle?.brand || "Report"}_${vehicle?.model || ""}.pdf`);
+        } catch (err) {
+            console.error("PDF generation failed", err);
+            alert("Failed to generate PDF report.");
+        } finally {
+            setDownloading(false);
+        }
     };
 
     return (
@@ -557,16 +705,34 @@ function VehicleFinancingOptions() {
                 </p>
             </div>
 
-            {/* BACK TO RESULTS BUTTON */}
-            <div className="mt-6 animate-fade-in animate-delay-400">
+            {/* BACK TO RESULTS / DOWNLOAD BUTTONS */}
+            <div className="flex flex-col sm:flex-row gap-4 mt-8 animate-fade-in animate-delay-400">
                 <button
                     onClick={() => navigate("/results", { state: { vehicle, predictedPrice } })}
-                    className="btn-secondary flex items-center gap-2 py-3 px-6"
+                    className="flex-1 btn-secondary flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-semibold transition-all duration-300"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                     Back to Results
+                </button>
+
+                <button
+                    onClick={handleDownloadPDF}
+                    disabled={downloading}
+                    className="flex-1 btn-primary flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-semibold transition-all duration-300 disabled:opacity-70 shadow-lg shadow-blue-500/20"
+                >
+                    {downloading ? (
+                        <>
+                            <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Generating Report...
+                        </>
+                    ) : (
+                        <>
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                            Download Financing Report
+                        </>
+                    )}
                 </button>
             </div>
         </div>

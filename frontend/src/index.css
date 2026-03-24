@@ -43,15 +43,17 @@ body {
    ============================================ */
 
 /* Form Inputs */
-.input {
-  @apply bg-slate-900/50 border border-slate-600/50 text-white p-3.5 rounded-xl w-full outline-none;
-  @apply transition-all duration-300 ease-out;
-  @apply focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:bg-slate-900;
-  @apply placeholder:text-slate-500;
-}
+@layer components {
+  .input {
+    @apply bg-slate-900/50 border border-slate-600/50 text-white p-3.5 rounded-xl w-full outline-none;
+    @apply transition-all duration-300 ease-out;
+    @apply focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:bg-slate-900;
+    @apply placeholder:text-slate-500;
+  }
 
-.input:hover {
-  @apply border-slate-500 bg-slate-900/70;
+  .input:hover {
+    @apply border-slate-500 bg-slate-900/70;
+  }
 }
 
 /* Form Labels */

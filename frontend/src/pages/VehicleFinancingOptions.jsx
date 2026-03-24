@@ -182,7 +182,8 @@ function VehicleFinancingOptions() {
 
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
-            const userEmail = (await getCurrentUser()) || "Guest User";
+            const user = await getCurrentUser();
+            const userEmail = user ? (user.username || user.email) : "Guest User";
 
             // 1. Draw Logo
             const logoImg = new Image();

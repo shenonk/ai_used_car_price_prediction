@@ -5,6 +5,7 @@ import logo from "../assets/logo/autovaluelk-logo.png"
 
 function Register() {
     const navigate = useNavigate()
+    const [username, setUsername] = useState("")
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
@@ -28,7 +29,7 @@ function Register() {
         setIsLoading(true)
         await new Promise(resolve => setTimeout(resolve, 1000))
 
-        const result = await register(email, password)
+        const result = await register(email, password, username)
         setIsLoading(false)
 
         if (result.success) {
@@ -82,6 +83,26 @@ function Register() {
                                 {error}
                             </div>
                         )}
+
+                        {/* Username */}
+                        <div className="space-y-2">
+                            <label className="label text-center">Username</label>
+                            <div className="relative group">
+                                <input
+                                    type="text"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    placeholder="Choose a username"
+                                    className="input pl-12"
+                                    required
+                                />
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
 
                         {/* Email */}
                         <div className="space-y-2">

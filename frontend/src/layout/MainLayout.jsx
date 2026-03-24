@@ -7,15 +7,15 @@ function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(false);
-  const [userEmail, setUserEmail] = useState(null);
+  const [userInfo, setUserInfo] = useState({ email: null, username: null });
 
   useEffect(() => {
     const checkAuth = async () => {
       const isLogged = await isLoggedIn();
       setLoggedIn(isLogged);
       if (isLogged) {
-        const email = await getCurrentUser();
-        setUserEmail(email);
+        const user = await getCurrentUser();
+        setUserInfo(user || { email: null, username: null });
       }
     };
     checkAuth();
@@ -152,7 +152,9 @@ function MainLayout() {
         {/* User Section */}
         <div className="p-4 border-t border-slate-700/50">
           {loggedIn && (
-            <p className="text-xs text-slate-400 text-center mb-2 truncate">{userEmail}</p>
+            <p className="text-sm font-bold text-white text-center mb-3 truncate">
+              {userInfo.username || userInfo.email}
+            </p>
           )}
           <button onClick={handleAuthAction} className={`w-full flex items-center justify-center gap-2 ${loggedIn ? 'btn-secondary' : 'btn-primary'}`}>
             {loggedIn ? (

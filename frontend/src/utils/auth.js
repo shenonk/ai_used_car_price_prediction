@@ -2,10 +2,13 @@ import { supabase } from './supabaseClient';
 
 // Auth utility — Supabase-based authentication
 
-export async function register(email, password) {
+export async function register(email, password, username) {
     const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+            data: { username }
+        }
     });
 
     if (error) {
@@ -37,7 +40,7 @@ export async function isLoggedIn() {
 
 export async function getCurrentUser() {
     const { data: { user } } = await supabase.auth.getUser();
-    return user ? user.email : null;
+    return user ? { email: user.email, username: user.user_metadata?.username } : null;
 }
 
 export async function resetPassword(email) {

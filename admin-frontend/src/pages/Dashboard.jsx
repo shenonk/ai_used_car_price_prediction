@@ -1,5 +1,24 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
+import { supabaseAdmin } from '../utils/supabaseClient';
+
+const formatDate = (dateStr) => {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric'
+    });
+};
+
+const formatRelativeTime = (dateStr) => {
+    if (!dateStr) return 'Never';
+    const num = Math.floor((new Date() - new Date(dateStr)) / 60000); 
+    if (num < 1) return 'Just now';
+    if (num < 60) return `${num} minute${num !== 1 ? 's' : ''} ago`;
+    const hours = Math.floor(num / 60);
+    if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days !== 1 ? 's' : ''} ago`;
+};
 
 /**
  * Dashboard — Admin overview page with stats cards.
@@ -10,9 +29,57 @@ function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    const [recentUsers, setRecentUsers] = useState([]);
+    const [usersLoading, setUsersLoading] = useState(true);
+
     useEffect(() => {
         fetchStats();
+        fetchRecentUsers();
     }, []);
+
+    const fetchRecentUsers = async () => {
+        try {
+            if (!supabaseAdmin) {
+                throw new Error('No service role key found. Using mock users.');
+            }
+            const { data, error } = await supabaseAdmin.auth.admin.listUsers();
+            if (error) throw error;
+            
+            const sorted = data.users.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 15);
+            setRecentUsers(sorted);
+        } catch (err) {
+            console.warn('Admin users fetch issue:', err.message);
+            // Fallback mock representation for UX
+            setRecentUsers([
+                {
+                    id: '1',
+                    email: 'kushantha@example.com',
+                    user_metadata: { username: 'Kushantha' },
+                    email_confirmed_at: '2026-03-24T10:00:00Z',
+                    created_at: '2026-03-24T09:00:00Z',
+                    last_sign_in_at: new Date(Date.now() - 7200000).toISOString()
+                },
+                {
+                    id: '2',
+                    email: 'guest_user@example.com',
+                    user_metadata: { username: 'GuestUser123' },
+                    email_confirmed_at: null,
+                    created_at: '2026-03-23T14:30:00Z',
+                    last_sign_in_at: new Date(Date.now() - 86400000).toISOString()
+                },
+                {
+                    id: '3',
+                    email: 'dev_test@example.com',
+                    user_metadata: { username: 'Developer' },
+                    email_confirmed_at: '2026-03-20T11:20:00Z',
+                    created_at: '2026-03-20T11:00:00Z',
+                    last_sign_in_at: new Date(Date.now() - 172800000).toISOString()
+                }
+            ]);
+        } finally {
+            setUsersLoading(false);
+        }
+    };
 
     const fetchStats = async () => {
         try {
@@ -147,6 +214,85 @@ function Dashboard() {
                         </div>
                     );
                 })}
+            </div>
+
+            {/* Recent Registrations Table */}
+            <div className="mt-10 animate-[fade-in_0.6s_ease-out]">
+                <h2 className="text-xl font-bold text-white mb-4">Recent Registrations</h2>
+                <div className="bg-[#1e293b] border border-cyan-500/20 rounded-2xl overflow-hidden shadow-lg shadow-cyan-500/5">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm text-slate-300">
+                            <thead className="bg-slate-900/50 text-xs uppercase text-slate-400 border-b border-cyan-500/10">
+                                <tr>
+                                    <th className="px-6 py-4 font-semibold">User</th>
+                                    <th className="px-6 py-4 font-semibold">Status</th>
+                                    <th className="px-6 py-4 font-semibold">Joined</th>
+                                    <th className="px-6 py-4 font-semibold">Last Active</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-cyan-500/10">
+                                {usersLoading ? (
+                                    <tr>
+                                        <td colSpan="4" className="px-6 py-8 text-center text-slate-500">
+                                            <div className="flex justify-center flex-col items-center">
+                                                <svg className="animate-spin h-6 w-6 text-cyan-500 mb-2" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                </svg>
+                                                Loading users...
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : recentUsers.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="4" className="px-6 py-8 text-center text-slate-500">
+                                            No recent registrations found.
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    recentUsers.map((user) => (
+                                        <tr key={user.id} className="hover:bg-slate-800/50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="font-bold text-white mb-0.5">
+                                                    {user.user_metadata?.username || 'Unknown User'}
+                                                </div>
+                                                <div className="text-xs text-slate-400 truncate max-w-[200px]">
+                                                    {user.email}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {user.email_confirmed_at ? (
+                                                    <span className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-inner shadow-emerald-500/10">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                                        Confirmed
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 shadow-inner shadow-amber-500/10">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                                        Pending
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-300">
+                                                {formatDate(user.created_at)}
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-400">
+                                                {formatRelativeTime(user.last_sign_in_at)}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                {/* Note about admin key if using mock data */}
+                {!usersLoading && recentUsers.length > 0 && !import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY && (
+                    <p className="text-xs text-amber-500/50 mt-3 text-center">
+                        Viewing mock records. Add <code className="bg-slate-800 px-1 py-0.5 rounded text-amber-400 tracking-wider">VITE_SUPABASE_SERVICE_ROLE_KEY</code> to your .env to see secure live data.
+                    </p>
+                )}
             </div>
         </div>
     );

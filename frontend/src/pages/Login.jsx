@@ -2,6 +2,8 @@ import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { login } from "../utils/auth"
 import logo from "../assets/logo/autovaluelk-logo.png"
+import LoadingOverlay from "../components/auth/LoadingOverlay"
+import SuccessToast from "../components/auth/SuccessToast"
 
 function Login() {
   const navigate = useNavigate()
@@ -10,6 +12,7 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+  const [showSuccess, setShowSuccess] = useState(false)
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -21,7 +24,10 @@ function Login() {
     setIsLoading(false)
 
     if (result.success) {
-      navigate("/")
+      setShowSuccess(true)
+      setTimeout(() => {
+        navigate("/")
+      }, 2000)
     } else {
       setError(result.error)
     }
@@ -29,6 +35,8 @@ function Login() {
 
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
+      <LoadingOverlay isOpen={isLoading} message="Connecting to AutoValueLK..." />
+      <SuccessToast isOpen={showSuccess} message="Login Successful!" subMessage="Redirecting to dashboard..." />
 
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">

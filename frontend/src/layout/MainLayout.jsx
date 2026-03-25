@@ -2,12 +2,24 @@ import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { isLoggedIn, logout, getCurrentUser } from "../utils/auth";
 import logo from "../assets/logo/autovaluelk-logo.png";
+import { useTranslation } from "react-i18next";
 
-function MainLayout() {
+const MainLayout = () => {
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState({ email: null, username: null });
+
+  useEffect(() => {
+    if (i18n.resolvedLanguage === 'si' || i18n.resolvedLanguage === 'ta') {
+      document.body.style.letterSpacing = '0.02em';
+      document.body.style.lineHeight = '1.6';
+    } else {
+      document.body.style.letterSpacing = 'normal';
+      document.body.style.lineHeight = 'normal';
+    }
+  }, [i18n.resolvedLanguage]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -24,7 +36,7 @@ function MainLayout() {
   const navItems = [
     {
       path: "/",
-      label: "Dashboard",
+      label: t("dashboard"),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
@@ -33,7 +45,7 @@ function MainLayout() {
     },
     {
       path: "/price-check",
-      label: "Price Check",
+      label: t("price_check"),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -42,7 +54,7 @@ function MainLayout() {
     },
     {
       path: "/results",
-      label: "Results",
+      label: t("results"),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
@@ -51,7 +63,7 @@ function MainLayout() {
     },
     {
       path: "/financing",
-      label: "Financing",
+      label: t("financing"),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -60,7 +72,7 @@ function MainLayout() {
     },
     {
       path: "/analytics",
-      label: "Analytics",
+      label: t("analytics"),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -69,7 +81,7 @@ function MainLayout() {
     },
     {
       path: "/notifications",
-      label: "Notifications",
+      label: t("notifications"),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -78,7 +90,7 @@ function MainLayout() {
     },
     {
       path: "/settings",
-      label: "Settings",
+      label: t("settings"),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -150,19 +162,47 @@ function MainLayout() {
         </div>
 
         {/* User Section */}
-        <div className="p-4 border-t border-slate-700/50">
+        <div className="p-4 border-t border-slate-700/50 flex flex-col gap-3">
           {loggedIn && (
-            <p className="text-sm font-bold text-white text-center mb-3 truncate">
-              {userInfo.username || userInfo.email}
+            <p className="text-sm font-bold text-white text-center truncate">
+              {t("welcome")}, {userInfo.username || userInfo.email}
             </p>
           )}
+
+          {/* Language Switcher */}
+          <div className="flex items-center justify-center gap-2 bg-slate-800/50 p-1.5 rounded-xl border border-slate-700/50 mx-2">
+            <button 
+              onClick={() => i18n.changeLanguage('en')} 
+              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'en' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'text-slate-400 hover:text-white'}`}
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              EN
+            </button>
+            <span className="text-slate-600 text-xs">|</span>
+            <button 
+              onClick={() => i18n.changeLanguage('si')} 
+              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'si' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'text-slate-400 hover:text-white'}`}
+              style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            >
+              සිං
+            </button>
+            <span className="text-slate-600 text-xs">|</span>
+            <button 
+              onClick={() => i18n.changeLanguage('ta')} 
+              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'ta' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'text-slate-400 hover:text-white'}`}
+              style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            >
+              தமிழ்
+            </button>
+          </div>
+
           <button onClick={handleAuthAction} className={`w-full flex items-center justify-center gap-2 ${loggedIn ? 'btn-secondary' : 'btn-primary'}`}>
             {loggedIn ? (
               <>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                <span>Logout</span>
+                <span>{t("logout")}</span>
               </>
             ) : (
               <>

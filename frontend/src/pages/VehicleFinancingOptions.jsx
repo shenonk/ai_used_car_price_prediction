@@ -1,130 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getCurrentUser } from "../utils/auth";
+import { supabase } from "../utils/supabaseClient";
 import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png";
-
-// ============================================
-// MOCK DATA — Sri Lankan financial institutions
-// ============================================
-const institutions = [
-    {
-        id: 1,
-        name: "Commercial Bank",
-        type: "Bank",
-        interestRate: 8.5,
-        maxTenure: 60,
-        minDownPayment: 20,
-        logo: "🏦",
-        color: "blue",
-    },
-    {
-        id: 2,
-        name: "Sampath Bank",
-        type: "Bank",
-        interestRate: 9.0,
-        maxTenure: 72,
-        minDownPayment: 15,
-        logo: "🏦",
-        color: "cyan",
-    },
-    {
-        id: 3,
-        name: "People's Bank",
-        type: "Bank",
-        interestRate: 7.5,
-        maxTenure: 60,
-        minDownPayment: 20,
-        logo: "🏛️",
-        color: "emerald",
-    },
-    {
-        id: 4,
-        name: "Vallibel Finance",
-        type: "Leasing",
-        interestRate: 10.5,
-        maxTenure: 48,
-        minDownPayment: 25,
-        logo: "💰",
-        color: "amber",
-    },
-    {
-        id: 5,
-        name: "LB Finance",
-        type: "Leasing",
-        interestRate: 11.0,
-        maxTenure: 48,
-        minDownPayment: 20,
-        logo: "💳",
-        color: "rose",
-    },
-    {
-        id: 6,
-        name: "HNB Finance",
-        type: "Bank",
-        interestRate: 8.0,
-        maxTenure: 60,
-        minDownPayment: 15,
-        logo: "🏦",
-        color: "purple",
-    },
-    {
-        id: 7,
-        name: "Vallibel Finance",
-        type: "Auto Draft",
-        category: "Draft",
-        interestRate: 21.0,
-        maxTenure: 12,
-        minDownPayment: 10,
-        logo: "💸",
-        color: "amber",
-    },
-    {
-        id: 8,
-        name: "LB Finance",
-        type: "Power Draft",
-        category: "Draft",
-        interestRate: 19.5,
-        maxTenure: 12,
-        minDownPayment: 10,
-        logo: "💸",
-        color: "rose",
-    },
-    {
-        id: 9,
-        name: "Union Bank",
-        type: "Turbo-Draft",
-        category: "Draft",
-        interestRate: 16.5,
-        maxTenure: 12,
-        minDownPayment: 10,
-        logo: "💸",
-        color: "emerald",
-    },
-    {
-        id: 10,
-        name: "CDB",
-        type: "Smart Draft",
-        category: "Draft",
-        interestRate: 18.0,
-        maxTenure: 12,
-        minDownPayment: 10,
-        logo: "💸",
-        color: "blue",
-    },
-    {
-        id: 11,
-        name: "Singer Finance",
-        type: "Quick Draft",
-        category: "Draft",
-        interestRate: 20.5,
-        maxTenure: 12,
-        minDownPayment: 10,
-        logo: "💸",
-        color: "cyan",
-    },
-];
 
 // ============================================
 // COMPONENT
@@ -138,11 +18,48 @@ function VehicleFinancingOptions() {
     const vehicle = location.state?.vehicle || null;
     const formattedPrice = predictedPrice.toLocaleString("en-LK");
 
-    const [financingType, setFinancingType] = useState("loan"); // 'loan' or 'leasing'
+    const [financingType, setFinancingType] = useState("loan"); // 'loan', 'leasing', or 'draft'
+    const [institutions, setInstitutions] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [selectedInstitution, setSelectedInstitution] = useState(null);
     const [downPaymentPercent, setDownPaymentPercent] = useState(20);
     const [tenure, setTenure] = useState(36); // months
     const [downloading, setDownloading] = useState(false);
+
+    useEffect(() => {
+        fetchInstitutions();
+    }, []);
+
+    const fetchInstitutions = async () => {
+        try {
+            setIsLoading(true);
+            const { data, error } = await supabase
+                .from('financing_options')
+                .select('*')
+                .eq('status', 'Active');
+
+            if (error) throw error;
+
+            // Map database fields to the UI-friendly format
+            const mappedData = data.map(item => ({
+                id: item.id,
+                name: item.name,
+                type: item.type, // 'Leasing', 'Personal Loan', 'Draft' 
+                interestRate: item.fixed_rate || item.floating_rate || 0,
+                maxTenure: item.type === "Draft" ? 12 : 60, // Defaulting if not in DB
+                minDownPayment: item.max_ltv ? (100 - item.max_ltv) : 20,
+                logo: item.logo_url || null,
+                // Assign UI colors based on index or name if needed
+                color: ["blue", "cyan", "emerald", "amber", "rose", "purple"][Math.floor(Math.random() * 6)]
+            }));
+
+            setInstitutions(mappedData);
+        } catch (error) {
+            console.error('Error fetching financing options:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Derived calculations
     const downPayment = Math.round(predictedPrice * (downPaymentPercent / 100));
@@ -161,9 +78,13 @@ function VehicleFinancingOptions() {
     const totalInterest = totalPayable - loanAmount;
 
     // Filter institutions by financing type
-    const filteredInstitutions = institutions.filter((inst) =>
-        financingType === "loan" ? inst.type === "Bank" : financingType === "leasing" ? inst.type === "Leasing" : inst.category === "Draft"
-    );
+    // Loan -> 'Personal Loan' or 'Bank', Leasing -> 'Leasing', Draft -> 'Draft'
+    const filteredInstitutions = institutions.filter((inst) => {
+        if (financingType === "loan") return inst.type === "Personal Loan" || inst.type === "Bank" || inst.type === "Loan";
+        if (financingType === "leasing") return inst.type === "Leasing";
+        if (financingType === "draft") return inst.type === "Draft";
+        return false;
+    });
 
     // Color maps for institution cards
     const colorMap = {
@@ -272,7 +193,7 @@ function VehicleFinancingOptions() {
                 const actualDownPayment = Math.max(downPaymentPercent, inst.minDownPayment);
                 const instLoan = predictedPrice * (1 - actualDownPayment / 100);
                 const actualTenure = Math.min(tenure, inst.maxTenure);
-                const instEmi = inst.category === "Draft"
+                const instEmi = financingType === "draft"
                     ? Math.round((instLoan * (inst.interestRate / 100)) / 12)
                     : Math.round(
                         (instLoan * instMonthlyRate * Math.pow(1 + instMonthlyRate, actualTenure)) /
@@ -483,60 +404,82 @@ function VehicleFinancingOptions() {
             {/* =========================================
           3️⃣ FINANCIAL INSTITUTION SELECTION
           ========================================= */}
-            <div className="card p-6 mb-6 animate-fade-in animate-delay-200">
+            <div className="card p-6 mb-6 animate-fade-in animate-delay-200 min-h-[300px]">
                 <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                     <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                     {financingType === "loan" ? "Select a Bank" : financingType === "leasing" ? "Select a Leasing Company" : "Select a Draft Provider"}
                 </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredInstitutions.map((inst) => {
-                        const colors = colorMap[inst.color];
-                        const isSelected = selectedInstitution?.id === inst.id;
-                        return (
-                            <button
-                                key={inst.id}
-                                onClick={() => { setSelectedInstitution(inst); setTenure(Math.min(tenure, inst.maxTenure)); }}
-                                className={`p-5 rounded-xl border-2 transition-all duration-300 text-left ${colors.hover} ${isSelected
-                                        ? `${colors.border} ${colors.bg} shadow-lg`
-                                        : "border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/50"
-                                    }`}
-                            >
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${isSelected ? colors.bg : "bg-slate-700/50"
-                                        }`}>
-                                        {inst.logo}
+
+                {isLoading ? (
+                    <div className="flex flex-col items-center justify-center py-12">
+                        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+                        <p className="text-slate-400 animate-pulse">Currently fetching the latest Sri Lankan banking rates...</p>
+                    </div>
+                ) : filteredInstitutions.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+                        <svg className="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-lg font-medium text-slate-400">No financing options available for this category yet.</p>
+                        <p className="text-sm">Please try a different financing type.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredInstitutions.map((inst) => {
+                            const colors = colorMap[inst.color];
+                            const isSelected = selectedInstitution?.id === inst.id;
+                            return (
+                                <button
+                                    key={inst.id}
+                                    onClick={() => { setSelectedInstitution(inst); setTenure(Math.min(tenure, inst.maxTenure)); }}
+                                    className={`p-5 rounded-xl border-2 transition-all duration-300 text-left ${colors.hover} ${isSelected
+                                            ? `${colors.border} ${colors.bg} shadow-lg`
+                                            : "border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/50"
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden ${isSelected ? colors.bg : "bg-slate-700/50"
+                                            }`}>
+                                            {inst.logo ? (
+                                                <img src={inst.logo} alt={inst.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                                </svg>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className={`font-semibold text-sm ${isSelected ? colors.text : "text-white"}`}>{inst.name}</p>
+                                            <p className="text-xs text-slate-500">{inst.type}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className={`font-semibold text-sm ${isSelected ? colors.text : "text-white"}`}>{inst.name}</p>
-                                        <p className="text-xs text-slate-500">{inst.type}</p>
+                                    <div className="flex justify-between text-xs">
+                                        <div>
+                                            <p className="text-slate-500">Interest Rate</p>
+                                            <p className={`font-semibold ${isSelected ? colors.text : "text-white"}`}>{inst.interestRate}%</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-slate-500">Max Tenure</p>
+                                            <p className={`font-semibold ${isSelected ? colors.text : "text-white"}`}>{inst.maxTenure} months</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <div>
-                                        <p className="text-slate-500">Interest Rate</p>
-                                        <p className={`font-semibold ${isSelected ? colors.text : "text-white"}`}>{inst.interestRate}%</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-slate-500">Max Tenure</p>
-                                        <p className={`font-semibold ${isSelected ? colors.text : "text-white"}`}>{inst.maxTenure} months</p>
-                                    </div>
-                                </div>
-                                {isSelected && (
-                                    <div className="mt-3 flex items-center gap-1 text-xs" style={{ color: "inherit" }}>
-                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${colors.bg} ${colors.text}`}>
-                                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            Selected
-                                        </span>
-                                    </div>
-                                )}
-                            </button>
-                        );
-                    })}
-                </div>
+                                    {isSelected && (
+                                        <div className="mt-3 flex items-center gap-1 text-xs" style={{ color: "inherit" }}>
+                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full ${colors.bg} ${colors.text}`}>
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                Selected
+                                            </span>
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* =========================================
@@ -550,6 +493,26 @@ function VehicleFinancingOptions() {
                         </svg>
                         {financingType === "loan" ? "Loan" : financingType === "leasing" ? "Leasing" : "Draft"} Calculation — {selectedInstitution.name}
                     </h2>
+
+                    {/* Institution Selector Dropdown */}
+                    <div className="mb-8 p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 flex flex-col sm:flex-row items-center gap-4">
+                        <label className="text-sm font-medium text-slate-400 whitespace-nowrap">Switch Institution:</label>
+                        <select 
+                            value={selectedInstitution?.id || ""} 
+                            onChange={(e) => {
+                                const inst = filteredInstitutions.find(i => i.id === e.target.value);
+                                if (inst) {
+                                    setSelectedInstitution(inst);
+                                    setTenure(Math.min(tenure, inst.maxTenure));
+                                }
+                            }}
+                            className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                        >
+                            {filteredInstitutions.map(inst => (
+                                <option key={inst.id} value={inst.id}>{inst.name} ({inst.interestRate}%)</option>
+                            ))}
+                        </select>
+                    </div>
 
                     {/* Sliders */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -643,63 +606,77 @@ function VehicleFinancingOptions() {
                     </span>
                 </h2>
 
-                <div className="overflow-x-auto">
-                    <table className="table-modern">
-                        <thead>
-                            <tr>
-                                <th>Institution</th>
-                                <th>Interest Rate</th>
-                                <th>Max Tenure</th>
-                                <th>Min Down Payment</th>
-                                <th>Est. Monthly Payment *</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredInstitutions.map((inst) => {
-                                const instMonthlyRate = inst.interestRate / 100 / 12;
-                                const actualDownPayment = Math.max(downPaymentPercent, inst.minDownPayment);
-                                const instLoan = predictedPrice * (1 - actualDownPayment / 100);
-                                const actualTenure = Math.min(tenure, inst.maxTenure);
-                                const instEmi = inst.category === "Draft"
-                                    ? Math.round((instLoan * (inst.interestRate / 100)) / 12)
-                                    : Math.round(
-                                        (instLoan * instMonthlyRate * Math.pow(1 + instMonthlyRate, actualTenure)) /
-                                        (Math.pow(1 + instMonthlyRate, actualTenure) - 1)
-                                    );
-                                const colors = colorMap[inst.color];
-                                const isSelected = selectedInstitution?.id === inst.id;
+                <div className="overflow-x-auto min-h-[100px]">
+                    {isLoading ? (
+                        <div className="flex justify-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+                        </div>
+                    ) : filteredInstitutions.length === 0 ? (
+                        <p className="text-center py-8 text-slate-500">No data available to compare.</p>
+                    ) : (
+                        <table className="table-modern">
+                            <thead>
+                                <tr>
+                                    <th>Institution</th>
+                                    <th>Interest Rate</th>
+                                    <th>Max Tenure</th>
+                                    <th>Min Down Payment</th>
+                                    <th>Est. Monthly Payment *</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredInstitutions.map((inst) => {
+                                    const instMonthlyRate = inst.interestRate / 100 / 12;
+                                    const actualDownPayment = Math.max(downPaymentPercent, inst.minDownPayment);
+                                    const instLoan = predictedPrice * (1 - actualDownPayment / 100);
+                                    const actualTenure = Math.min(tenure, inst.maxTenure);
+                                    const instEmi = financingType === "draft"
+                                        ? Math.round((instLoan * (inst.interestRate / 100)) / 12)
+                                        : Math.round(
+                                            (instLoan * instMonthlyRate * Math.pow(1 + instMonthlyRate, actualTenure)) /
+                                            (Math.pow(1 + instMonthlyRate, actualTenure) - 1)
+                                        );
+                                    const colors = colorMap[inst.color];
+                                    const isSelected = selectedInstitution?.id === inst.id;
 
-                                return (
-                                    <tr
-                                        key={inst.id}
-                                        className={`cursor-pointer ${isSelected ? "bg-blue-500/5" : ""}`}
-                                        onClick={() => { setSelectedInstitution(inst); setTenure(Math.min(tenure, inst.maxTenure)); }}
-                                    >
-                                        <td>
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-lg">{inst.logo}</span>
-                                                <div>
-                                                    <p className="font-medium text-white">{inst.name}</p>
-                                                    <p className="text-xs text-slate-500">{inst.type}</p>
+                                    return (
+                                        <tr
+                                            key={inst.id}
+                                            className={`cursor-pointer ${isSelected ? "bg-blue-500/5" : ""}`}
+                                            onClick={() => { setSelectedInstitution(inst); setTenure(Math.min(tenure, inst.maxTenure)); }}
+                                        >
+                                            <td>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-slate-700">
+                                                        {inst.logo ? (
+                                                            <img src={inst.logo} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-xs">🏦</span>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-white">{inst.name}</p>
+                                                        <p className="text-xs text-slate-500">{inst.type}</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${colors.bg} ${colors.text}`}>
-                                                {inst.interestRate}%
-                                            </span>
-                                        </td>
-                                        <td className="text-slate-300">{inst.maxTenure} months</td>
-                                        <td className="text-slate-300">{inst.minDownPayment}%</td>
-                                        <td>
-                                            <span className="font-semibold text-white">LKR {instEmi.toLocaleString("en-LK")}</span>
-                                            <p className="text-xs text-slate-500">for {actualTenure} months</p>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                                            </td>
+                                            <td>
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${colors.bg} ${colors.text}`}>
+                                                    {inst.interestRate}%
+                                                </span>
+                                            </td>
+                                            <td className="text-slate-300">{inst.maxTenure} months</td>
+                                            <td className="text-slate-300">{inst.minDownPayment}%</td>
+                                            <td>
+                                                <span className="font-semibold text-white">LKR {instEmi.toLocaleString("en-LK")}</span>
+                                                <p className="text-xs text-slate-500">for {actualTenure} months</p>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
                 <p className="text-xs text-slate-600 mt-4">
                     * Estimated monthly payment based on down payment ({downPaymentPercent}%) and tenure ({tenure} months), adjusted for institution limits.
@@ -720,7 +697,7 @@ function VehicleFinancingOptions() {
 
                 <button
                     onClick={handleDownloadPDF}
-                    disabled={downloading}
+                    disabled={downloading || institutions.length === 0}
                     className="flex-1 btn-primary flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-semibold transition-all duration-300 disabled:opacity-70 shadow-lg shadow-blue-500/20"
                 >
                     {downloading ? (

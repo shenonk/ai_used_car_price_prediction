@@ -164,9 +164,19 @@ const MainLayout = () => {
         {/* User Section */}
         <div className="p-4 border-t border-slate-700/50 flex flex-col gap-3">
           {loggedIn && (
-            <p className="text-sm font-bold text-white text-center truncate">
-              {t("welcome")}, {userInfo.username || userInfo.email}
-            </p>
+            <div className="flex items-center justify-center gap-3">
+              {userInfo.avatar_url && (
+                <img 
+                  src={userInfo.avatar_url} 
+                  alt="Profile" 
+                  className="w-8 h-8 rounded-full border border-slate-600 object-cover" 
+                  referrerPolicy="no-referrer"
+                />
+              )}
+              <p className="text-sm font-bold text-white truncate">
+                {t("welcome")}, {userInfo.username || userInfo.email}
+              </p>
+            </div>
           )}
 
           {/* Language Switcher */}

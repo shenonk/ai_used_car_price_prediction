@@ -13,6 +13,7 @@ import Analytics from "./pages/Analytics";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import VehicleFinancingOptions from "./pages/VehicleFinancingOptions";
+import HelpCenter from "./pages/HelpCenter";
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
           <Route path="notifications" element={<Notifications />} />
           <Route path="settings" element={<Settings />} />
           <Route path="financing" element={<VehicleFinancingOptions />} />
+          <Route path="help" element={<HelpCenter />} />
         </Route>
 
       </Routes>

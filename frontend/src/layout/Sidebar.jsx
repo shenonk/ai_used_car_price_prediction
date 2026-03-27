@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom"
 import logo from "../../assets/logo/autovaluelk-logo.png"
 import { useTranslation } from "react-i18next"
+import { HelpCircle } from "lucide-react"
 
 const Sidebar = () => {
   const { t, i18n } = useTranslation();
   return (
     <div className="w-64 h-screen bg-[#020617] border-r border-gray-800 text-gray-300 fixed flex flex-col justify-between">
-
       {/* Top */}
       <div>
         <div className="p-6 border-b border-gray-800">
@@ -22,16 +22,19 @@ const Sidebar = () => {
         </div>
 
         <nav className="flex flex-col p-4 gap-2 text-sm">
-
           <Link to="/" className="p-3 rounded-lg hover:bg-gray-800">{t("dashboard")}</Link>
           <Link to="/price" className="p-3 rounded-lg hover:bg-gray-800">{t("price_check")}</Link>
           <Link to="/results" className="p-3 rounded-lg hover:bg-gray-800">{t("results")}</Link>
           <Link to="/financing" className="p-3 rounded-lg hover:bg-gray-800">{t("financing")}</Link>
           <Link to="/analytics" className="p-3 rounded-lg hover:bg-gray-800">{t("analytics")}</Link>
           <Link to="/notifications" className="p-3 rounded-lg hover:bg-gray-800">{t("notifications")}</Link>
-
+          <Link to="/help" className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800">
+            <HelpCircle size={18} />
+            {t("help_center")}
+          </Link>
         </nav>
       </div>
+
 
       {/* Bottom login */}
       <div className="p-4 border-t border-gray-800 flex flex-col gap-3">

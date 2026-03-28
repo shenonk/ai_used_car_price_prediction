@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import logo from "../assets/logo/autovaluelk-logo.png"
 
 function PriceCheck() {
   const navigate = useNavigate()
@@ -101,10 +102,8 @@ function PriceCheck() {
         <div className="card-glass p-8">
 
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17h8M8 17v-4m8 4v-4m-8 0h8m-8 0l-2-4h12l-2 4M6 13l-2-4h16l-2 4" />
-              </svg>
+            <div className="w-14 h-14 rounded-xl bg-white/5 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-xl overflow-hidden">
+              <img src={logo} alt="AutoValueLK Logo" className="w-10 h-10 object-contain" />
             </div>
             <div>
               <h2 className="text-xl text-white font-semibold">Enter Vehicle Details</h2>

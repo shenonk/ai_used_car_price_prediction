@@ -2,6 +2,8 @@ import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { register } from "../utils/auth"
 import logo from "../assets/logo/autovaluelk-logo.png"
+import LoadingOverlay from "../components/auth/LoadingOverlay"
+import SuccessToast from "../components/auth/SuccessToast"
 
 function Register() {
     const navigate = useNavigate()
@@ -12,6 +14,7 @@ function Register() {
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState("")
     const [showPassword, setShowPassword] = useState(false)
+    const [showSuccess, setShowSuccess] = useState(false)
 
     const handleRegister = async (e) => {
         e.preventDefault()
@@ -33,8 +36,10 @@ function Register() {
         setIsLoading(false)
 
         if (result.success) {
-            alert("Account created successfully! Please sign in.")
-            navigate("/login")
+            setShowSuccess(true)
+            setTimeout(() => {
+                navigate("/login")
+            }, 2000)
         } else {
             setError(result.error)
         }
@@ -42,6 +47,8 @@ function Register() {
 
     return (
         <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
+            <LoadingOverlay isOpen={isLoading} message="Securing your account..." />
+            <SuccessToast isOpen={showSuccess} message="Account Created!" subMessage="Redirecting to login..." />
 
             {/* Background */}
             <div className="absolute inset-0 overflow-hidden">

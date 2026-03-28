@@ -40,7 +40,11 @@ export async function isLoggedIn() {
 
 export async function getCurrentUser() {
     const { data: { user } } = await supabase.auth.getUser();
-    return user ? { email: user.email, username: user.user_metadata?.username } : null;
+    return user ? { 
+        email: user.email, 
+        username: user.user_metadata?.username,
+        avatar_url: user.user_metadata?.avatar_url
+    } : null;
 }
 
 export async function resetPassword(email) {
@@ -57,6 +61,20 @@ export async function resetPassword(email) {
 export async function updatePassword(newPassword) {
     const { error } = await supabase.auth.updateUser({
         password: newPassword
+    });
+
+    if (error) {
+        return { success: false, error: error.message };
+    }
+    return { success: true };
+}
+
+export async function loginWithGoogle() {
+    const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+            redirectTo: window.location.origin + '/'
+        }
     });
 
     if (error) {

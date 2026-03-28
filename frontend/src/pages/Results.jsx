@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer
@@ -7,6 +7,7 @@ import {
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getCurrentUser } from "../utils/auth";
+import { supabase } from "../utils/supabaseClient";
 import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png";
 
 function Results() {
@@ -16,8 +17,65 @@ function Results() {
   const predictedPrice = location.state?.predictedPrice || 4500000;
   const [alertSet, setAlertSet] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [loanPlans, setLoanPlans] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const formattedPrice = predictedPrice.toLocaleString('en-LK');
+
+  useEffect(() => {
+    fetchBestRates();
+  }, []);
+
+  const fetchBestRates = async () => {
+    try {
+      setIsLoading(true);
+      // Fetch the lowest available bank rate for the results preview
+      const { data, error } = await supabase
+        .from('financing_options')
+        .select('fixed_rate')
+        .eq('status', 'Active')
+        .eq('type', 'Bank')
+        .order('fixed_rate', { ascending: true })
+        .limit(1);
+
+      const bestRate = data && data.length > 0 ? data[0].fixed_rate : 8.5;
+
+      const plans = [
+        { 
+            years: 3, 
+            interest: `${bestRate}%`, 
+            monthly: Math.round((predictedPrice * 0.9 * (1 + (bestRate/100 * 3))) / 36).toLocaleString(), 
+            total: Math.round(predictedPrice * 0.9 * (1 + (bestRate/100 * 3))).toLocaleString(), 
+            recommended: true 
+        },
+        { 
+            years: 5, 
+            interest: `${(bestRate + 0.5)}%`, 
+            monthly: Math.round((predictedPrice * 0.9 * (1 + ((bestRate+0.5)/100 * 5))) / 60).toLocaleString(), 
+            total: Math.round(predictedPrice * 0.9 * (1 + ((bestRate+0.5)/100 * 5))).toLocaleString(), 
+            recommended: false 
+        },
+        { 
+            years: 7, 
+            interest: `${(bestRate + 1.0)}%`, 
+            monthly: Math.round((predictedPrice * 0.9 * (1 + ((bestRate+1.0)/100 * 7))) / 84).toLocaleString(), 
+            total: Math.round(predictedPrice * 0.9 * (1 + ((bestRate+1.0)/100 * 7))).toLocaleString(), 
+            recommended: false 
+        },
+      ];
+      setLoanPlans(plans);
+    } catch (err) {
+      console.error("Error fetching rates:", err);
+      // Fallback plans if fetch fails
+      setLoanPlans([
+        { years: 3, interest: "8.5%", monthly: "125,000", total: "4,500,000", recommended: true },
+        { years: 5, interest: "9%", monthly: "85,000", total: "5,100,000", recommended: false },
+        { years: 7, interest: "9.5%", monthly: "65,000", total: "5,460,000", recommended: false },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const pieData = [
     { name: "Principal", value: 85.4 },
@@ -33,12 +91,6 @@ function Results() {
     { name: "40%", down: Math.round(predictedPrice * 0.4), monthly: Math.round((predictedPrice * 0.6 * 1.085) / 36) },
   ];
 
-  const loanPlans = [
-    { years: 3, interest: "8.5%", monthly: Math.round((predictedPrice * 0.9 * 1.085) / 36).toLocaleString(), total: Math.round(predictedPrice * 0.9 * 1.085).toLocaleString(), recommended: true },
-    { years: 5, interest: "9%", monthly: Math.round((predictedPrice * 0.9 * 1.09) / 60).toLocaleString(), total: Math.round(predictedPrice * 0.9 * 1.09).toLocaleString(), recommended: false },
-    { years: 7, interest: "9.5%", monthly: Math.round((predictedPrice * 0.9 * 1.095) / 84).toLocaleString(), total: Math.round(predictedPrice * 0.9 * 1.095).toLocaleString(), recommended: false },
-  ];
-
   const handleDownloadPDF = async () => {
     setDownloading(true);
     try {
@@ -51,11 +103,9 @@ function Results() {
       const userEmail = user ? (user.username || user.email) : "Guest User";
 
       // 1. Draw Logo
-      // Try to load the image. Adjust logo dimensions based on the aspect ratio (roughly square now).
       const logoImg = new Image();
       logoImg.src = logoUrl;
       
-      // We'll wait until the image is loaded (or if it's already complete)
       await new Promise((resolve) => {
         if (logoImg.complete) resolve();
         else {
@@ -227,27 +277,35 @@ function Results() {
             Loan Repayment Plans
           </h2>
           <div className="space-y-4">
-            {loanPlans.map((plan, index) => (
-              <div key={index} className={`p-4 rounded-xl border transition-all duration-300 hover:translate-x-1 ${plan.recommended ? 'bg-blue-500/20 border-blue-500/50' : 'bg-slate-800/30 border-slate-700/50 hover:border-slate-600/50'}`}>
-                <div className="flex justify-between items-center mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-semibold text-white">{plan.years} Years</span>
-                    {plan.recommended && <span className="badge badge-success text-xs">Recommended</span>}
-                  </div>
-                  <span className="text-sm text-slate-400">{plan.interest} Interest</span>
+            {isLoading ? (
+                <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <div>
-                    <p className="text-slate-400">Monthly Payment</p>
-                    <p className="font-semibold text-blue-400 text-lg">LKR {plan.monthly}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-slate-400">Total Amount</p>
-                    <p className="font-semibold text-white">LKR {plan.total}</p>
-                  </div>
+            ) : loanPlans.length === 0 ? (
+                <p className="text-center py-8 text-slate-500">No loan plans available.</p>
+            ) : (
+                loanPlans.map((plan, index) => (
+                <div key={index} className={`p-4 rounded-xl border transition-all duration-300 hover:translate-x-1 ${plan.recommended ? 'bg-blue-500/20 border-blue-500/50' : 'bg-slate-800/30 border-slate-700/50 hover:border-slate-600/50'}`}>
+                    <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center gap-2">
+                        <span className="text-lg font-semibold text-white">{plan.years} Years</span>
+                        {plan.recommended && <span className="badge badge-success text-xs">Recommended</span>}
+                    </div>
+                    <span className="text-sm text-slate-400">{plan.interest} Interest</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                    <div>
+                        <p className="text-slate-400">Monthly Payment</p>
+                        <p className="font-semibold text-blue-400 text-lg">LKR {plan.monthly}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-slate-400">Total Amount</p>
+                        <p className="font-semibold text-white">LKR {plan.total}</p>
+                    </div>
+                    </div>
                 </div>
-              </div>
-            ))}
+                ))
+            )}
           </div>
         </div>
 

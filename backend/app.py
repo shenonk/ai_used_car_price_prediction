@@ -62,30 +62,50 @@ def get_db_connection():
     )
 
 def save_prediction_to_db(brand, model, year, engine, mileage, predicted_price):
-    """Save a prediction directly to the PostgreSQL database."""
-    if not db_password or db_password == "your_database_password_here":
-        print("[WARN] SUPABASE_DB_PASSWORD not set in .env - skipping DB save", flush=True)
+    """Save a prediction to the database. Tries direct PostgreSQL first, then falls back to Supabase REST API."""
+    
+    # --- Attempt 1: Direct PostgreSQL connection ---
+    if db_password and db_password != "your_database_password_here":
+        conn = None
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute(
+                """INSERT INTO predictions (brand, model, year, engine, mileage, predicted_price)
+                   VALUES (%s, %s, %s, %s, %s, %s)""",
+                (brand, model, int(year), int(engine), int(mileage), Decimal(str(predicted_price)))
+            )
+            conn.commit()
+            cur.close()
+            print(f"[OK] Prediction saved (PostgreSQL): {brand} {model} {year} - LKR {predicted_price:,}", flush=True)
+            return True
+        except Exception as e:
+            print(f"[WARN] Direct DB save failed: {e}", flush=True)
+            print("[INFO] Falling back to Supabase REST API...", flush=True)
+        finally:
+            if conn:
+                conn.close()
+
+    # --- Attempt 2: Supabase REST API fallback ---
+    if supabase:
+        try:
+            supabase.table("predictions").insert({
+                "brand": brand,
+                "model": model,
+                "year": int(year),
+                "engine": int(engine),
+                "mileage": int(mileage),
+                "predicted_price": float(predicted_price)
+            }).execute()
+            print(f"[OK] Prediction saved (Supabase API): {brand} {model} {year} - LKR {predicted_price:,}", flush=True)
+            return True
+        except Exception as e:
+            print(f"[FAIL] Supabase API save error: {e}", flush=True)
+            return False
+    else:
+        print("[WARN] No database connection available — prediction not saved", flush=True)
         return False
 
-    conn = None
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute(
-            """INSERT INTO predictions (brand, model, year, engine, mileage, predicted_price)
-               VALUES (%s, %s, %s, %s, %s, %s)""",
-            (brand, model, int(year), int(engine), int(mileage), Decimal(str(predicted_price)))
-        )
-        conn.commit()
-        cur.close()
-        print(f"[OK] Prediction saved: {brand} {model} {year} - LKR {predicted_price:,}", flush=True)
-        return True
-    except Exception as e:
-        print(f"[FAIL] DB save error: {e}", flush=True)
-        return False
-    finally:
-        if conn:
-            conn.close()
 
 def get_admin_by_email(email):
     """Look up an admin user by email from the admin_users table."""

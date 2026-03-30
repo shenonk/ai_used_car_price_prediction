@@ -41,6 +41,7 @@ export async function isLoggedIn() {
 export async function getCurrentUser() {
     const { data: { user } } = await supabase.auth.getUser();
     return user ? { 
+        id: user.id,
         email: user.email, 
         username: user.user_metadata?.username,
         avatar_url: user.user_metadata?.avatar_url

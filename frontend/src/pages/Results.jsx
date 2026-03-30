@@ -8,6 +8,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getCurrentUser } from "../utils/auth";
 import { supabase } from "../utils/supabaseClient";
+import { loadUserAlerts, upsertUserAlert } from "../utils/userAlerts";
 import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png";
 
 function Results() {
@@ -15,6 +16,8 @@ function Results() {
   const navigate = useNavigate();
   const vehicle = location.state?.vehicle || null;
   const predictedPrice = location.state?.predictedPrice || 4500000;
+  const predictedAt = location.state?.predictedAt || Date.now();
+  const predictionKey = location.state?.predictionKey || `${vehicle?.brand || "unknown"}-${vehicle?.model || "unknown"}-${predictedAt}`;
   const [alertSet, setAlertSet] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [loanPlans, setLoanPlans] = useState([]);
@@ -25,6 +28,29 @@ function Results() {
   useEffect(() => {
     fetchBestRates();
   }, []);
+
+  useEffect(() => {
+    const persistPredictionForCurrentUser = async () => {
+      if (!vehicle) {
+        return;
+      }
+
+      const user = await getCurrentUser();
+      if (!user) {
+        return;
+      }
+
+      upsertUserAlert(user, {
+        predictionKey,
+        vehicle,
+        price: predictedPrice,
+        createdAt: predictedAt,
+        source: "prediction",
+      });
+    };
+
+    persistPredictionForCurrentUser();
+  }, [predictionKey, predictedAt, predictedPrice, vehicle]);
 
   const fetchBestRates = async () => {
     try {
@@ -208,14 +234,25 @@ function Results() {
     }
   };
 
-  const handleSetAlert = () => {
-    const alerts = JSON.parse(localStorage.getItem('carpriceai_alerts') || '[]');
-    alerts.push({
+  const handleSetAlert = async () => {
+    const user = await getCurrentUser();
+    if (!user) {
+      alert("Please log in to save price alerts.");
+      return;
+    }
+
+    const existingAlerts = loadUserAlerts(user);
+    const matchingAlert = existingAlerts.find((item) => item.predictionKey === predictionKey);
+
+    upsertUserAlert(user, {
+      predictionKey,
       vehicle: vehicle || { brand: 'Unknown', model: 'Unknown' },
       price: predictedPrice,
-      createdAt: Date.now()
+      createdAt: matchingAlert?.createdAt || predictedAt,
+      source: "prediction",
+      tracked: true,
     });
-    localStorage.setItem('carpriceai_alerts', JSON.stringify(alerts));
+
     setAlertSet(true);
     setTimeout(() => setAlertSet(false), 3000);
   };

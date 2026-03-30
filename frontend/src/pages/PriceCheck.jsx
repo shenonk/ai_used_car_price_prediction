@@ -66,6 +66,8 @@ function PriceCheck() {
         state: {
           vehicle: form,
           predictedPrice: data.predicted_price,
+          predictedAt: Date.now(),
+          predictionKey: `pred-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         },
       })
     } catch (error) {

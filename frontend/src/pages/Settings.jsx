@@ -16,12 +16,11 @@ import {
 } from "lucide-react";
 import { getCurrentUser, logout } from "../utils/auth";
 import { useNavigate } from "react-router-dom";
+import { getAlertsStorageKey, getPrefsStorageKey, loadUserAlerts, saveUserAlerts } from "../utils/userAlerts";
 
 function Settings() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const PREFS_KEY = 'carpriceai_notification_prefs';
-  const ALERTS_KEY = 'carpriceai_alerts';
 
   const [activeTab, setActiveTab] = useState("profile");
   const [userInfo, setUserInfo] = useState({ email: null, username: null });
@@ -40,14 +39,15 @@ function Settings() {
       setIsLoading(true);
       // Fetch user info
       const user = await getCurrentUser();
-      setUserInfo(user || { email: 'guest@example.com', username: 'Guest' });
+      const resolvedUser = user || { email: 'guest@example.com', username: 'Guest' };
+      setUserInfo(resolvedUser);
 
       // Fetch prefs
-      const storedPrefs = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null');
+      const storedPrefs = JSON.parse(localStorage.getItem(getPrefsStorageKey(resolvedUser)) || 'null');
       if (storedPrefs) setPrefs(storedPrefs);
 
       // Fetch alerts
-      const storedAlerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
+      const storedAlerts = loadUserAlerts(resolvedUser);
       setAlerts(storedAlerts);
       
       setIsLoading(false);
@@ -61,21 +61,27 @@ function Settings() {
   };
 
   const handleSavePrefs = () => {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    localStorage.setItem(getPrefsStorageKey(userInfo), JSON.stringify(prefs));
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const deleteAlert = (index) => {
-    const newAlerts = alerts.filter((_, i) => i !== index);
+  const deleteAlert = (predictionKey, alertIndex) => {
+    const newAlerts = alerts.filter((alert, index) => {
+      if (predictionKey) {
+        return alert.predictionKey !== predictionKey;
+      }
+
+      return index !== alertIndex;
+    });
     setAlerts(newAlerts);
-    localStorage.setItem(ALERTS_KEY, JSON.stringify(newAlerts));
+    saveUserAlerts(userInfo, newAlerts);
   };
 
   const clearAllData = () => {
     if (window.confirm("Are you sure you want to clear all local data? This includes your price alerts and preferences.")) {
-      localStorage.removeItem(PREFS_KEY);
-      localStorage.removeItem(ALERTS_KEY);
+      localStorage.removeItem(getPrefsStorageKey(userInfo));
+      localStorage.removeItem(getAlertsStorageKey(userInfo));
       setAlerts([]);
       setPrefs({
         priceAlerts: true,
@@ -277,7 +283,7 @@ function Settings() {
                     <div className="grid gap-4">
                       {alerts.map((alert, idx) => (
                         <div 
-                          key={idx}
+                          key={alert.predictionKey || idx}
                           className="flex items-center justify-between p-5 rounded-2xl bg-[#1e293b]/40 border border-slate-700/50 hover:border-blue-500/30 transition-all duration-300"
                         >
                           <div className="flex items-center gap-4">
@@ -294,7 +300,7 @@ function Settings() {
                             </div>
                           </div>
                           <button 
-                            onClick={() => deleteAlert(idx)}
+                            onClick={() => deleteAlert(alert.predictionKey, idx)}
                             className="p-3 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
                           >
                             <Trash2 size={20} />

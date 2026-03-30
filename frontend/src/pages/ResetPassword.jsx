@@ -46,13 +46,32 @@ function ResetPassword() {
         }
 
         setIsLoading(true)
-        const result = await updatePassword(newPassword)
-        setIsLoading(false)
+        try {
+            const result = await updatePassword(newPassword)
 
-        if (result.success) {
-            setStep(2)
-        } else {
-            setError(result.error)
+            if (result.success) {
+                if (result.requiresRelogin) {
+                    navigate("/login", {
+                        replace: true,
+                        state: {
+                            authMessage: result.message || "Password updated, please log in again.",
+                            authSubMessage: "For security, your password reset ended the current session.",
+                        },
+                    })
+                    return
+                }
+
+                setStep(2)
+            } else {
+                setError(result.error)
+            }
+        } catch (err) {
+            const message = typeof err?.message === "string" && err.message.toLowerCase().includes("auth session missing")
+                ? "Auth session missing. Please refresh the page or log in again for security before updating your password."
+                : "Something went wrong while updating your password. Please refresh the page or log in again and try once more."
+            setError(message)
+        } finally {
+            setIsLoading(false)
         }
     }
 

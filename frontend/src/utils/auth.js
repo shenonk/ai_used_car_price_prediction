@@ -64,42 +64,67 @@ function isAuthSessionMissingError(error) {
 }
 
 export async function updatePassword(newPassword) {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    if (sessionError || !session) {
-        return {
-            success: false,
-            error: "Session expired. Please refresh the page or log in again before updating your password.",
-            requiresRelogin: true,
-            isSessionMissing: true,
-        };
-    }
+        if (sessionError || !session) {
+            return {
+                success: false,
+                error: "Session expired. Please refresh the page or log in again before updating your password.",
+                requiresRelogin: true,
+                isSessionMissing: true,
+            };
+        }
 
-    const { data, error } = await supabase.auth.updateUser({
-        password: newPassword
-    });
+        const { data, error } = await supabase.auth.updateUser({
+            password: newPassword
+        });
 
-    if (error) {
+        if (error) {
+            const isSessionMissing = isAuthSessionMissingError(error);
+            return {
+                success: false,
+                error: isSessionMissing
+                    ? "Auth session missing. Please refresh the page or log in again for security before updating your password."
+                    : error.message,
+                requiresRelogin: isSessionMissing,
+                isSessionMissing,
+            };
+        }
+
+        const { data: { session: refreshedSession }, error: refreshedSessionError } = await supabase.auth.getSession();
+
+        if (refreshedSessionError || !refreshedSession) {
+            await supabase.auth.signOut();
+            return {
+                success: true,
+                requiresRelogin: true,
+                message: "Password updated, please log in again.",
+            };
+        }
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+            return {
+                success: true,
+                requiresRelogin: true,
+                message: "Password updated, please log in again.",
+            };
+        }
+
+        return { success: true, user, requiresRelogin: false };
+    } catch (error) {
         const isSessionMissing = isAuthSessionMissingError(error);
         return {
             success: false,
             error: isSessionMissing
                 ? "Auth session missing. Please refresh the page or log in again for security before updating your password."
-                : error.message,
+                : error?.message || "Unable to update password right now. Please refresh the page and try again.",
             requiresRelogin: isSessionMissing,
             isSessionMissing,
         };
     }
-
-    if (!data?.user) {
-        return {
-            success: true,
-            requiresRelogin: true,
-            message: "Password updated, please log in again.",
-        };
-    }
-
-    return { success: true, user: data.user, requiresRelogin: false };
 }
 
 export async function loginWithGoogle() {

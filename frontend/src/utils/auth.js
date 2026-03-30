@@ -59,15 +59,47 @@ export async function resetPassword(email) {
     return { success: true };
 }
 
+function isAuthSessionMissingError(error) {
+    return typeof error?.message === 'string' && error.message.toLowerCase().includes('auth session missing');
+}
+
 export async function updatePassword(newPassword) {
-    const { error } = await supabase.auth.updateUser({
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !session) {
+        return {
+            success: false,
+            error: "Session expired. Please refresh the page or log in again before updating your password.",
+            requiresRelogin: true,
+            isSessionMissing: true,
+        };
+    }
+
+    const { data, error } = await supabase.auth.updateUser({
         password: newPassword
     });
 
     if (error) {
-        return { success: false, error: error.message };
+        const isSessionMissing = isAuthSessionMissingError(error);
+        return {
+            success: false,
+            error: isSessionMissing
+                ? "Auth session missing. Please refresh the page or log in again for security before updating your password."
+                : error.message,
+            requiresRelogin: isSessionMissing,
+            isSessionMissing,
+        };
     }
-    return { success: true };
+
+    if (!data?.user) {
+        return {
+            success: true,
+            requiresRelogin: true,
+            message: "Password updated, please log in again.",
+        };
+    }
+
+    return { success: true, user: data.user, requiresRelogin: false };
 }
 
 export async function loginWithGoogle() {

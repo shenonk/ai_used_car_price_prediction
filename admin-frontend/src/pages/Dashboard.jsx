@@ -1,55 +1,115 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Users } from 'lucide-react';
 import api from '../services/api';
 import { supabaseAdmin } from '../utils/supabaseClient';
 
 const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
+    if (!dateStr) return '-';
+
     return new Date(dateStr).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric'
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
     });
 };
 
 const formatRelativeTime = (dateStr) => {
     if (!dateStr) return 'Never';
-    const num = Math.floor((new Date() - new Date(dateStr)) / 60000); 
+
+    const num = Math.floor((new Date() - new Date(dateStr)) / 60000);
+
     if (num < 1) return 'Just now';
     if (num < 60) return `${num} minute${num !== 1 ? 's' : ''} ago`;
+
     const hours = Math.floor(num / 60);
     if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+
     const days = Math.floor(hours / 24);
     return `${days} day${days !== 1 ? 's' : ''} ago`;
 };
 
-/**
- * Dashboard — Admin overview page with stats cards.
- * Fetches data from GET /api/admin/stats
- */
 function Dashboard() {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-
+    const [dauCount, setDauCount] = useState(0);
+    const [dauLoading, setDauLoading] = useState(true);
     const [recentUsers, setRecentUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(true);
 
     useEffect(() => {
         fetchStats();
+        fetchDAU();
         fetchRecentUsers();
     }, []);
+
+    const fetchDAU = async () => {
+        const now = new Date();
+        const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        try {
+            setDauLoading(true);
+
+            if (!supabaseAdmin) {
+                throw new Error('No service role key found.');
+            }
+
+            const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
+                page: 1,
+                perPage: 1000,
+            });
+
+            if (!usersError) {
+                const activeUsers = (data?.users || []).filter((user) => {
+                    if (!user.last_sign_in_at) return false;
+                    return new Date(user.last_sign_in_at) >= last24Hours;
+                });
+
+                setDauCount(activeUsers.length);
+                return;
+            }
+
+            const authListBlocked = /not admin|permission|service role|unauthorized|forbidden/i.test(usersError?.message || '');
+
+            if (authListBlocked) {
+                const { count: updatedCount, error: updatedError } = await supabaseAdmin
+                    .from('profiles')
+                    .select('id', { count: 'exact', head: true })
+                    .gte('updated_at', last24Hours.toISOString());
+
+                if (!updatedError) {
+                    setDauCount(typeof updatedCount === 'number' ? updatedCount : 0);
+                    return;
+                }
+
+                throw updatedError || new Error('Unable to fetch fallback DAU from profiles.updated_at.');
+            }
+
+            throw usersError || new Error('Unable to fetch DAU from auth.users.');
+        } catch (err) {
+            console.warn('DAU fetch issue:', err.message);
+            setDauCount(0);
+        } finally {
+            setDauLoading(false);
+        }
+    };
 
     const fetchRecentUsers = async () => {
         try {
             if (!supabaseAdmin) {
                 throw new Error('No service role key found. Using mock users.');
             }
-            const { data, error } = await supabaseAdmin.auth.admin.listUsers();
-            if (error) throw error;
-            
-            const sorted = data.users.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 15);
+
+            const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
+            if (usersError) throw usersError;
+
+            const sorted = data.users
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                .slice(0, 15);
+
             setRecentUsers(sorted);
         } catch (err) {
             console.warn('Admin users fetch issue:', err.message);
-            // Fallback mock representation for UX
             setRecentUsers([
                 {
                     id: '1',
@@ -57,7 +117,7 @@ function Dashboard() {
                     user_metadata: { username: 'Kushantha' },
                     email_confirmed_at: '2026-03-24T10:00:00Z',
                     created_at: '2026-03-24T09:00:00Z',
-                    last_sign_in_at: new Date(Date.now() - 7200000).toISOString()
+                    last_sign_in_at: new Date(Date.now() - 7200000).toISOString(),
                 },
                 {
                     id: '2',
@@ -65,7 +125,7 @@ function Dashboard() {
                     user_metadata: { username: 'GuestUser123' },
                     email_confirmed_at: null,
                     created_at: '2026-03-23T14:30:00Z',
-                    last_sign_in_at: new Date(Date.now() - 86400000).toISOString()
+                    last_sign_in_at: new Date(Date.now() - 86400000).toISOString(),
                 },
                 {
                     id: '3',
@@ -73,8 +133,8 @@ function Dashboard() {
                     user_metadata: { username: 'Developer' },
                     email_confirmed_at: '2026-03-20T11:20:00Z',
                     created_at: '2026-03-20T11:00:00Z',
-                    last_sign_in_at: new Date(Date.now() - 172800000).toISOString()
-                }
+                    last_sign_in_at: new Date(Date.now() - 172800000).toISOString(),
+                },
             ]);
         } finally {
             setUsersLoading(false);
@@ -85,9 +145,8 @@ function Dashboard() {
         try {
             const res = await api.get('/api/admin/stats');
             setStats(res.data);
-        } catch (err) {
+        } catch {
             setError('Unable to load dashboard stats. Backend may be unavailable.');
-            // Fallback data for UI preview
             setStats({
                 total_predictions: 1248,
                 r2_score: 0.9234,
@@ -104,7 +163,7 @@ function Dashboard() {
         ? [
             {
                 title: 'Total Predictions',
-                value: stats.total_predictions?.toLocaleString() || '—',
+                value: stats.total_predictions?.toLocaleString() || '-',
                 icon: (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -113,8 +172,25 @@ function Dashboard() {
                 color: 'blue',
             },
             {
-                title: 'Model R² Score',
-                value: stats.r2_score != null ? stats.r2_score.toFixed(4) : '—',
+                title: 'Daily Active Users (DAU)',
+                value: dauLoading ? (
+                    <span className="inline-flex items-center gap-2">
+                        <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        <span>0</span>
+                    </span>
+                ) : (
+                    dauCount.toLocaleString()
+                ),
+                subtext: 'Unique logins in the last 24 hours',
+                icon: <Users className="w-6 h-6" strokeWidth={1.8} />,
+                color: 'emerald',
+            },
+            {
+                title: 'Model R2 Score',
+                value: stats.r2_score != null ? stats.r2_score.toFixed(4) : '-',
                 icon: (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
@@ -124,7 +200,7 @@ function Dashboard() {
             },
             {
                 title: 'Current MAE',
-                value: stats.mae != null ? `LKR ${stats.mae.toLocaleString()}` : '—',
+                value: stats.mae != null ? `LKR ${stats.mae.toLocaleString()}` : '-',
                 icon: (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -134,7 +210,7 @@ function Dashboard() {
             },
             {
                 title: 'Last Training Date',
-                value: stats.last_training_date || '—',
+                value: stats.last_training_date || '-',
                 icon: (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -144,7 +220,7 @@ function Dashboard() {
             },
             {
                 title: 'Active Loan Interest Rate',
-                value: stats.active_loan_rate != null ? `${stats.active_loan_rate}%` : '—',
+                value: stats.active_loan_rate != null ? `${stats.active_loan_rate}%` : '-',
                 icon: (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -176,13 +252,11 @@ function Dashboard() {
 
     return (
         <div className="animate-[fade-in_0.5s_ease-out]">
-            {/* Header */}
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-white">Dashboard</h1>
                 <p className="text-gray-500 text-sm mt-1">System overview and model performance metrics</p>
             </div>
 
-            {/* Error banner */}
             {error && (
                 <div className="mb-6 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-400 text-sm flex items-center gap-2">
                     <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -192,16 +266,14 @@ function Dashboard() {
                 </div>
             )}
 
-            {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {statCards.map((card, i) => {
                     const colors = colorMap[card.color];
+
                     return (
                         <div
                             key={i}
-                            className={`bg-gray-900/60 border ${colors.border} rounded-2xl p-5 
-                hover:bg-gray-900/80 hover:-translate-y-1 transition-all duration-300
-                shadow-lg ${colors.glow}`}
+                            className={`bg-gray-900/60 border ${colors.border} rounded-2xl p-5 hover:bg-gray-900/80 hover:-translate-y-1 transition-all duration-300 shadow-lg ${colors.glow}`}
                             style={{ animationDelay: `${i * 80}ms` }}
                         >
                             <div className="flex items-start justify-between mb-4">
@@ -210,13 +282,15 @@ function Dashboard() {
                                 </div>
                             </div>
                             <p className="text-gray-500 text-xs font-medium uppercase tracking-wider mb-1">{card.title}</p>
-                            <p className="text-xl font-bold text-white">{card.value}</p>
+                            <p className={`text-xl font-bold ${card.color === 'emerald' || card.color === 'cyan' ? colors.text : 'text-white'}`}>
+                                {card.value}
+                            </p>
+                            {card.subtext && <p className="text-slate-500 text-xs mt-1">{card.subtext}</p>}
                         </div>
                     );
                 })}
             </div>
 
-            {/* Recent Registrations Table */}
             <div className="mt-10 animate-[fade-in_0.6s_ease-out]">
                 <h2 className="text-xl font-bold text-white mb-4">Recent Registrations</h2>
                 <div className="bg-[#1e293b] border border-cyan-500/20 rounded-2xl overflow-hidden shadow-lg shadow-cyan-500/5">
@@ -286,8 +360,7 @@ function Dashboard() {
                         </table>
                     </div>
                 </div>
-                
-                {/* Note about admin key if using mock data */}
+
                 {!usersLoading && recentUsers.length > 0 && !import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY && (
                     <p className="text-xs text-amber-500/50 mt-3 text-center">
                         Viewing mock records. Add <code className="bg-slate-800 px-1 py-0.5 rounded text-amber-400 tracking-wider">VITE_SUPABASE_SERVICE_ROLE_KEY</code> to your .env to see secure live data.

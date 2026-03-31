@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { useNavigate, Link } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { useNavigate, Link, useLocation } from "react-router-dom"
 import { login, loginWithGoogle } from "../utils/auth"
 import logo from "../assets/logo/autovaluelk-logo.png"
 import LoadingOverlay from "../components/auth/LoadingOverlay"
@@ -7,12 +7,28 @@ import SuccessToast from "../components/auth/SuccessToast"
 
 function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const authMessage = location.state?.authMessage || ""
+  const authSubMessage = location.state?.authSubMessage || "Please sign in to continue."
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
-  const [showSuccess, setShowSuccess] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(Boolean(authMessage))
+
+  useEffect(() => {
+    if (!authMessage) {
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setShowSuccess(false)
+      navigate(location.pathname, { replace: true, state: {} })
+    }, 3000)
+
+    return () => window.clearTimeout(timeout)
+  }, [authMessage, location.pathname, navigate])
 
   const handleGoogleLogin = async () => {
     setError("")
@@ -46,7 +62,11 @@ function Login() {
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
       <LoadingOverlay isOpen={isLoading} message="Connecting to AutoValueLK..." />
-      <SuccessToast isOpen={showSuccess} message="Login Successful!" subMessage="Redirecting to dashboard..." />
+      <SuccessToast
+        isOpen={showSuccess}
+        message={authMessage || "Login Successful!"}
+        subMessage={authMessage ? authSubMessage : "Redirecting to dashboard..."}
+      />
 
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">

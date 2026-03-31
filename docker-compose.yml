@@ -1,0 +1,55 @@
+# ============================================
+#  AutoValueLK — Multi-Container Docker Setup
+#  Run:  docker-compose --env-file .env.docker up --build
+# ============================================
+
+services:
+  # ── User-Facing Frontend (React + Vite) ──
+  frontend-user:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+        VITE_API_URL: ${VITE_API_URL}
+    ports:
+      - "3000:80"
+    networks:
+      - autovalue-network
+    restart: unless-stopped
+
+  # ── Admin Dashboard Frontend (React + Vite) ──
+  frontend-admin:
+    build:
+      context: ./admin-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_SUPABASE_SERVICE_ROLE_KEY: ${VITE_SUPABASE_SERVICE_ROLE_KEY}
+    ports:
+      - "3001:80"
+    networks:
+      - autovalue-network
+    restart: unless-stopped
+
+  # ── Backend API (Flask + Gunicorn) ──
+  backend-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env.docker
+    networks:
+      - autovalue-network
+    restart: unless-stopped
+
+# ── Shared Network ──
+networks:
+  autovalue-network:
+    driver: bridge
+

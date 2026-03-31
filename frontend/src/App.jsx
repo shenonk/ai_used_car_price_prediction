@@ -7,6 +7,7 @@ import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
+import Marketplace from "./pages/Marketplace";
 import PriceCheck from "./pages/PriceCheck";
 import Results from "./pages/Results";
 import Analytics from "./pages/Analytics";
@@ -29,6 +30,7 @@ function App() {
         {/* MAIN LAYOUT WRAP */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
+          <Route path="marketplace" element={<Marketplace />} />
           <Route path="price-check" element={<PriceCheck />} />
           <Route path="results" element={<Results />} />
           <Route path="analytics" element={<Analytics />} />

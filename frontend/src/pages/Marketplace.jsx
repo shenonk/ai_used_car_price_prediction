@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ShieldCheck, Sparkles } from "lucide-react";
+import { CalendarRange, ChevronDown, Fuel, Gauge, ShieldCheck, Sparkles } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
 
@@ -90,6 +90,27 @@ function Marketplace() {
     () => ["All Fuel Types", ...new Set(approvedCars.map((car) => car.fuel_type).filter(Boolean))],
     [approvedCars]
   );
+
+  const filteredCars = useMemo(() => {
+    return approvedCars.filter((car) => {
+      const matchesBrand =
+        filters.brand === "All Brands" || car.brand === filters.brand;
+      const matchesModel =
+        filters.model === "All Models" || car.model === filters.model;
+      const matchesFuel =
+        filters.fuelType === "All Fuel Types" || car.fuel_type === filters.fuelType;
+
+      const price = Number(car.price || 0);
+      const matchesPriceRange =
+        filters.priceRange === "All Prices" ||
+        (filters.priceRange === "Under 3M" && price < 3000000) ||
+        (filters.priceRange === "3M - 6M" && price >= 3000000 && price <= 6000000) ||
+        (filters.priceRange === "6M - 10M" && price > 6000000 && price <= 10000000) ||
+        (filters.priceRange === "Above 10M" && price > 10000000);
+
+      return matchesBrand && matchesModel && matchesFuel && matchesPriceRange;
+    });
+  }, [approvedCars, filters]);
 
   const handleFilterChange = (key, value) => {
     setFilters((current) => ({
@@ -275,6 +296,102 @@ function Marketplace() {
         )}
       </section>
 
+      <section className="mt-8 animate-fade-in animate-delay-200">
+        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-white">Approved cars for buyers</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Listings only appear here after admin approval.
+            </p>
+          </div>
+          <div className="rounded-full border border-slate-700/60 bg-slate-900/70 px-4 py-2 text-sm text-slate-300">
+            Showing {filteredCars.length} of {approvedCars.length} approved listings
+          </div>
+        </div>
+
+        {filteredCars.length === 0 ? (
+          <div className="card flex min-h-[260px] flex-col items-center justify-center p-8 text-center">
+            <div className="rounded-full border border-slate-700/70 bg-slate-900/80 p-4">
+              <Sparkles className="h-7 w-7 text-cyan-300" />
+            </div>
+            <h3 className="mt-5 text-xl font-semibold text-white">No approved cars match these filters</h3>
+            <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
+              Try adjusting the filters, or wait for an admin to approve new seller submissions.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
+            {filteredCars.map((car) => (
+              <article
+                key={car.id}
+                className="group overflow-hidden rounded-[28px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
+              >
+                <div className="relative h-56 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
+                  {car.image_url ? (
+                    <img
+                      src={car.image_url}
+                      alt={`${car.brand} ${car.model}`}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
+                      <ShieldCheck className="h-10 w-10 text-cyan-300/70" />
+                      <span className="text-sm text-slate-400">Approved listing</span>
+                    </div>
+                  )}
+
+                  <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Approved
+                  </div>
+                </div>
+
+                <div className="p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-semibold text-white">
+                        {car.brand} {car.model}
+                      </h3>
+                      <p className="mt-1 text-sm text-slate-400">{car.condition || "Used vehicle"}</p>
+                    </div>
+                    <p className="text-right text-lg font-bold text-cyan-300">
+                      {formatCurrency(car.price)}
+                    </p>
+                  </div>
+
+                  <div className="mt-5 grid grid-cols-2 gap-3">
+                    <MarketplaceMeta
+                      icon={<CalendarRange className="h-4 w-4" />}
+                      label="Year"
+                      value={car.year || "-"}
+                    />
+                    <MarketplaceMeta
+                      icon={<Gauge className="h-4 w-4" />}
+                      label="Mileage"
+                      value={`${Number(car.mileage || 0).toLocaleString()} km`}
+                    />
+                    <MarketplaceMeta
+                      icon={<Fuel className="h-4 w-4" />}
+                      label="Fuel"
+                      value={car.fuel_type || "-"}
+                    />
+                    <MarketplaceMeta
+                      icon={
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.25 18.75h7.5m-7.5-13.5h7.5M9 7.5h6a2.25 2.25 0 012.25 2.25v4.5A2.25 2.25 0 0115 16.5H9a2.25 2.25 0 01-2.25-2.25v-4.5A2.25 2.25 0 019 7.5z" />
+                        </svg>
+                      }
+                      label="Gearbox"
+                      value={car.transmission || "-"}
+                    />
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
       {isPublishModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -439,6 +556,18 @@ function InputField({ label, value, onChange, placeholder, type = "text" }) {
         className="w-full rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
       />
     </label>
+  );
+}
+
+function MarketplaceMeta({ icon, label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-3">
+      <div className="flex items-center gap-2 text-slate-500">
+        {icon}
+        <span className="text-xs font-medium uppercase tracking-[0.18em]">{label}</span>
+      </div>
+      <p className="mt-2 text-sm font-medium text-white">{value}</p>
+    </div>
   );
 }
 

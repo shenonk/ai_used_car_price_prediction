@@ -44,6 +44,7 @@ function Marketplace() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [submitState, setSubmitState] = useState({ saving: false, error: "", success: "" });
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [selectedCar, setSelectedCar] = useState(null);
 
   const fetchListings = async () => {
     try {
@@ -324,6 +325,15 @@ function Marketplace() {
             {filteredCars.map((car) => (
               <article
                 key={car.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedCar(car)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setSelectedCar(car);
+                  }
+                }}
                 className="group overflow-hidden rounded-[28px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
               >
                 <div className="relative h-56 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
@@ -385,12 +395,138 @@ function Marketplace() {
                       value={car.transmission || "-"}
                     />
                   </div>
+
+                  <div className="mt-5 flex items-center justify-between border-t border-slate-800/80 pt-4">
+                    <p className="text-sm text-slate-400">Tap to expand this listing</p>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedCar(car);
+                      }}
+                      className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
+                    >
+                      View details
+                    </button>
+                  </div>
                 </div>
               </article>
             ))}
           </div>
         )}
       </section>
+
+      {selectedCar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm"
+            onClick={() => setSelectedCar(null)}
+          />
+
+          <section className="relative z-10 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[30px] border border-slate-700/60 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94),rgba(30,41,59,0.96))] shadow-2xl shadow-slate-950/50">
+            <div className="grid lg:grid-cols-[1.2fr_0.9fr]">
+              <div className="relative min-h-[320px] border-b border-slate-800 lg:min-h-[620px] lg:border-b-0 lg:border-r">
+                {selectedCar.image_url ? (
+                  <img
+                    src={selectedCar.image_url}
+                    alt={`${selectedCar.brand} ${selectedCar.model}`}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-4 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.16),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))] text-slate-500">
+                    <ShieldCheck className="h-14 w-14 text-cyan-300/70" />
+                    <p className="text-sm text-slate-300">Approved marketplace listing</p>
+                  </div>
+                )}
+
+                <div className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                  <ShieldCheck className="h-4 w-4" />
+                  Approved by admin
+                </div>
+              </div>
+
+              <div className="p-6 md:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Marketplace listing</p>
+                    <h2 className="mt-2 text-3xl font-semibold text-white">
+                      {selectedCar.brand} {selectedCar.model}
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-400">
+                      Explore the full vehicle details with a larger image preview before contacting the seller.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCar(null)}
+                    className="rounded-full border border-slate-700/70 bg-slate-900/80 px-3 py-2 text-sm text-slate-300 transition hover:border-slate-500/80 hover:text-white"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="mt-6 rounded-[24px] border border-cyan-500/15 bg-cyan-500/10 p-5">
+                  <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">Price</p>
+                  <p className="mt-2 text-3xl font-bold text-cyan-100">
+                    {formatCurrency(selectedCar.price)}
+                  </p>
+                </div>
+
+                <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <MarketplaceMeta
+                    icon={<CalendarRange className="h-4 w-4" />}
+                    label="Year"
+                    value={selectedCar.year || "-"}
+                  />
+                  <MarketplaceMeta
+                    icon={<Gauge className="h-4 w-4" />}
+                    label="Mileage"
+                    value={`${Number(selectedCar.mileage || 0).toLocaleString()} km`}
+                  />
+                  <MarketplaceMeta
+                    icon={<Fuel className="h-4 w-4" />}
+                    label="Fuel"
+                    value={selectedCar.fuel_type || "-"}
+                  />
+                  <MarketplaceMeta
+                    icon={
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.25 18.75h7.5m-7.5-13.5h7.5M9 7.5h6a2.25 2.25 0 012.25 2.25v4.5A2.25 2.25 0 0115 16.5H9a2.25 2.25 0 01-2.25-2.25v-4.5A2.25 2.25 0 019 7.5z" />
+                      </svg>
+                    }
+                    label="Gearbox"
+                    value={selectedCar.transmission || "-"}
+                  />
+                  <MarketplaceMeta
+                    icon={<ShieldCheck className="h-4 w-4" />}
+                    label="Condition"
+                    value={selectedCar.condition || "-"}
+                  />
+                  <MarketplaceMeta
+                    icon={<Sparkles className="h-4 w-4" />}
+                    label="Status"
+                    value="Approved and visible"
+                  />
+                </div>
+
+                <div className="mt-6 rounded-[24px] border border-slate-800/80 bg-slate-900/70 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Listing summary
+                  </p>
+                  <p className="mt-3 text-sm leading-7 text-slate-300">
+                    {selectedCar.brand} {selectedCar.model} is a {selectedCar.condition || "vehicle"} from{" "}
+                    {selectedCar.year || "an unspecified year"} with{" "}
+                    {Number(selectedCar.mileage || 0).toLocaleString()} km on the odometer, powered by{" "}
+                    {selectedCar.fuel_type || "an unspecified fuel type"} and paired with a{" "}
+                    {selectedCar.transmission || "standard"} transmission.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
 
       {isPublishModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

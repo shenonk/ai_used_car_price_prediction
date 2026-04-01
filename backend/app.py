@@ -127,13 +127,17 @@ def save_prediction_to_db(brand, model, year, engine, mileage, predicted_price):
 
 def get_admin_by_email(email):
     """Look up an admin user by email from the admin_users table."""
+    normalized_email = (email or "").lower().strip()
+    if not normalized_email:
+        return None
+
     conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
             "SELECT id, email, full_name, role, created_at FROM admin_users WHERE email = %s",
-            (email.lower().strip(),),
+            (normalized_email,),
         )
         row = cur.fetchone()
         cur.close()
@@ -145,13 +149,27 @@ def get_admin_by_email(email):
                 "role": row[3],
                 "created_at": str(row[4]),
             }
-        return None
     except Exception as e:
         print(f"[FAIL] Admin lookup error: {e}", flush=True)
-        return None
     finally:
         if conn:
             conn.close()
+
+    if supabase:
+        try:
+            response = (
+                supabase.table("admin_users")
+                .select("id,email,full_name,role,created_at")
+                .eq("email", normalized_email)
+                .limit(1)
+                .execute()
+            )
+            if response.data:
+                return response.data[0]
+        except Exception as e:
+            print(f"[FAIL] Admin lookup via Supabase API error: {e}", flush=True)
+
+    return None
 
 
 # ============================================
@@ -399,6 +417,9 @@ def admin_login():
     try:
         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
         if res.user:
+            admin = get_admin_by_email(email)
+            if not admin:
+                return jsonify({"error": "This account is not authorized for admin access."}), 403
             return jsonify({"token": res.session.access_token, "message": "Admin login successful"})
         return jsonify({"error": "Invalid email or password."}), 401
     except Exception as e:

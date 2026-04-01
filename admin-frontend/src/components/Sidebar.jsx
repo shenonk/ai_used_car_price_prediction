@@ -26,6 +26,15 @@ function Sidebar() {
             ),
         },
         {
+            to: '/admin/marketplace',
+            label: 'Marketplace',
+            icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 7.5l1.664 9.152A2.25 2.25 0 006.879 18.5h10.242a2.25 2.25 0 002.215-1.848L21 7.5M3 7.5h18M3 7.5l1.2-2.4A2.25 2.25 0 016.213 3.75h11.574A2.25 2.25 0 0119.8 5.1L21 7.5M9 11.25h6" />
+                </svg>
+            ),
+        },
+        {
             to: '/admin/financing',
             label: 'Financing',
             icon: (

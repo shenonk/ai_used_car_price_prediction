@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import LoanRates from './pages/LoanRates';
 import Notifications from './pages/Notifications';
 import Financing from './pages/Financing';
+import Marketplace from './pages/Marketplace';
 
 /**
  * AdminLayout — sidebar + scrollable content area.
@@ -40,6 +41,7 @@ function App() {
           }
         >
           <Route path="/admin/dashboard" element={<Dashboard />} />
+          <Route path="/admin/marketplace" element={<Marketplace />} />
           <Route path="/admin/loan-rates" element={<LoanRates />} />
           <Route path="/admin/financing" element={<Financing />} />
           <Route path="/admin/notifications" element={<Notifications />} />

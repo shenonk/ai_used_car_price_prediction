@@ -31,7 +31,7 @@ function Notifications() {
         try {
             const res = await api.get('/api/admin/notifications');
             setNotifications(res.data.notifications || res.data);
-        } catch (err) {
+        } catch {
             setError('Unable to load notifications.');
             // Fallback data for UI preview
             setNotifications([

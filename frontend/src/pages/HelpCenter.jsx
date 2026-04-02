@@ -7,16 +7,20 @@ import {
   PlayCircle,
   ChevronDown,
   ChevronUp,
-  MessageCircle,
   Mail,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-
 const HelpCenter = () => {
-  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [openFaq, setOpenFaq] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    message: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState("");
+  const [submitError, setSubmitError] = useState("");
 
   const categories = [
     {
@@ -115,6 +119,64 @@ const HelpCenter = () => {
   const toggleFaq = (id) => {
     setOpenFaq(openFaq === id ? null : id);
   };
+
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setSubmitSuccess("");
+    setSubmitError("");
+    setIsSubmitting(true);
+
+    const payload = {
+      user_name: formData.full_name.trim(),
+      user_email: formData.email.trim(),
+      message: formData.message.trim(),
+      status: "open",
+    };
+
+    try {
+      const response = await fetch("http://localhost:5000/api/support-ticket", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to send support ticket.");
+      }
+    } catch (error) {
+      setSubmitError(error.message || "We couldn't send your message right now. Please try again in a moment.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    setFormData({
+      full_name: "",
+      email: "",
+      message: "",
+    });
+    setSubmitSuccess("Thank you! Our support team will contact you shortly.");
+    setIsSubmitting(false);
+    window.setTimeout(() => {
+      setSubmitSuccess("");
+    }, 4000);
+  };
+
+  const isFormValid =
+    formData.full_name.trim() &&
+    formData.email.trim() &&
+    formData.message.trim();
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-[#f8fafc] p-8 animate-fade-in">
@@ -223,27 +285,56 @@ const HelpCenter = () => {
 
         <div className="flex flex-col items-center justify-center space-y-8 py-12 border-t border-slate-800/50">
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">Still need help?</h2>
+            <h2 className="text-2xl font-bold mb-2">Contact Us</h2>
             <p className="text-slate-400">Our support team is available 24/7 to assist you.</p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-            <button
-              type="button"
-              onClick={() => navigate("/notifications")}
-              className="flex-1 flex items-center justify-center gap-2 bg-[#3B82F6] hover:bg-[#2563eb] text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-[1.02] shadow-[0_4px_20px_rgba(59,130,246,0.3)]"
-            >
-              <MessageCircle className="w-5 h-5" />
-              Chat with Support
-            </button>
-            <a
-              href="mailto:support@autovaluelk.com?subject=AutoValueLK%20Help%20Request"
-              className="flex-1 flex items-center justify-center gap-2 bg-transparent border border-white/20 hover:bg-white/5 text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-[1.02]"
-            >
-              <Mail className="w-5 h-5" />
-              Email Us
-            </a>
-          </div>
+          <form onSubmit={handleSubmit} className="w-full max-w-2xl space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input
+                type="text"
+                name="full_name"
+                value={formData.full_name}
+                onChange={handleInputChange}
+                placeholder="Full Name"
+                required
+                className="w-full bg-[#1e293b]/50 border border-slate-700/50 py-4 px-5 rounded-xl outline-none transition-all duration-300 focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20 backdrop-blur-md"
+              />
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                placeholder="Email Address"
+                required
+                className="w-full bg-[#1e293b]/50 border border-slate-700/50 py-4 px-5 rounded-xl outline-none transition-all duration-300 focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20 backdrop-blur-md"
+              />
+            </div>
+
+            <textarea
+              name="message"
+              value={formData.message}
+              onChange={handleInputChange}
+              placeholder="Tell us how we can help..."
+              required
+              rows="6"
+              className="w-full bg-[#1e293b]/50 border border-slate-700/50 py-4 px-5 rounded-2xl outline-none transition-all duration-300 focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20 backdrop-blur-md resize-none"
+            />
+
+            <div className="flex flex-col items-center gap-3">
+              <button
+                type="submit"
+                disabled={isSubmitting || !isFormValid}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#3B82F6] hover:bg-[#2563eb] disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-[1.02] shadow-[0_4px_20px_rgba(59,130,246,0.3)]"
+              >
+                <Mail className="w-5 h-5" />
+                {isSubmitting ? "Sending..." : "Send Message"}
+              </button>
+
+              {submitSuccess && <p className="text-emerald-400 text-sm text-center">{submitSuccess}</p>}
+              {submitError && <p className="text-rose-400 text-sm text-center">{submitError}</p>}
+            </div>
+          </form>
         </div>
       </div>
     </div>

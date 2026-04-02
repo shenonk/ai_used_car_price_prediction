@@ -1,67 +1,116 @@
-import React, { useState } from 'react';
-import { 
-  Search, 
-  BookOpen, 
-  CreditCard, 
-  ShieldCheck, 
-  PlayCircle, 
-  ChevronDown, 
-  ChevronUp, 
-  MessageCircle, 
+import React, { useState } from "react";
+import {
+  Search,
+  BookOpen,
+  CreditCard,
+  ShieldCheck,
+  PlayCircle,
+  ChevronDown,
+  ChevronUp,
+  MessageCircle,
   Mail,
-  HelpCircle
-} from 'lucide-react';
-import { useTranslation } from 'react-i18next';
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const HelpCenter = () => {
-  const { t } = useTranslation();
-  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+  const [searchQuery, setSearchQuery] = useState("");
   const [openFaq, setOpenFaq] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState("all");
 
   const categories = [
     {
-      id: 'financing',
-      title: 'Financing Basics',
+      id: "financing",
+      title: "Financing Basics",
       icon: <BookOpen className="w-8 h-8" />,
-      description: 'Learn about loans, leasing, and credit requirements.'
+      description: "Learn about loans, leasing, and credit requirements.",
+      keywords: ["loan", "leasing", "finance", "credit", "interest"],
+      route: "/financing",
     },
     {
-      id: 'payments',
-      title: 'Payment Methods',
+      id: "payments",
+      title: "Payment Methods",
       icon: <CreditCard className="w-8 h-8" />,
-      description: 'Manage your bank details and payment schedules.'
+      description: "Manage your bank details and payment schedules.",
+      keywords: ["payment", "bank", "schedule", "installment", "details"],
+      route: "/settings",
     },
     {
-      id: 'security',
-      title: 'Account Security',
+      id: "security",
+      title: "Account Security",
       icon: <ShieldCheck className="w-8 h-8" />,
-      description: 'Keep your personal and financial data safe.'
+      description: "Keep your personal and financial data safe.",
+      keywords: ["password", "security", "account", "login", "safe"],
+      route: "/settings",
     },
     {
-      id: 'tutorials',
-      title: 'App Tutorials',
+      id: "tutorials",
+      title: "App Tutorials",
       icon: <PlayCircle className="w-8 h-8" />,
-      description: 'Step-by-step guides on using AutoValueLK.'
-    }
+      description: "Step-by-step guides on using AutoValueLK.",
+      keywords: ["guide", "tutorial", "results", "price", "dashboard"],
+      route: "/price-check",
+    },
   ];
 
   const faqs = [
     {
       id: 1,
+      category: "financing",
       question: "How do I apply for vehicle financing?",
-      answer: "You can apply directly through our 'Financing' page. Simply select your preferred lender, enter your details, and submit the application. Our team will review it within 24-48 hours."
+      answer:
+        "You can apply through the Financing page. Compare lenders, review the estimated monthly cost, and continue with the provider that best matches your budget.",
     },
     {
       id: 2,
+      category: "financing",
       question: "What are the current interest rates?",
-      answer: "Interest rates vary by lender and based on your credit profile. Currently, they range from 8.5% to 14.2% per annum. You can compare real-time rates on our comparison table."
+      answer:
+        "Interest rates vary by lender and your profile. The Financing page shows the currently available provider rates stored in the system for comparison.",
     },
     {
       id: 3,
+      category: "payments",
       question: "How do I update my bank details?",
-      answer: "Navigate to Settings > Payment Methods. From there, you can add, remove, or update your linked bank accounts for seamless transactions."
-    }
+      answer:
+        "Go to Settings to manage your saved preferences and account-related options. Payment and profile-related changes can be reviewed there.",
+    },
+    {
+      id: 4,
+      category: "security",
+      question: "Where can I change my password?",
+      answer:
+        "Open Settings and use the Security tab to update your password and keep your account protected.",
+    },
+    {
+      id: 5,
+      category: "tutorials",
+      question: "How do I start a vehicle price check?",
+      answer:
+        "Open Price Check, enter the vehicle details, and submit the form to generate a predicted vehicle value and related results.",
+    },
   ];
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredCategories = categories.filter((cat) => {
+    if (!normalizedQuery) return true;
+
+    const haystack = `${cat.title} ${cat.description} ${cat.keywords.join(" ")}`.toLowerCase();
+    return haystack.includes(normalizedQuery);
+  });
+
+  const filteredFaqs = faqs.filter((faq) => {
+    const matchesCategory = selectedCategory === "all" || faq.category === selectedCategory;
+    const haystack = `${faq.question} ${faq.answer}`.toLowerCase();
+    const matchesSearch = !normalizedQuery || haystack.includes(normalizedQuery);
+    return matchesCategory && matchesSearch;
+  });
+
+  const handleCategoryClick = (category) => {
+    setSelectedCategory(category.id);
+    setOpenFaq(null);
+  };
 
   const toggleFaq = (id) => {
     setOpenFaq(openFaq === id ? null : id);
@@ -70,13 +119,11 @@ const HelpCenter = () => {
   return (
     <div className="min-h-screen bg-[#0f172a] text-[#f8fafc] p-8 animate-fade-in">
       <div className="max-w-6xl mx-auto space-y-16">
-        
-        {/* Header Section */}
         <div className="text-center space-y-8 py-10">
           <h1 className="text-5xl font-bold tracking-tight">
             How can we <span className="gradient-text">help you?</span>
           </h1>
-          
+
           <div className="max-w-2xl mx-auto relative group">
             <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-[#3B82F6] transition-colors">
               <Search className="w-5 h-5" />
@@ -89,80 +136,115 @@ const HelpCenter = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+
+          {selectedCategory !== "all" && (
+            <div className="flex items-center justify-center gap-3 text-sm">
+              <span className="text-slate-400">
+                Filtering by {categories.find((cat) => cat.id === selectedCategory)?.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("all")}
+                className="text-[#3B82F6] hover:text-blue-300 transition-colors"
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Categories Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {categories.map((cat) => (
-            <div 
+          {filteredCategories.map((cat) => (
+            <button
+              type="button"
               key={cat.id}
-              className="group p-8 rounded-2xl border border-slate-700/50 bg-[#1e293b]/40 backdrop-blur-lg transition-all duration-300 hover:-translate-y-2 hover:border-[#3B82F6]/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] cursor-pointer"
+              onClick={() => handleCategoryClick(cat)}
+              className={`group p-8 rounded-2xl border backdrop-blur-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] text-left ${
+                selectedCategory === cat.id
+                  ? "border-[#3B82F6]/60 bg-[#1e293b]/70"
+                  : "border-slate-700/50 bg-[#1e293b]/40 hover:border-[#3B82F6]/50"
+              } cursor-pointer`}
             >
               <div className="w-16 h-16 rounded-xl bg-blue-500/10 flex items-center justify-center text-[#3B82F6] mb-6 group-hover:scale-110 transition-transform">
                 {cat.icon}
               </div>
               <h3 className="text-xl font-semibold mb-3">{cat.title}</h3>
               <p className="text-slate-400 text-sm leading-relaxed">{cat.description}</p>
-            </div>
+            </button>
           ))}
         </div>
 
-        {/* FAQ Section */}
         <div className="space-y-8 glass p-8 md:p-12 rounded-3xl">
           <div className="text-center md:text-left">
             <h2 className="text-3xl font-bold mb-2">Frequently Asked Questions</h2>
             <p className="text-slate-400">Quick answers to common questions about our platform.</p>
           </div>
-          
+
           <div className="grid gap-4">
-            {faqs.map((faq) => (
-              <div 
-                key={faq.id}
-                className={`border border-slate-700/50 rounded-2xl overflow-hidden transition-all duration-300 ${openFaq === faq.id ? 'bg-[#1e293b]/60 border-slate-600/50' : 'bg-transparent'}`}
-              >
-                <button 
-                  onClick={() => toggleFaq(faq.id)}
-                  className="w-full p-6 flex items-center justify-between text-left hover:bg-slate-800/30 transition-colors"
+            {filteredFaqs.length === 0 ? (
+              <div className="border border-slate-700/50 rounded-2xl p-6 bg-[#1e293b]/30 text-center">
+                <p className="text-white text-lg font-medium">No matching help articles found.</p>
+                <p className="text-slate-400 mt-2">Try another keyword or clear the category filter.</p>
+              </div>
+            ) : (
+              filteredFaqs.map((faq) => (
+                <div
+                  key={faq.id}
+                  className={`border border-slate-700/50 rounded-2xl overflow-hidden transition-all duration-300 ${
+                    openFaq === faq.id ? "bg-[#1e293b]/60 border-slate-600/50" : "bg-transparent"
+                  }`}
                 >
-                  <span className="text-lg font-medium">{faq.question}</span>
-                  {openFaq === faq.id ? (
-                    <ChevronUp className="w-5 h-5 text-[#3B82F6]" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-slate-500" />
-                  )}
-                </button>
-                
-                <div 
-                  className={`overflow-hidden transition-all duration-500 ease-in-out ${openFaq === faq.id ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}
-                >
-                  <div className="p-6 pt-0 text-slate-400 leading-relaxed border-t border-slate-700/30 mt-2">
-                    {faq.answer}
+                  <button
+                    onClick={() => toggleFaq(faq.id)}
+                    className="w-full p-6 flex items-center justify-between text-left hover:bg-slate-800/30 transition-colors"
+                  >
+                    <span className="text-lg font-medium">{faq.question}</span>
+                    {openFaq === faq.id ? (
+                      <ChevronUp className="w-5 h-5 text-[#3B82F6]" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-slate-500" />
+                    )}
+                  </button>
+
+                  <div
+                    className={`overflow-hidden transition-all duration-500 ease-in-out ${
+                      openFaq === faq.id ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
+                    }`}
+                  >
+                    <div className="p-6 pt-0 text-slate-400 leading-relaxed border-t border-slate-700/30 mt-2">
+                      {faq.answer}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
-        {/* Support CTA */}
         <div className="flex flex-col items-center justify-center space-y-8 py-12 border-t border-slate-800/50">
           <div className="text-center">
             <h2 className="text-2xl font-bold mb-2">Still need help?</h2>
             <p className="text-slate-400">Our support team is available 24/7 to assist you.</p>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
-            <button className="flex-1 flex items-center justify-center gap-2 bg-[#3B82F6] hover:bg-[#2563eb] text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-[1.02] shadow-[0_4px_20px_rgba(59,130,246,0.3)]">
+            <button
+              type="button"
+              onClick={() => navigate("/notifications")}
+              className="flex-1 flex items-center justify-center gap-2 bg-[#3B82F6] hover:bg-[#2563eb] text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-[1.02] shadow-[0_4px_20px_rgba(59,130,246,0.3)]"
+            >
               <MessageCircle className="w-5 h-5" />
               Chat with Support
             </button>
-            <button className="flex-1 flex items-center justify-center gap-2 bg-transparent border border-white/20 hover:bg-white/5 text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-[1.02]">
+            <a
+              href="mailto:support@autovaluelk.com?subject=AutoValueLK%20Help%20Request"
+              className="flex-1 flex items-center justify-center gap-2 bg-transparent border border-white/20 hover:bg-white/5 text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-[1.02]"
+            >
               <Mail className="w-5 h-5" />
               Email Us
-            </button>
+            </a>
           </div>
         </div>
-
       </div>
     </div>
   );

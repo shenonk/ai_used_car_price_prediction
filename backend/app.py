@@ -392,6 +392,61 @@ def get_public_notifications():
         return jsonify({"error": str(e)}), 500
 
 
+# --- Public Support Ticket: Create ---
+@app.route("/api/support-ticket", methods=["POST"])
+def create_support_ticket():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    ticket = {
+        "user_name": data.get("user_name", "").strip(),
+        "user_email": data.get("user_email", "").strip(),
+        "message": data.get("message", "").strip(),
+        "status": "open",
+    }
+
+    if not ticket["user_name"] or not ticket["user_email"] or not ticket["message"]:
+        return jsonify({"error": "user_name, user_email, and message are required"}), 400
+
+    try:
+        res = supabase.table("support_tickets").insert(ticket).execute()
+        created_ticket = res.data[0] if res.data else ticket
+        return jsonify({"message": "Support ticket created", "ticket": created_ticket}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# --- Admin Support Tickets: List ---
+@app.route("/api/admin/support-tickets", methods=["GET"])
+@token_required
+def get_support_tickets():
+    try:
+        res = supabase.table("support_tickets").select("*").order("created_at", desc=True).execute()
+        return jsonify({"tickets": res.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# --- Admin Support Ticket: Update Status ---
+@app.route("/api/admin/support-ticket/<string:ticket_id>", methods=["PUT"])
+@token_required
+def update_support_ticket(ticket_id):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    status = data.get("status", "").strip().lower()
+    if status not in ["open", "read", "closed"]:
+        return jsonify({"error": "Invalid status"}), 400
+
+    try:
+        res = supabase.table("support_tickets").update({"status": status}).eq("id", ticket_id).execute()
+        return jsonify({"message": "Support ticket updated", "ticket": res.data[0] if res.data else None})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ============================================
 # RUN SERVER
 # ============================================

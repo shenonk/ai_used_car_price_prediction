@@ -45,10 +45,11 @@ function Marketplace() {
   });
   const [loadError, setLoadError] = useState("");
   const [form, setForm] = useState(initialForm);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImages, setSelectedImages] = useState([]);
   const [submitState, setSubmitState] = useState({ saving: false, error: "", success: "" });
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [selectedCar, setSelectedCar] = useState(null);
+  const [selectedCarImage, setSelectedCarImage] = useState("");
 
   const fetchListings = async () => {
     try {
@@ -132,9 +133,21 @@ function Marketplace() {
     }));
   };
 
-  const handleImageChange = (event) => {
+  const handleImageChange = (slotIndex, event) => {
     const file = event.target.files?.[0] || null;
-    setSelectedImage(file);
+    setSelectedImages((current) => {
+      const next = [...current];
+      next[slotIndex] = file;
+      return next.slice(0, 5);
+    });
+  };
+
+  const handleRemoveImage = (slotIndex) => {
+    setSelectedImages((current) => {
+      const next = [...current];
+      next[slotIndex] = null;
+      return next;
+    });
   };
 
   const handleSubmit = async (event) => {
@@ -144,9 +157,7 @@ function Marketplace() {
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => formData.append(key, value));
-      if (selectedImage) {
-        formData.append("image", selectedImage);
-      }
+      selectedImages.filter(Boolean).forEach((file) => formData.append("images", file));
 
       const {
         data: { session },
@@ -173,7 +184,7 @@ function Marketplace() {
         success: "Your car was submitted successfully and is now pending admin review.",
       });
       setForm(initialForm);
-      setSelectedImage(null);
+      setSelectedImages([]);
       setIsPublishModalOpen(false);
       event.target.reset();
       fetchListings();
@@ -184,6 +195,12 @@ function Marketplace() {
         success: "",
       });
     }
+  };
+
+  const getListingImages = (car) => {
+    const images = Array.isArray(car?.image_urls) ? car.image_urls.filter(Boolean) : [];
+    if (images.length > 0) return images;
+    return car?.image_url ? [car.image_url] : [];
   };
 
   return (
@@ -331,19 +348,23 @@ function Marketplace() {
                 key={car.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => setSelectedCar(car)}
+                onClick={() => {
+                  setSelectedCar(car);
+                  setSelectedCarImage(getListingImages(car)[0] || "");
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     setSelectedCar(car);
+                    setSelectedCarImage(getListingImages(car)[0] || "");
                   }
                 }}
                 className="group overflow-hidden rounded-[28px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
               >
                 <div className="relative h-56 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
-                  {car.image_url ? (
+                  {getListingImages(car)[0] ? (
                     <img
-                      src={car.image_url}
+                      src={getListingImages(car)[0]}
                       alt={`${car.brand} ${car.model}`}
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     />
@@ -410,6 +431,7 @@ function Marketplace() {
                       onClick={(event) => {
                         event.stopPropagation();
                         setSelectedCar(car);
+                        setSelectedCarImage(getListingImages(car)[0] || "");
                       }}
                       className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
                     >
@@ -433,9 +455,9 @@ function Marketplace() {
           <section className="relative z-10 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[30px] border border-slate-700/60 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94),rgba(30,41,59,0.96))] shadow-2xl shadow-slate-950/50">
             <div className="grid lg:grid-cols-[1.2fr_0.9fr]">
               <div className="relative min-h-[320px] border-b border-slate-800 lg:min-h-[620px] lg:border-b-0 lg:border-r">
-                {selectedCar.image_url ? (
+                {selectedCarImage ? (
                   <img
-                    src={selectedCar.image_url}
+                    src={selectedCarImage}
                     alt={`${selectedCar.brand} ${selectedCar.model}`}
                     className="h-full w-full object-cover"
                   />
@@ -479,6 +501,25 @@ function Marketplace() {
                     {formatCurrency(selectedCar.price)}
                   </p>
                 </div>
+
+                {getListingImages(selectedCar).length > 1 && (
+                  <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+                    {getListingImages(selectedCar).map((imageUrl, index) => (
+                      <button
+                        key={`${selectedCar.id}-image-${index}`}
+                        type="button"
+                        onClick={() => setSelectedCarImage(imageUrl)}
+                        className={`h-20 w-24 shrink-0 overflow-hidden rounded-2xl border transition ${
+                          selectedCarImage === imageUrl
+                            ? "border-cyan-400/60 shadow-[0_0_0_1px_rgba(34,211,238,0.3)]"
+                            : "border-slate-700/70 hover:border-slate-500/80"
+                        }`}
+                      >
+                        <img src={imageUrl} alt={`${selectedCar.brand} ${selectedCar.model} view ${index + 1}`} className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <MarketplaceMeta
@@ -678,18 +719,23 @@ function Marketplace() {
                 />
               </div>
 
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-300">Image</span>
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={handleImageChange}
-                  className="w-full rounded-2xl border border-dashed border-slate-600 bg-slate-900/70 px-4 py-3 text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-cyan-500/20 file:px-3 file:py-2 file:text-sm file:font-medium file:text-cyan-100"
-                />
-                <p className="mt-2 text-xs text-slate-500">
-                  Optional. JPG, PNG, and WEBP are supported.
+              <div>
+                <span className="mb-2 block text-sm font-medium text-slate-300">Vehicle Images</span>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <ImageUploadSlot
+                      key={index}
+                      slotIndex={index}
+                      file={selectedImages[index] || null}
+                      onChange={handleImageChange}
+                      onRemove={handleRemoveImage}
+                    />
+                  ))}
+                </div>
+                <p className="mt-3 text-xs text-slate-500">
+                  Optional. Add up to 5 JPG, PNG, or WEBP images. You can publish with none, one, or several photos.
                 </p>
-              </label>
+              </div>
 
               {submitState.error && (
                 <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
@@ -778,6 +824,79 @@ function TextareaField({ label, value, onChange, placeholder }) {
         className="w-full resize-none rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
       />
     </label>
+  );
+}
+
+function ImageUploadSlot({ slotIndex, file, onChange, onRemove }) {
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+
+  return (
+    <div className="group relative overflow-hidden rounded-[24px] border border-dashed border-slate-600 bg-slate-900/70">
+      <label className="block cursor-pointer">
+        <input
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          onChange={(event) => onChange(slotIndex, event)}
+          className="hidden"
+        />
+
+        <div className="relative flex h-44 items-center justify-center overflow-hidden">
+          {previewUrl ? (
+            <>
+              <img
+                src={previewUrl}
+                alt={`Vehicle upload ${slotIndex + 1}`}
+                className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-transparent px-4 pb-3 pt-8">
+                <p className="truncate text-xs font-medium text-white">{file.name}</p>
+              </div>
+            </>
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-4 text-center text-slate-500 transition group-hover:bg-white/[0.02]">
+              <div className="rounded-full border border-cyan-400/20 bg-cyan-500/10 p-3 text-cyan-200">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 16.5V7.5m0 0l-3.75 3.75M12 7.5l3.75 3.75M3.75 15v2.25A2.25 2.25 0 006 19.5h12a2.25 2.25 0 002.25-2.25V15" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-200">Image {slotIndex + 1}</p>
+                <p className="mt-1 text-xs text-slate-500">Click to add photo</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </label>
+
+      <div className="flex items-center justify-between border-t border-slate-800/80 px-4 py-3">
+        <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
+          Slot {slotIndex + 1}
+        </span>
+        {file ? (
+          <button
+            type="button"
+            onClick={() => onRemove(slotIndex)}
+            className="rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/15"
+          >
+            Remove
+          </button>
+        ) : (
+          <span className="text-xs text-slate-600">Optional</span>
+        )}
+      </div>
+    </div>
   );
 }
 

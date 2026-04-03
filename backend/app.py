@@ -310,6 +310,20 @@ def upload_listing_image(image_file, listing_id):
     return {"path": storage_path, "public_url": public_url}
 
 
+def upload_listing_images(image_files, listing_id):
+    if not image_files:
+        return []
+
+    uploaded = []
+    for image_file in image_files[:5]:
+        if not image_file or not image_file.filename:
+            continue
+        upload_result = upload_listing_image(image_file, listing_id)
+        if upload_result:
+            uploaded.append(upload_result["public_url"])
+    return uploaded
+
+
 def get_storage_path_from_public_url(image_url):
     if not image_url:
         return None
@@ -639,10 +653,16 @@ def create_marketplace_listing():
     payload["id"] = str(uuid4())
 
     try:
-        image_file = request.files.get("image")
-        if image_file:
-            upload_result = upload_listing_image(image_file, payload["id"])
-            payload["image_url"] = upload_result["public_url"]
+        image_files = request.files.getlist("images")
+        if not image_files:
+            single_image = request.files.get("image")
+            if single_image:
+                image_files = [single_image]
+
+        uploaded_images = upload_listing_images(image_files, payload["id"])
+        if uploaded_images:
+            payload["image_urls"] = uploaded_images
+            payload["image_url"] = uploaded_images[0]
 
         response = supabase.table("listings").insert(payload).execute()
         created_listing = response.data[0] if response.data else payload
@@ -712,7 +732,7 @@ def admin_delete_marketplace_listing(listing_id):
     try:
         lookup_response = (
             supabase.table("listings")
-            .select("id,image_url")
+            .select("id,image_url,image_urls")
             .eq("id", listing_id)
             .limit(1)
             .execute()
@@ -721,12 +741,24 @@ def admin_delete_marketplace_listing(listing_id):
             return jsonify({"error": "Listing not found"}), 404
 
         listing = lookup_response.data[0]
-        image_path = get_storage_path_from_public_url(listing.get("image_url"))
-        if image_path:
+        public_urls = []
+        if isinstance(listing.get("image_urls"), list):
+            public_urls.extend([url for url in listing.get("image_urls") if url])
+        if listing.get("image_url"):
+            public_urls.append(listing.get("image_url"))
+
+        image_paths = list(
+            {
+                path
+                for path in (get_storage_path_from_public_url(url) for url in public_urls)
+                if path
+            }
+        )
+        if image_paths:
             try:
-                supabase.storage.from_(MARKETPLACE_BUCKET).remove([image_path])
+                supabase.storage.from_(MARKETPLACE_BUCKET).remove(image_paths)
             except Exception as storage_error:
-                print(f"[WARN] Failed to delete listing image: {storage_error}", flush=True)
+                print(f"[WARN] Failed to delete listing image(s): {storage_error}", flush=True)
 
         supabase.table("listings").delete().eq("id", listing_id).execute()
         return jsonify({"message": "Listing deleted successfully"})

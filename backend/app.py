@@ -249,6 +249,10 @@ def normalize_listing_payload(data):
     payload = {
         "brand": (data.get("brand") or "").strip(),
         "model": (data.get("model") or "").strip(),
+        "seller_name": (data.get("seller_name") or "").strip(),
+        "phone_number": (data.get("phone_number") or "").strip(),
+        "vehicle_location": (data.get("vehicle_location") or "").strip(),
+        "vehicle_description": (data.get("vehicle_description") or "").strip(),
         "fuel_type": (data.get("fuel_type") or "").strip(),
         "transmission": (data.get("transmission") or "").strip(),
         "condition": (data.get("condition") or "").strip(),
@@ -260,6 +264,15 @@ def normalize_listing_payload(data):
     missing = [key for key, value in payload.items() if value == ""]
     if missing:
         raise ValueError(f"Missing required fields: {', '.join(missing)}")
+
+    if len(payload["seller_name"]) > 120:
+        raise ValueError("seller_name must be 120 characters or fewer")
+    if len(payload["phone_number"]) > 40:
+        raise ValueError("phone_number must be 40 characters or fewer")
+    if len(payload["vehicle_location"]) > 160:
+        raise ValueError("vehicle_location must be 160 characters or fewer")
+    if len(payload["vehicle_description"]) > 2000:
+        raise ValueError("vehicle_description must be 2000 characters or fewer")
 
     return payload
 

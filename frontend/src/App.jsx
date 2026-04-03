@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
+import ChatBot from "./components/ChatBot";
 import MainLayout from "./layout/MainLayout";
 
 import Login from "./pages/Login";
@@ -39,6 +40,7 @@ function App() {
         </Route>
 
       </Routes>
+      <ChatBot />
     </BrowserRouter>
   );
 }

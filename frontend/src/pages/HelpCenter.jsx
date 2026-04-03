@@ -9,6 +9,7 @@ import {
   ChevronUp,
   Mail,
 } from "lucide-react";
+
 const HelpCenter = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [openFaq, setOpenFaq] = useState(null);
@@ -283,7 +284,10 @@ const HelpCenter = () => {
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-center space-y-8 py-12 border-t border-slate-800/50">
+        <div
+          id="contact-us-section"
+          className="flex flex-col items-center justify-center space-y-8 py-12 border-t border-slate-800/50 scroll-mt-24"
+        >
           <div className="text-center">
             <h2 className="text-2xl font-bold mb-2">Contact Us</h2>
             <p className="text-slate-400">Our support team is available 24/7 to assist you.</p>

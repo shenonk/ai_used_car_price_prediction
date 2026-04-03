@@ -22,6 +22,10 @@ const fallbackListings = [
     id: 'mock-1',
     brand: 'Toyota',
     model: 'Corolla Cross',
+    seller_name: 'Kavindu Perera',
+    phone_number: '0771234567',
+    vehicle_location: 'Kandy',
+    vehicle_description: 'Single-owner vehicle with full service history and a clean interior.',
     year: 2022,
     mileage: 18000,
     fuel_type: 'Hybrid',
@@ -37,6 +41,10 @@ const fallbackListings = [
     id: 'mock-2',
     brand: 'Honda',
     model: 'Vezel',
+    seller_name: 'Dinesh Fernando',
+    phone_number: '0719988776',
+    vehicle_location: 'Nugegoda',
+    vehicle_description: 'Fresh import with original paint, reverse camera, and low mileage.',
     year: 2021,
     mileage: 32000,
     fuel_type: 'Hybrid',
@@ -52,6 +60,10 @@ const fallbackListings = [
     id: 'mock-3',
     brand: 'Suzuki',
     model: 'Wagon R',
+    seller_name: 'Supun Silva',
+    phone_number: '0754443322',
+    vehicle_location: 'Kurunegala',
+    vehicle_description: 'Daily-driven family car. Minor cosmetic marks noted on rear bumper.',
     year: 2018,
     mileage: 54000,
     fuel_type: 'Petrol',
@@ -67,6 +79,10 @@ const fallbackListings = [
     id: 'mock-4',
     brand: 'BMW',
     model: '320d',
+    seller_name: 'Ravin Jayasinghe',
+    phone_number: '0765556677',
+    vehicle_location: 'Colombo 05',
+    vehicle_description: 'Maintained through agent records with premium features and recent servicing.',
     year: 2019,
     mileage: 47000,
     fuel_type: 'Diesel',
@@ -178,6 +194,10 @@ function Marketplace() {
       const haystack = [
         listing.brand,
         listing.model,
+        listing.seller_name,
+        listing.phone_number,
+        listing.vehicle_location,
+        listing.vehicle_description,
         listing.year,
         listing.fuel_type,
         listing.transmission,
@@ -467,6 +487,16 @@ function ListingDetail({ listing, busy, onStatusChange, onDelete }) {
         <DetailCard label="Gearbox" value={listing.transmission || '-'} />
         <DetailCard label="Condition" value={listing.condition || '-'} />
         <DetailCard label="Seller ID" value={listing.user_id || 'Anonymous'} />
+        <DetailCard label="Seller Name" value={listing.seller_name || '-'} />
+        <DetailCard label="Phone Number" value={listing.phone_number || '-'} />
+        <DetailCard label="Location" value={listing.vehicle_location || '-'} />
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Seller Description</p>
+        <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-300">
+          {listing.vehicle_description || 'No description was included with this listing.'}
+        </p>
       </div>
 
       <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">

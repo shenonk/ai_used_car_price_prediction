@@ -16,6 +16,10 @@ const priceRanges = [
 const initialForm = {
   brand: "",
   model: "",
+  seller_name: "",
+  phone_number: "",
+  vehicle_location: "",
+  vehicle_description: "",
   year: "",
   mileage: "",
   fuel_type: "Petrol",
@@ -363,6 +367,9 @@ function Marketplace() {
                         {car.brand} {car.model}
                       </h3>
                       <p className="mt-1 text-sm text-slate-400">{car.condition || "Used vehicle"}</p>
+                      <p className="mt-2 text-sm text-slate-500">
+                        {car.seller_name || "Private seller"} • {car.vehicle_location || "Location not listed"}
+                      </p>
                     </div>
                     <p className="text-right text-lg font-bold text-cyan-300">
                       {formatCurrency(car.price)}
@@ -475,6 +482,33 @@ function Marketplace() {
 
                 <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <MarketplaceMeta
+                    icon={
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.118a7.5 7.5 0 1115 0A17.933 17.933 0 0112 21.75a17.933 17.933 0 01-7.5-1.632z" />
+                      </svg>
+                    }
+                    label="Seller"
+                    value={selectedCar.seller_name || "-"}
+                  />
+                  <MarketplaceMeta
+                    icon={
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 6.75c0 7.318 5.932 13.25 13.25 13.25h.75a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.965-.852-1.089l-4.423-1.106a1.125 1.125 0 00-1.173.417l-.97 1.293a1.125 1.125 0 01-1.21.38 10.502 10.502 0 01-6.273-6.273 1.125 1.125 0 01.38-1.21l1.293-.97c.328-.246.5-.652.417-1.173L4.96 3.602A1.125 1.125 0 003.872 2.75H2.5A2.25 2.25 0 00.25 5v1.75z" />
+                      </svg>
+                    }
+                    label="Phone"
+                    value={selectedCar.phone_number || "-"}
+                  />
+                  <MarketplaceMeta
+                    icon={
+                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 21a8.967 8.967 0 005.002-1.516A8.967 8.967 0 0021 12c0-4.971-4.029-9-9-9s-9 4.029-9 9a8.967 8.967 0 003.998 7.484A8.967 8.967 0 0012 21zm0-13.5a2.25 2.25 0 110 4.5 2.25 2.25 0 010-4.5z" />
+                      </svg>
+                    }
+                    label="Location"
+                    value={selectedCar.vehicle_location || "-"}
+                  />
+                  <MarketplaceMeta
                     icon={<CalendarRange className="h-4 w-4" />}
                     label="Year"
                     value={selectedCar.year || "-"}
@@ -508,6 +542,15 @@ function Marketplace() {
                     label="Status"
                     value="Approved and visible"
                   />
+                </div>
+
+                <div className="mt-6 rounded-[24px] border border-slate-800/80 bg-slate-900/70 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Description
+                  </p>
+                  <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-300">
+                    {selectedCar.vehicle_description || "No description provided for this vehicle."}
+                  </p>
                 </div>
 
                 <div className="mt-6 rounded-[24px] border border-slate-800/80 bg-slate-900/70 p-5">
@@ -568,6 +611,18 @@ function Marketplace() {
                   placeholder="Corolla"
                 />
                 <InputField
+                  label="Your Name"
+                  value={form.seller_name}
+                  onChange={(value) => handleInputChange("seller_name", value)}
+                  placeholder="Kasun Perera"
+                />
+                <InputField
+                  label="Phone Number"
+                  value={form.phone_number}
+                  onChange={(value) => handleInputChange("phone_number", value)}
+                  placeholder="0771234567"
+                />
+                <InputField
                   label="Year"
                   type="number"
                   value={form.year}
@@ -605,6 +660,21 @@ function Marketplace() {
                   value={form.price}
                   onChange={(value) => handleInputChange("price", value)}
                   placeholder="7200000"
+                />
+              </div>
+
+              <div className="grid gap-4">
+                <InputField
+                  label="Vehicle Location"
+                  value={form.vehicle_location}
+                  onChange={(value) => handleInputChange("vehicle_location", value)}
+                  placeholder="Maharagama, Colombo"
+                />
+                <TextareaField
+                  label="Vehicle Description"
+                  value={form.vehicle_description}
+                  onChange={(value) => handleInputChange("vehicle_description", value)}
+                  placeholder="Share the vehicle condition, service history, special features, and anything buyers should know."
                 />
               </div>
 
@@ -690,6 +760,22 @@ function InputField({ label, value, onChange, placeholder, type = "text" }) {
         placeholder={placeholder}
         required
         className="w-full rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
+      />
+    </label>
+  );
+}
+
+function TextareaField({ label, value, onChange, placeholder }) {
+  return (
+    <label className="block">
+      <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={5}
+        required
+        className="w-full resize-none rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
       />
     </label>
   );

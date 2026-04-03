@@ -34,6 +34,7 @@ const fallbackListings = [
     price: 11250000,
     status: 'pending',
     image_url: '',
+    image_urls: [],
     created_at: '2026-03-31T08:00:00Z',
     user_id: 'user_104',
   },
@@ -53,6 +54,7 @@ const fallbackListings = [
     price: 12900000,
     status: 'approved',
     image_url: '',
+    image_urls: [],
     created_at: '2026-03-29T10:30:00Z',
     user_id: 'user_087',
   },
@@ -72,6 +74,7 @@ const fallbackListings = [
     price: 6350000,
     status: 'rejected',
     image_url: '',
+    image_urls: [],
     created_at: '2026-03-28T14:15:00Z',
     user_id: 'user_055',
   },
@@ -91,6 +94,7 @@ const fallbackListings = [
     price: 19800000,
     status: 'sold',
     image_url: '',
+    image_urls: [],
     created_at: '2026-03-25T12:45:00Z',
     user_id: 'user_021',
   },
@@ -153,6 +157,12 @@ const formatRelativeTime = (value) => {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 };
 
+const getListingImages = (listing) => {
+  const images = Array.isArray(listing?.image_urls) ? listing.image_urls.filter(Boolean) : [];
+  if (images.length > 0) return images;
+  return listing?.image_url ? [listing.image_url] : [];
+};
+
 function Marketplace() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -162,6 +172,7 @@ function Marketplace() {
   const [activeTab, setActiveTab] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState('');
+  const [selectedImage, setSelectedImage] = useState('');
 
   useEffect(() => {
     fetchListings();
@@ -177,10 +188,12 @@ function Marketplace() {
       const nextListings = response.data?.listings || [];
       setListings(nextListings);
       setSelectedId((current) => current || nextListings[0]?.id || '');
+      setSelectedImage((current) => current || getListingImages(nextListings[0])[0] || '');
     } catch {
       setError('Unable to load live marketplace submissions right now. Showing preview data.');
       setListings(fallbackListings);
       setSelectedId((current) => current || fallbackListings[0]?.id || '');
+      setSelectedImage((current) => current || getListingImages(fallbackListings[0])[0] || '');
     } finally {
       setLoading(false);
     }
@@ -223,6 +236,12 @@ function Marketplace() {
       setSelectedId(filteredListings[0].id);
     }
   }, [filteredListings, selectedListing]);
+
+  useEffect(() => {
+    if (selectedListing) {
+      setSelectedImage(getListingImages(selectedListing)[0] || '');
+    }
+  }, [selectedListing]);
 
   const summary = useMemo(
     () => ({
@@ -385,15 +404,18 @@ function Marketplace() {
                 <button
                   key={listing.id}
                   type="button"
-                  onClick={() => setSelectedId(listing.id)}
+                  onClick={() => {
+                    setSelectedId(listing.id);
+                    setSelectedImage(getListingImages(listing)[0] || '');
+                  }}
                   className={`flex w-full flex-col gap-4 p-5 text-left transition hover:bg-white/[0.03] lg:flex-row lg:items-center ${
                     selectedListing?.id === listing.id ? 'bg-cyan-500/[0.06]' : ''
                   }`}
                 >
                   <div className="flex h-24 w-full items-center justify-center rounded-2xl border border-slate-800 bg-[linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.95))] text-slate-500 lg:w-36">
-                    {listing.image_url ? (
+                    {getListingImages(listing)[0] ? (
                       <img
-                        src={listing.image_url}
+                        src={getListingImages(listing)[0]}
                         alt={`${listing.brand} ${listing.model}`}
                         className="h-full w-full rounded-2xl object-cover"
                       />
@@ -429,6 +451,8 @@ function Marketplace() {
           {selectedListing ? (
             <ListingDetail
               listing={selectedListing}
+              selectedImage={selectedImage}
+              onSelectImage={setSelectedImage}
               busy={busyId === selectedListing.id}
               onStatusChange={updateStatus}
               onDelete={deleteListing}
@@ -448,16 +472,16 @@ function Marketplace() {
   );
 }
 
-function ListingDetail({ listing, busy, onStatusChange, onDelete }) {
+function ListingDetail({ listing, selectedImage, onSelectImage, busy, onStatusChange, onDelete }) {
   const actions = getActionsForStatus(listing.status);
 
   return (
     <div>
       <div className="overflow-hidden rounded-[24px] border border-slate-800">
         <div className="flex h-56 items-center justify-center bg-[linear-gradient(135deg,rgba(30,41,59,0.95),rgba(8,47,73,0.85))] text-slate-500">
-          {listing.image_url ? (
+          {selectedImage ? (
             <img
-              src={listing.image_url}
+              src={selectedImage}
               alt={`${listing.brand} ${listing.model}`}
               className="h-full w-full object-cover"
             />
@@ -469,6 +493,29 @@ function ListingDetail({ listing, busy, onStatusChange, onDelete }) {
           )}
         </div>
       </div>
+
+      {getListingImages(listing).length > 1 && (
+        <div className="mt-4 flex gap-3 overflow-x-auto pb-1">
+          {getListingImages(listing).map((imageUrl, index) => (
+            <button
+              key={`${listing.id}-admin-image-${index}`}
+              type="button"
+              onClick={() => onSelectImage(imageUrl)}
+              className={`h-20 w-24 shrink-0 overflow-hidden rounded-2xl border transition ${
+                selectedImage === imageUrl
+                  ? 'border-cyan-400/60 shadow-[0_0_0_1px_rgba(34,211,238,0.3)]'
+                  : 'border-slate-700/70 hover:border-slate-500/80'
+              }`}
+            >
+              <img
+                src={imageUrl}
+                alt={`${listing.brand} ${listing.model} view ${index + 1}`}
+                className="h-full w-full object-cover"
+              />
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="mt-5 flex items-center justify-between gap-3">
         <div>

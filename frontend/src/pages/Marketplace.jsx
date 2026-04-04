@@ -204,6 +204,53 @@ function Marketplace() {
     return car?.image_url ? [car.image_url] : [];
   };
 
+  const selectedCarImages = useMemo(() => getListingImages(selectedCar), [selectedCar]);
+
+  const lightboxIndex = useMemo(
+    () => selectedCarImages.findIndex((imageUrl) => imageUrl === lightboxImage),
+    [lightboxImage, selectedCarImages]
+  );
+
+  const showPreviousLightboxImage = () => {
+    if (selectedCarImages.length <= 1) return;
+    const currentIndex = lightboxIndex >= 0 ? lightboxIndex : 0;
+    const nextIndex = (currentIndex - 1 + selectedCarImages.length) % selectedCarImages.length;
+    setLightboxImage(selectedCarImages[nextIndex]);
+    setSelectedCarImage(selectedCarImages[nextIndex]);
+  };
+
+  const showNextLightboxImage = () => {
+    if (selectedCarImages.length <= 1) return;
+    const currentIndex = lightboxIndex >= 0 ? lightboxIndex : 0;
+    const nextIndex = (currentIndex + 1) % selectedCarImages.length;
+    setLightboxImage(selectedCarImages[nextIndex]);
+    setSelectedCarImage(selectedCarImages[nextIndex]);
+  };
+
+  useEffect(() => {
+    if (!lightboxImage) return undefined;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setLightboxImage("");
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        showPreviousLightboxImage();
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        showNextLightboxImage();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [lightboxImage, lightboxIndex, selectedCarImages]);
+
   return (
     <div className="min-h-screen bg-[#0f172a] px-6 py-8 md:px-8">
       <section className="relative overflow-hidden rounded-[28px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/95 p-8 shadow-2xl shadow-slate-950/30 animate-fade-in">
@@ -632,11 +679,46 @@ function Marketplace() {
           />
 
           <div className="relative z-10 flex h-full w-full max-w-7xl items-center justify-center">
+            {selectedCarImages.length > 1 && (
+              <button
+                type="button"
+                onClick={showPreviousLightboxImage}
+                className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full border border-slate-700/70 bg-slate-900/90 p-3 text-slate-200 transition hover:border-slate-500/80 hover:text-white md:left-6"
+                aria-label="Previous image"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+              </button>
+            )}
+
             <img
               src={lightboxImage}
               alt="Full vehicle view"
               className="max-h-full max-w-full object-contain"
             />
+
+            {selectedCarImages.length > 1 && (
+              <button
+                type="button"
+                onClick={showNextLightboxImage}
+                className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full border border-slate-700/70 bg-slate-900/90 p-3 text-slate-200 transition hover:border-slate-500/80 hover:text-white md:right-6"
+                aria-label="Next image"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </button>
+            )}
+
+            {selectedCarImages.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-slate-700/70 bg-slate-900/85 px-4 py-2 text-xs text-slate-200">
+                <span>
+                  {lightboxIndex + 1} / {selectedCarImages.length}
+                </span>
+                <span className="text-slate-500">Use ← → keys</span>
+              </div>
+            )}
 
             <button
               type="button"

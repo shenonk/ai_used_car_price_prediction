@@ -1,17 +1,23 @@
+import mimetypes
 import os
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from functools import wraps
-from supabase import create_client, Client
-from dotenv import load_dotenv
-import psycopg2
+from datetime import datetime
 from decimal import Decimal
+from functools import wraps
+from urllib.parse import urlparse
+from uuid import uuid4
+
+import psycopg2
+from dotenv import load_dotenv
+from flask import Flask, g, jsonify, request
+from flask_cors import CORS
+from supabase import Client, create_client
 
 # Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 
 # ============================================
 # SUPABASE CONFIG
@@ -20,34 +26,40 @@ url: str = os.environ.get("SUPABASE_URL", "")
 key: str = os.environ.get("SUPABASE_KEY", "")
 
 if not url or url == "your_supabase_url_here":
-    print("\n" + "!"*50)
+    print("\n" + "!" * 50)
     print("  CRITICAL ERROR: SUPABASE_URL is missing or placeholder!")
     print("  Please update backend/.env with your real Supabase URL.")
-    print("!"*50 + "\n")
+    print("!" * 50 + "\n")
 
 if not key or key == "your_supabase_service_role_key_here":
-    print("\n" + "!"*50)
+    print("\n" + "!" * 50)
     print("  CRITICAL ERROR: SUPABASE_KEY is missing or placeholder!")
     print("  Please update backend/.env with your real Supabase Service Role Key.")
-    print("!"*50 + "\n")
+    print("!" * 50 + "\n")
 
 try:
     supabase: Client = create_client(url, key)
 except Exception as e:
     print(f"\nFailed to initialize Supabase client: {e}")
-    # We continue to let Flask start, but API calls will fail until fixed
     supabase = None
+
+MARKETPLACE_BUCKET = os.environ.get("SUPABASE_MARKETPLACE_BUCKET", "car_images")
+MARKETPLACE_ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
 
 # ============================================
 # DIRECT POSTGRESQL CONNECTION (bypasses PostgREST)
 # ============================================
 db_password = os.environ.get("SUPABASE_DB_PASSWORD", "")
-# Extract project ref from URL (e.g. "bwsxujswqbfifsjizxrb" from "https://bwsxujswqbfifsjizxrb.supabase.co")
 project_ref = url.replace("https://", "").split(".")[0] if url else ""
 DB_HOST = f"db.{project_ref}.supabase.co"
 DB_PORT = 5432
 DB_NAME = "postgres"
 DB_USER = "postgres"
+
 
 def get_db_connection():
     """Get a direct PostgreSQL connection to the Supabase database."""
@@ -58,13 +70,12 @@ def get_db_connection():
         user=DB_USER,
         password=db_password,
         sslmode="require",
-        connect_timeout=5
+        connect_timeout=5,
     )
+
 
 def save_prediction_to_db(brand, model, year, engine, mileage, predicted_price):
     """Save a prediction to the database. Tries direct PostgreSQL first, then falls back to Supabase REST API."""
-    
-    # --- Attempt 1: Direct PostgreSQL connection ---
     if db_password and db_password != "your_database_password_here":
         conn = None
         try:
@@ -73,11 +84,14 @@ def save_prediction_to_db(brand, model, year, engine, mileage, predicted_price):
             cur.execute(
                 """INSERT INTO predictions (brand, model, year, engine, mileage, predicted_price)
                    VALUES (%s, %s, %s, %s, %s, %s)""",
-                (brand, model, int(year), int(engine), int(mileage), Decimal(str(predicted_price)))
+                (brand, model, int(year), int(engine), int(mileage), Decimal(str(predicted_price))),
             )
             conn.commit()
             cur.close()
-            print(f"[OK] Prediction saved (PostgreSQL): {brand} {model} {year} - LKR {predicted_price:,}", flush=True)
+            print(
+                f"[OK] Prediction saved (PostgreSQL): {brand} {model} {year} - LKR {predicted_price:,}",
+                flush=True,
+            )
             return True
         except Exception as e:
             print(f"[WARN] Direct DB save failed: {e}", flush=True)
@@ -86,36 +100,44 @@ def save_prediction_to_db(brand, model, year, engine, mileage, predicted_price):
             if conn:
                 conn.close()
 
-    # --- Attempt 2: Supabase REST API fallback ---
     if supabase:
         try:
-            supabase.table("predictions").insert({
-                "brand": brand,
-                "model": model,
-                "year": int(year),
-                "engine": int(engine),
-                "mileage": int(mileage),
-                "predicted_price": float(predicted_price)
-            }).execute()
-            print(f"[OK] Prediction saved (Supabase API): {brand} {model} {year} - LKR {predicted_price:,}", flush=True)
+            supabase.table("predictions").insert(
+                {
+                    "brand": brand,
+                    "model": model,
+                    "year": int(year),
+                    "engine": int(engine),
+                    "mileage": int(mileage),
+                    "predicted_price": float(predicted_price),
+                }
+            ).execute()
+            print(
+                f"[OK] Prediction saved (Supabase API): {brand} {model} {year} - LKR {predicted_price:,}",
+                flush=True,
+            )
             return True
         except Exception as e:
             print(f"[FAIL] Supabase API save error: {e}", flush=True)
             return False
-    else:
-        print("[WARN] No database connection available — prediction not saved", flush=True)
-        return False
+
+    print("[WARN] No database connection available - prediction not saved", flush=True)
+    return False
 
 
 def get_admin_by_email(email):
     """Look up an admin user by email from the admin_users table."""
+    normalized_email = (email or "").lower().strip()
+    if not normalized_email:
+        return None
+
     conn = None
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute(
             "SELECT id, email, full_name, role, created_at FROM admin_users WHERE email = %s",
-            (email.lower().strip(),)
+            (normalized_email,),
         )
         row = cur.fetchone()
         cur.close()
@@ -125,41 +147,192 @@ def get_admin_by_email(email):
                 "email": row[1],
                 "full_name": row[2],
                 "role": row[3],
-                "created_at": str(row[4])
+                "created_at": str(row[4]),
             }
-        return None
     except Exception as e:
         print(f"[FAIL] Admin lookup error: {e}", flush=True)
-        return None
     finally:
         if conn:
             conn.close()
 
+    if supabase:
+        try:
+            response = (
+                supabase.table("admin_users")
+                .select("id,email,full_name,role,created_at")
+                .eq("email", normalized_email)
+                .limit(1)
+                .execute()
+            )
+            if response.data:
+                return response.data[0]
+        except Exception as e:
+            print(f"[FAIL] Admin lookup via Supabase API error: {e}", flush=True)
+
+    return None
+
 
 # ============================================
-# AUTH HELPER — verify Supabase session token
+# AUTH HELPERS
 # ============================================
+def extract_bearer_token():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header.split(" ", 1)[1].strip()
+    return None
+
+
+def get_authenticated_user(token):
+    if not token or not supabase:
+        return None
+
+    try:
+        response = supabase.auth.get_user(token)
+        return getattr(response, "user", None)
+    except Exception:
+        return None
+
+
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = None
-        if 'Authorization' in request.headers:
-            auth_header = request.headers['Authorization']
-            if auth_header.startswith('Bearer '):
-                token = auth_header.split(' ')[1]
+        token = extract_bearer_token()
         if not token:
             return jsonify({"error": "Token is missing"}), 401
-        
-        try:
-            # Verify the token via Supabase
-            user = supabase.auth.get_user(token)
-            if not user:
-                return jsonify({"error": "Invalid or expired token"}), 401
-        except Exception as e:
-            return jsonify({"error": str(e)}), 401
-            
+
+        user = get_authenticated_user(token)
+        if not user:
+            return jsonify({"error": "Invalid or expired token"}), 401
+
+        g.current_user = user
         return f(*args, **kwargs)
+
     return decorated
+
+
+def admin_required(f):
+    @wraps(f)
+    @token_required
+    def decorated(*args, **kwargs):
+        email = (getattr(g.current_user, "email", "") or "").strip().lower()
+        admin = get_admin_by_email(email)
+        if not admin:
+            return jsonify({"error": "Admin access required"}), 403
+
+        g.current_admin = admin
+        return f(*args, **kwargs)
+
+    return decorated
+
+
+def parse_int_field(field_name, raw_value, *, minimum=None, maximum=None):
+    try:
+        value = int(raw_value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{field_name} must be a valid integer") from None
+
+    if minimum is not None and value < minimum:
+        raise ValueError(f"{field_name} must be at least {minimum}")
+    if maximum is not None and value > maximum:
+        raise ValueError(f"{field_name} must be at most {maximum}")
+    return value
+
+
+def get_request_payload():
+    if request.content_type and "multipart/form-data" in request.content_type:
+        return request.form.to_dict()
+    return request.get_json(silent=True) or {}
+
+
+def normalize_listing_payload(data):
+    current_year = datetime.utcnow().year + 1
+    payload = {
+        "brand": (data.get("brand") or "").strip(),
+        "model": (data.get("model") or "").strip(),
+        "seller_name": (data.get("seller_name") or "").strip(),
+        "phone_number": (data.get("phone_number") or "").strip(),
+        "vehicle_location": (data.get("vehicle_location") or "").strip(),
+        "vehicle_description": (data.get("vehicle_description") or "").strip(),
+        "fuel_type": (data.get("fuel_type") or "").strip(),
+        "transmission": (data.get("transmission") or "").strip(),
+        "condition": (data.get("condition") or "").strip(),
+        "year": parse_int_field("year", data.get("year"), minimum=1900, maximum=current_year),
+        "mileage": parse_int_field("mileage", data.get("mileage"), minimum=0),
+        "price": parse_int_field("price", data.get("price"), minimum=0),
+    }
+
+    missing = [key for key, value in payload.items() if value == ""]
+    if missing:
+        raise ValueError(f"Missing required fields: {', '.join(missing)}")
+
+    if len(payload["seller_name"]) > 120:
+        raise ValueError("seller_name must be 120 characters or fewer")
+    if len(payload["phone_number"]) > 40:
+        raise ValueError("phone_number must be 40 characters or fewer")
+    if len(payload["vehicle_location"]) > 160:
+        raise ValueError("vehicle_location must be 160 characters or fewer")
+    if len(payload["vehicle_description"]) > 2000:
+        raise ValueError("vehicle_description must be 2000 characters or fewer")
+
+    return payload
+
+
+def upload_listing_image(image_file, listing_id):
+    if not image_file or not image_file.filename:
+        return None
+
+    content_type = (image_file.mimetype or "").lower()
+    file_extension = MARKETPLACE_ALLOWED_IMAGE_TYPES.get(content_type)
+
+    if not file_extension:
+        guessed_extension = os.path.splitext(image_file.filename)[1].lower()
+        if guessed_extension in {".jpg", ".jpeg"}:
+            content_type = "image/jpeg"
+            file_extension = ".jpg"
+        elif guessed_extension in {".png", ".webp"}:
+            content_type = mimetypes.types_map.get(guessed_extension, content_type)
+            file_extension = guessed_extension
+
+    if not file_extension:
+        raise ValueError("Image must be a JPG, PNG, or WEBP file")
+
+    image_bytes = image_file.read()
+    if not image_bytes:
+        raise ValueError("Uploaded image is empty")
+
+    storage_path = f"listings/{listing_id}/{uuid4().hex}{file_extension}"
+    supabase.storage.from_(MARKETPLACE_BUCKET).upload(
+        storage_path,
+        image_bytes,
+        {"content-type": content_type or "application/octet-stream"},
+    )
+    public_url = supabase.storage.from_(MARKETPLACE_BUCKET).get_public_url(storage_path)
+    return {"path": storage_path, "public_url": public_url}
+
+
+def upload_listing_images(image_files, listing_id):
+    if not image_files:
+        return []
+
+    uploaded = []
+    for image_file in image_files[:5]:
+        if not image_file or not image_file.filename:
+            continue
+        upload_result = upload_listing_image(image_file, listing_id)
+        if upload_result:
+            uploaded.append(upload_result["public_url"])
+    return uploaded
+
+
+def get_storage_path_from_public_url(image_url):
+    if not image_url:
+        return None
+
+    parsed = urlparse(image_url)
+    marker = f"/storage/v1/object/public/{MARKETPLACE_BUCKET}/"
+    if marker not in parsed.path:
+        return None
+    return parsed.path.split(marker, 1)[1]
 
 
 # ============================================
@@ -167,19 +340,43 @@ def token_required(f):
 # ============================================
 def predict_price(brand, model, year, engine, mileage):
     brand_prices = {
-        "toyota": 5200000, "honda": 5500000, "nissan": 4800000,
-        "suzuki": 3500000, "mitsubishi": 4500000, "bmw": 8500000,
-        "benz": 9500000, "mercedes": 9500000, "hyundai": 4200000,
-        "kia": 4000000, "mazda": 4600000, "subaru": 5000000,
-        "daihatsu": 3200000, "perodua": 3000000, "mg": 4800000,
+        "toyota": 5200000,
+        "honda": 5500000,
+        "nissan": 4800000,
+        "suzuki": 3500000,
+        "mitsubishi": 4500000,
+        "bmw": 8500000,
+        "benz": 9500000,
+        "mercedes": 9500000,
+        "hyundai": 4200000,
+        "kia": 4000000,
+        "mazda": 4600000,
+        "subaru": 5000000,
+        "daihatsu": 3200000,
+        "perodua": 3000000,
+        "mg": 4800000,
     }
 
     model_adjustments = {
-        "aqua": 1.05, "prius": 1.08, "vezel": 1.12, "civic": 1.10,
-        "fit": 0.95, "vitz": 0.92, "corolla": 1.06, "premio": 1.04,
-        "axio": 1.02, "swift": 0.98, "alto": 0.85, "wagon r": 0.88,
-        "x-trail": 1.15, "note": 0.96, "leaf": 1.10, "march": 0.88,
-        "lancer": 0.95, "outlander": 1.12, "montero": 1.20,
+        "aqua": 1.05,
+        "prius": 1.08,
+        "vezel": 1.12,
+        "civic": 1.10,
+        "fit": 0.95,
+        "vitz": 0.92,
+        "corolla": 1.06,
+        "premio": 1.04,
+        "axio": 1.02,
+        "swift": 0.98,
+        "alto": 0.85,
+        "wagon r": 0.88,
+        "x-trail": 1.15,
+        "note": 0.96,
+        "leaf": 1.10,
+        "march": 0.88,
+        "lancer": 0.95,
+        "outlander": 1.12,
+        "montero": 1.20,
     }
 
     base = brand_prices.get(brand.lower().strip(), 4500000)
@@ -220,12 +417,9 @@ def predict():
             return jsonify({"error": "Brand and model are required"}), 400
 
         predicted_price = predict_price(brand, model, int(year), int(engine), int(mileage))
-        
-        # Save prediction to database (direct PostgreSQL connection)
         save_prediction_to_db(brand, model, int(year), int(engine), int(mileage), predicted_price)
 
         return jsonify({"predicted_price": predicted_price})
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -238,8 +432,6 @@ def health():
 # ============================================
 # ADMIN API ENDPOINTS
 # ============================================
-
-# --- Admin Login ---
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login():
     data = request.get_json()
@@ -250,40 +442,46 @@ def admin_login():
     password = data.get("password", "")
 
     try:
-        # Perform Supabase Admin Login
         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
         if res.user:
+            admin = get_admin_by_email(email)
+            if not admin:
+                return jsonify({"error": "This account is not authorized for admin access."}), 403
             return jsonify({"token": res.session.access_token, "message": "Admin login successful"})
-        else:
-            return jsonify({"error": "Invalid email or password."}), 401
+        return jsonify({"error": "Invalid email or password."}), 401
     except Exception as e:
         return jsonify({"error": str(e)}), 401
 
 
-# --- Dashboard Stats ---
 @app.route("/api/admin/stats", methods=["GET"])
 @token_required
 def admin_stats():
     try:
-        # Fetch stats from Supabase
         pred_res = supabase.table("predictions").select("id", count="exact").execute()
         total_predictions = pred_res.count if pred_res.count is not None else 0
-        
-        loan_res = supabase.table("loan_rates").select("interest_rate").order("created_at", desc=True).limit(1).execute()
+
+        loan_res = (
+            supabase.table("loan_rates")
+            .select("interest_rate")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
         current_rate = loan_res.data[0]["interest_rate"] if loan_res.data else 12.5
 
-        return jsonify({
-            "total_predictions": total_predictions,
-            "r2_score": 0.9234,
-            "mae": 285000,
-            "last_training_date": "2026-02-28",
-            "active_loan_rate": current_rate
-        })
+        return jsonify(
+            {
+                "total_predictions": total_predictions,
+                "r2_score": 0.9234,
+                "mae": 285000,
+                "last_training_date": "2026-02-28",
+                "active_loan_rate": current_rate,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# --- Loan Rate: Get ---
 @app.route("/api/admin/loan-rate", methods=["GET"])
 @token_required
 def get_loan_rate():
@@ -291,13 +489,11 @@ def get_loan_rate():
         res = supabase.table("loan_rates").select("*").order("created_at", desc=True).limit(1).execute()
         if res.data:
             return jsonify(res.data[0])
-        else:
-            return jsonify({"interest_rate": 12.5, "min_down_payment": 20, "max_duration": 60})
+        return jsonify({"interest_rate": 12.5, "min_down_payment": 20, "max_duration": 60})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# --- Loan Rate: Update ---
 @app.route("/api/admin/update-loan-rate", methods=["POST"])
 @token_required
 def update_loan_rate():
@@ -308,7 +504,7 @@ def update_loan_rate():
     new_rate = {
         "interest_rate": data.get("interest_rate"),
         "min_down_payment": data.get("min_down_payment"),
-        "max_duration": data.get("max_duration")
+        "max_duration": data.get("max_duration"),
     }
 
     try:
@@ -318,7 +514,6 @@ def update_loan_rate():
         return jsonify({"error": str(e)}), 500
 
 
-# --- Notifications: List ---
 @app.route("/api/admin/notifications", methods=["GET"])
 @token_required
 def get_notifications():
@@ -329,7 +524,6 @@ def get_notifications():
         return jsonify({"error": str(e)}), 500
 
 
-# --- Notifications: Create ---
 @app.route("/api/admin/create-notification", methods=["POST"])
 @token_required
 def create_notification():
@@ -340,9 +534,9 @@ def create_notification():
     notif = {
         "title": data.get("title", ""),
         "message": data.get("message", ""),
-        "active": data.get("active", True)
+        "active": data.get("active", True),
     }
-    
+
     try:
         res = supabase.table("notifications").insert(notif).execute()
         return jsonify({"message": "Notification created", "notification": res.data[0]}), 201
@@ -350,7 +544,6 @@ def create_notification():
         return jsonify({"error": str(e)}), 500
 
 
-# --- Notifications: Delete ---
 @app.route("/api/admin/delete-notification/<int:notif_id>", methods=["DELETE"])
 @token_required
 def delete_notification(notif_id):
@@ -361,7 +554,6 @@ def delete_notification(notif_id):
         return jsonify({"error": str(e)}), 500
 
 
-# --- Notifications: Update ---
 @app.route("/api/admin/update-notification/<int:notif_id>", methods=["PUT"])
 @token_required
 def update_notification(notif_id):
@@ -372,21 +564,31 @@ def update_notification(notif_id):
     notif = {
         "title": data.get("title", ""),
         "message": data.get("message", ""),
-        "active": data.get("active", True)
+        "active": data.get("active", True),
     }
-    
+
     try:
         res = supabase.table("notifications").update(notif).eq("id", notif_id).execute()
-        return jsonify({"message": "Notification updated", "notification": res.data[0] if res.data else None})
+        return jsonify(
+            {
+                "message": "Notification updated",
+                "notification": res.data[0] if res.data else None,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
-# --- Public Notifications: List ---
 @app.route("/api/notifications", methods=["GET"])
 def get_public_notifications():
     try:
-        res = supabase.table("notifications").select("*").eq("active", True).order("created_at", desc=True).execute()
+        res = (
+            supabase.table("notifications")
+            .select("*")
+            .eq("active", True)
+            .order("created_at", desc=True)
+            .execute()
+        )
         return jsonify({"notifications": res.data})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -443,6 +645,178 @@ def update_support_ticket(ticket_id):
     try:
         res = supabase.table("support_tickets").update({"status": status}).eq("id", ticket_id).execute()
         return jsonify({"message": "Support ticket updated", "ticket": res.data[0] if res.data else None})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ============================================
+# MARKETPLACE API ENDPOINTS
+# ============================================
+@app.route("/api/marketplace/listings", methods=["GET"])
+def get_marketplace_listings():
+    try:
+        status = (request.args.get("status") or "approved").strip().lower()
+        query = supabase.table("listings").select("*").order("created_at", desc=True)
+
+        if status != "all":
+            query = query.eq("status", status)
+
+        response = query.execute()
+        return jsonify({"listings": response.data or []})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/marketplace/listings/<string:listing_id>", methods=["GET"])
+def get_marketplace_listing(listing_id):
+    try:
+        response = (
+            supabase.table("listings")
+            .select("*")
+            .eq("id", listing_id)
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            return jsonify({"error": "Listing not found"}), 404
+
+        listing = response.data[0]
+        if listing.get("status") != "approved":
+            return jsonify({"error": "Listing not found"}), 404
+
+        return jsonify({"listing": listing})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/marketplace/listings", methods=["POST"])
+def create_marketplace_listing():
+    if not supabase:
+        return jsonify({"error": "Supabase client is not configured"}), 500
+
+    data = get_request_payload()
+    try:
+        payload = normalize_listing_payload(data)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    current_user = get_authenticated_user(extract_bearer_token())
+    if current_user:
+        payload["user_id"] = str(current_user.id)
+
+    payload["status"] = "pending"
+    payload["id"] = str(uuid4())
+
+    try:
+        image_files = request.files.getlist("images")
+        if not image_files:
+            single_image = request.files.get("image")
+            if single_image:
+                image_files = [single_image]
+
+        uploaded_images = upload_listing_images(image_files, payload["id"])
+        if uploaded_images:
+            payload["image_urls"] = uploaded_images
+            payload["image_url"] = uploaded_images[0]
+
+        response = supabase.table("listings").insert(payload).execute()
+        created_listing = response.data[0] if response.data else payload
+
+        return (
+            jsonify(
+                {
+                    "message": "Listing submitted successfully and is pending review",
+                    "listing": created_listing,
+                }
+            ),
+            201,
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/marketplace/listings", methods=["GET"])
+@admin_required
+def admin_get_marketplace_listings():
+    try:
+        status = (request.args.get("status") or "all").strip().lower()
+        query = supabase.table("listings").select("*").order("created_at", desc=True)
+
+        if status != "all":
+            query = query.eq("status", status)
+
+        response = query.execute()
+        return jsonify({"listings": response.data or []})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/marketplace/listings/<string:listing_id>/status", methods=["PUT"])
+@admin_required
+def admin_update_marketplace_listing_status(listing_id):
+    data = request.get_json(silent=True) or {}
+    new_status = (data.get("status") or "").strip().lower()
+    allowed_statuses = {"approved", "pending", "rejected", "sold"}
+
+    if new_status not in allowed_statuses:
+        return (
+            jsonify({"error": f"status must be one of: {', '.join(sorted(allowed_statuses))}"}),
+            400,
+        )
+
+    try:
+        response = supabase.table("listings").update({"status": new_status}).eq("id", listing_id).execute()
+        if not response.data:
+            return jsonify({"error": "Listing not found"}), 404
+
+        return jsonify(
+            {
+                "message": "Listing status updated successfully",
+                "listing": response.data[0],
+            }
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/marketplace/listings/<string:listing_id>", methods=["DELETE"])
+@admin_required
+def admin_delete_marketplace_listing(listing_id):
+    try:
+        lookup_response = (
+            supabase.table("listings")
+            .select("id,image_url,image_urls")
+            .eq("id", listing_id)
+            .limit(1)
+            .execute()
+        )
+        if not lookup_response.data:
+            return jsonify({"error": "Listing not found"}), 404
+
+        listing = lookup_response.data[0]
+        public_urls = []
+        if isinstance(listing.get("image_urls"), list):
+            public_urls.extend([url for url in listing.get("image_urls") if url])
+        if listing.get("image_url"):
+            public_urls.append(listing.get("image_url"))
+
+        image_paths = list(
+            {
+                path
+                for path in (get_storage_path_from_public_url(url) for url in public_urls)
+                if path
+            }
+        )
+        if image_paths:
+            try:
+                supabase.storage.from_(MARKETPLACE_BUCKET).remove(image_paths)
+            except Exception as storage_error:
+                print(f"[WARN] Failed to delete listing image(s): {storage_error}", flush=True)
+
+        supabase.table("listings").delete().eq("id", listing_id).execute()
+        return jsonify({"message": "Listing deleted successfully"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

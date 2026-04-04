@@ -29,7 +29,7 @@ function LoanRates() {
             setInterestRate(data.interest_rate?.toString() || '');
             setMinDownPayment(data.min_down_payment?.toString() || '');
             setMaxDuration(data.max_duration?.toString() || '');
-        } catch (err) {
+        } catch {
             setError('Unable to load loan rate data.');
             // Fallback for UI preview
             const fallback = { interest_rate: 12.5, min_down_payment: 20, max_duration: 60 };

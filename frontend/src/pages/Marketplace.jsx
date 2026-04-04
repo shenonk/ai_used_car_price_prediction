@@ -50,6 +50,7 @@ function Marketplace() {
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [selectedCar, setSelectedCar] = useState(null);
   const [selectedCarImage, setSelectedCarImage] = useState("");
+  const [lightboxImage, setLightboxImage] = useState("");
 
   const fetchListings = async () => {
     try {
@@ -342,7 +343,7 @@ function Marketplace() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredCars.map((car) => (
               <article
                 key={car.id}
@@ -359,9 +360,9 @@ function Marketplace() {
                     setSelectedCarImage(getListingImages(car)[0] || "");
                   }
                 }}
-                className="group overflow-hidden rounded-[28px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
+                className="group overflow-hidden rounded-[24px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
               >
-                <div className="relative h-56 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
+                <div className="relative h-44 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
                   {getListingImages(car)[0] ? (
                     <img
                       src={getListingImages(car)[0]}
@@ -381,23 +382,23 @@ function Marketplace() {
                   </div>
                 </div>
 
-                <div className="p-5">
+                <div className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-xl font-semibold text-white">
+                      <h3 className="text-lg font-semibold text-white">
                         {car.brand} {car.model}
                       </h3>
-                      <p className="mt-1 text-sm text-slate-400">{car.condition || "Used vehicle"}</p>
-                      <p className="mt-2 text-sm text-slate-500">
+                      <p className="mt-1 text-xs text-slate-400">{car.condition || "Used vehicle"}</p>
+                      <p className="mt-2 text-xs text-slate-500">
                         {car.seller_name || "Private seller"} • {car.vehicle_location || "Location not listed"}
                       </p>
                     </div>
-                    <p className="text-right text-lg font-bold text-cyan-300">
+                    <p className="text-right text-base font-bold text-cyan-300">
                       {formatCurrency(car.price)}
                     </p>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="mt-4 grid grid-cols-2 gap-2.5">
                     <MarketplaceMeta
                       icon={<CalendarRange className="h-4 w-4" />}
                       label="Year"
@@ -424,8 +425,8 @@ function Marketplace() {
                     />
                   </div>
 
-                  <div className="mt-5 flex items-center justify-between border-t border-slate-800/80 pt-4">
-                    <p className="text-sm text-slate-400">Tap to expand this listing</p>
+                  <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3">
+                    <p className="text-xs text-slate-400">Tap to expand</p>
                     <button
                       type="button"
                       onClick={(event) => {
@@ -433,7 +434,7 @@ function Marketplace() {
                         setSelectedCar(car);
                         setSelectedCarImage(getListingImages(car)[0] || "");
                       }}
-                      className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
+                      className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
                     >
                       View details
                     </button>
@@ -456,11 +457,17 @@ function Marketplace() {
             <div className="grid lg:grid-cols-[1.2fr_0.9fr]">
               <div className="relative min-h-[320px] border-b border-slate-800 lg:min-h-[620px] lg:border-b-0 lg:border-r">
                 {selectedCarImage ? (
-                  <img
-                    src={selectedCarImage}
-                    alt={`${selectedCar.brand} ${selectedCar.model}`}
-                    className="h-full w-full object-cover"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setLightboxImage(selectedCarImage)}
+                    className="block h-full w-full"
+                  >
+                    <img
+                      src={selectedCarImage}
+                      alt={`${selectedCar.brand} ${selectedCar.model}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
                 ) : (
                   <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-4 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.16),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))] text-slate-500">
                     <ShieldCheck className="h-14 w-14 text-cyan-300/70" />
@@ -508,7 +515,10 @@ function Marketplace() {
                       <button
                         key={`${selectedCar.id}-image-${index}`}
                         type="button"
-                        onClick={() => setSelectedCarImage(imageUrl)}
+                        onClick={() => {
+                          setSelectedCarImage(imageUrl);
+                          setLightboxImage(imageUrl);
+                        }}
                         className={`h-20 w-24 shrink-0 overflow-hidden rounded-2xl border transition ${
                           selectedCarImage === imageUrl
                             ? "border-cyan-400/60 shadow-[0_0_0_1px_rgba(34,211,238,0.3)]"
@@ -609,6 +619,33 @@ function Marketplace() {
               </div>
             </div>
           </section>
+        </div>
+      )}
+
+      {lightboxImage && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/95 p-4">
+          <button
+            type="button"
+            onClick={() => setLightboxImage("")}
+            className="absolute inset-0 cursor-default"
+            aria-label="Close full image view"
+          />
+
+          <div className="relative z-10 flex h-full w-full max-w-7xl items-center justify-center">
+            <img
+              src={lightboxImage}
+              alt="Full vehicle view"
+              className="max-h-full max-w-full object-contain"
+            />
+
+            <button
+              type="button"
+              onClick={() => setLightboxImage("")}
+              className="absolute right-0 top-0 rounded-full border border-slate-700/70 bg-slate-900/90 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500/80 hover:text-white"
+            >
+              Close
+            </button>
+          </div>
         </div>
       )}
 

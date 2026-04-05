@@ -71,7 +71,7 @@ const ChatBot = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+    <div className="fixed bottom-20 right-4 z-50 flex flex-col items-end gap-4 sm:bottom-6 sm:right-6">
       {isOpen && (
         <div
           className="w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-blue-400/20 bg-[#0f2747]/75 shadow-[0_20px_60px_rgba(15,39,71,0.45)]"

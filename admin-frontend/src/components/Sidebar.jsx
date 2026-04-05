@@ -1,14 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { useState } from 'react';
 import logo from '../assets/logo/autovaluelk-logo.png';
 
 /**
  * Sidebar — Admin navigation with responsive mobile menu.
  * Uses NavLink for active state highlighting.
  */
-function Sidebar() {
+function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
     const navigate = useNavigate();
-    const [mobileOpen, setMobileOpen] = useState(false);
 
     const handleLogout = () => {
         localStorage.removeItem('admin_token');
@@ -80,33 +78,10 @@ function Sidebar() {
 
     return (
         <>
-            {/* Mobile hamburger button */}
-            <button
-                onClick={() => setMobileOpen(!mobileOpen)}
-                className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-gray-800 text-white border border-gray-700"
-            >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {mobileOpen ? (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    ) : (
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                    )}
-                </svg>
-            </button>
-
-            {/* Mobile overlay */}
-            {mobileOpen && (
-                <div
-                    className="lg:hidden fixed inset-0 bg-black/60 z-30"
-                    onClick={() => setMobileOpen(false)}
-                />
-            )}
-
             {/* Sidebar */}
             <aside
-                className={`fixed top-0 left-0 h-screen w-64 bg-gray-900/95 backdrop-blur-xl border-r border-gray-800
-          flex flex-col z-40 transition-transform duration-300 lg:translate-x-0
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-gray-800 bg-gray-900/95 backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0
+          ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
             >
                 {/* Logo */}
                 <div className="p-6 border-b border-gray-800">
@@ -127,7 +102,7 @@ function Sidebar() {
                             key={item.to}
                             to={item.to}
                             className={linkClasses}
-                            onClick={() => setMobileOpen(false)}
+                            onClick={() => setIsMobileMenuOpen(false)}
                         >
                             {item.icon}
                             {item.label}

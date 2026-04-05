@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X } from "lucide-react";
 import { isLoggedIn, logout, getCurrentUser } from "../utils/auth";
 import logo from "../assets/logo/autovaluelk-logo.png";
 import { useTranslation } from "react-i18next";
@@ -11,6 +11,7 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const [loggedIn, setLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState({ email: null, username: null });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (i18n.resolvedLanguage === 'si' || i18n.resolvedLanguage === 'ta') {
@@ -33,6 +34,10 @@ const MainLayout = () => {
     };
     checkAuth();
   }, [location.pathname]); // Re-check on navigation
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const navItems = [
     {
@@ -97,10 +102,31 @@ const MainLayout = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#0f172a]">
+    <div className="min-h-screen bg-[#0f172a]">
+      <button
+        type="button"
+        onClick={() => setIsMobileMenuOpen((open) => !open)}
+        className="fixed left-4 top-4 z-50 rounded-xl border border-slate-700/60 bg-slate-900/95 p-2 text-white shadow-lg shadow-black/20 backdrop-blur lg:hidden"
+        aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+        aria-expanded={isMobileMenuOpen}
+      >
+        {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+      </button>
+
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
 
       {/* PREMIUM SIDEBAR */}
-      <div className="w-72 bg-slate-900/80 backdrop-blur-xl border-r border-slate-700/50 flex flex-col fixed h-screen">
+      <div
+        className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col border-r border-slate-700/50 bg-slate-900/80 backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0 ${
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
 
         {/* Logo Section */}
         <div className="p-6 border-b border-slate-700/50">
@@ -120,6 +146,7 @@ const MainLayout = () => {
               key={item.path}
               to={item.path}
               className={`nav-link ${isActive(item.path) ? 'active' : ''}`}
+              onClick={() => setIsMobileMenuOpen(false)}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="font-medium">{item.label}</span>
@@ -210,8 +237,10 @@ const MainLayout = () => {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 ml-72 min-h-screen">
-        <Outlet />
+      <div className="min-h-screen w-full lg:ml-72 lg:w-[calc(100%-18rem)]">
+        <div className="min-h-screen pt-20 lg:pt-0">
+          <Outlet />
+        </div>
       </div>
 
     </div>

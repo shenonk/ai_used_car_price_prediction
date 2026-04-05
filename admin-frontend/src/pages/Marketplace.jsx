@@ -322,7 +322,7 @@ function Marketplace() {
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <StatCard label="Total ads" value={summary.total} accent="cyan" icon={<Store className="h-5 w-5" />} />
             <StatCard label="Pending" value={summary.pending} accent="amber" icon={<Clock3 className="h-5 w-5" />} />
             <StatCard label="Approved" value={summary.approved} accent="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
@@ -517,7 +517,7 @@ function ListingDetail({ listing, selectedImage, onSelectImage, busy, onStatusCh
         </div>
       )}
 
-      <div className="mt-5 flex items-center justify-between gap-3">
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-white">
             {listing.brand} {listing.model}
@@ -527,7 +527,7 @@ function ListingDetail({ listing, selectedImage, onSelectImage, busy, onStatusCh
         <StatusBadge status={listing.status} />
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
         <DetailCard label="Price" value={formatCurrency(listing.price)} />
         <DetailCard label="Mileage" value={`${Number(listing.mileage || 0).toLocaleString()} km`} />
         <DetailCard label="Fuel" value={listing.fuel_type || '-'} />

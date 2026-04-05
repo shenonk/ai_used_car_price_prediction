@@ -266,7 +266,7 @@ function Dashboard() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {statCards.map((card, i) => {
                     const colors = colorMap[card.color];
 
@@ -295,7 +295,7 @@ function Dashboard() {
                 <h2 className="text-xl font-bold text-white mb-4">Recent Registrations</h2>
                 <div className="bg-[#1e293b] border border-cyan-500/20 rounded-2xl overflow-hidden shadow-lg shadow-cyan-500/5">
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm text-slate-300">
+                        <table className="min-w-[640px] w-full text-left text-sm text-slate-300">
                             <thead className="bg-slate-900/50 text-xs uppercase text-slate-400 border-b border-cyan-500/10">
                                 <tr>
                                     <th className="px-6 py-4 font-semibold">User</th>

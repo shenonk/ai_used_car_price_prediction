@@ -4,6 +4,7 @@ import { LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, B
 import { isLoggedIn, logout, getCurrentUser } from "../utils/auth";
 import logo from "../assets/logo/autovaluelk-logo.png";
 import { useTranslation } from "react-i18next";
+import { applyTheme, getStoredTheme } from "../utils/theme";
 
 const MainLayout = () => {
   const { t, i18n } = useTranslation();
@@ -22,6 +23,10 @@ const MainLayout = () => {
       document.body.style.lineHeight = 'normal';
     }
   }, [i18n.resolvedLanguage]);
+
+  useEffect(() => {
+    applyTheme(getStoredTheme());
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -102,11 +107,11 @@ const MainLayout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a]">
+    <div className="theme-app-bg min-h-screen">
       <button
         type="button"
         onClick={() => setIsMobileMenuOpen((open) => !open)}
-        className="fixed left-4 top-4 z-50 rounded-xl border border-slate-700/60 bg-slate-900/95 p-2 text-white shadow-lg shadow-black/20 backdrop-blur lg:hidden"
+        className="theme-surface fixed left-4 top-4 z-50 rounded-xl p-2 theme-text-primary backdrop-blur lg:hidden"
         aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
         aria-expanded={isMobileMenuOpen}
       >
@@ -123,18 +128,18 @@ const MainLayout = () => {
 
       {/* PREMIUM SIDEBAR */}
       <div
-        className={`fixed left-0 top-0 z-40 flex h-screen w-72 flex-col border-r border-slate-700/50 bg-slate-900/80 backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0 ${
+        className={`theme-sidebar fixed left-0 top-0 z-40 flex h-screen w-72 flex-col border-r backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
 
         {/* Logo Section */}
-        <div className="p-6 border-b border-slate-700/50">
+        <div className="theme-divider p-6 border-b">
           <div className="flex items-center gap-3">
             <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
             <div>
-              <h1 className="text-lg font-bold text-white">AutoValueLK</h1>
-              <p className="text-xs text-slate-500">Sri Lankan Market</p>
+              <h1 className="theme-text-primary text-lg font-bold">AutoValueLK</h1>
+              <p className="theme-text-muted text-xs">Sri Lankan Market</p>
             </div>
           </div>
         </div>
@@ -158,57 +163,57 @@ const MainLayout = () => {
         </nav>
 
         {/* Quick Stats */}
-        <div className="p-4 border-t border-slate-700/50">
-          <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
+        <div className="theme-divider p-4 border-t">
+          <div className="theme-surface-soft mb-4 rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-slate-400">Model Accuracy</span>
+              <span className="theme-text-secondary text-xs">Model Accuracy</span>
               <span className="text-xs font-semibold text-emerald-400">87%</span>
             </div>
-            <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
+            <div className="theme-pill h-2 w-full overflow-hidden rounded-full">
               <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 rounded-full" style={{ width: '87%' }}></div>
             </div>
           </div>
         </div>
 
         {/* User Section */}
-        <div className="p-4 border-t border-slate-700/50 flex flex-col gap-3">
+        <div className="theme-divider flex flex-col gap-3 border-t p-4">
           {loggedIn && (
             <div className="flex items-center justify-center gap-3">
               {userInfo.avatar_url && (
                 <img 
                   src={userInfo.avatar_url} 
                   alt="Profile" 
-                  className="w-8 h-8 rounded-full border border-slate-600 object-cover" 
+                  className="theme-divider h-8 w-8 rounded-full border object-cover" 
                   referrerPolicy="no-referrer"
                 />
               )}
-              <p className="text-sm font-bold text-white truncate">
+              <p className="theme-text-primary truncate text-sm font-bold">
                 {t("welcome")}, {userInfo.username || userInfo.email}
               </p>
             </div>
           )}
 
           {/* Language Switcher */}
-          <div className="flex items-center justify-center gap-2 bg-slate-800/50 p-1.5 rounded-xl border border-slate-700/50 mx-2">
+          <div className="theme-pill mx-2 flex items-center justify-center gap-2 rounded-xl p-1.5">
             <button 
               onClick={() => i18n.changeLanguage('en')} 
-              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'en' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'text-slate-400 hover:text-white'}`}
+              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'en' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'theme-text-secondary'}`}
               style={{ fontFamily: 'Inter, sans-serif' }}
             >
               EN
             </button>
-            <span className="text-slate-600 text-xs">|</span>
+            <span className="theme-text-muted text-xs">|</span>
             <button 
               onClick={() => i18n.changeLanguage('si')} 
-              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'si' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'text-slate-400 hover:text-white'}`}
+              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'si' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'theme-text-secondary'}`}
               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
             >
               සිං
             </button>
-            <span className="text-slate-600 text-xs">|</span>
+            <span className="theme-text-muted text-xs">|</span>
             <button 
               onClick={() => i18n.changeLanguage('ta')} 
-              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'ta' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'text-slate-400 hover:text-white'}`}
+              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'ta' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'theme-text-secondary'}`}
               style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
             >
               தமிழ்

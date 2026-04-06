@@ -180,7 +180,7 @@ const HelpCenter = () => {
     formData.message.trim();
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-[#f8fafc] p-8 animate-fade-in">
+    <div className="theme-app-bg min-h-screen p-8 animate-fade-in">
       <div className="max-w-6xl mx-auto space-y-16">
         <div className="text-center space-y-8 py-10">
           <h1 className="text-5xl font-bold tracking-tight">
@@ -194,7 +194,7 @@ const HelpCenter = () => {
             <input
               type="text"
               placeholder="Search for articles, guides, or keywords..."
-              className="w-full bg-[#1e293b]/50 border border-slate-700/50 py-4 pl-14 pr-6 rounded-full outline-none transition-all duration-300 focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20 backdrop-blur-md"
+              className="w-full bg-[#1e293b]/50 border border-slate-700/50 py-4 pl-14 pr-6 rounded-full outline-none transition-all duration-300 focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20 backdrop-blur-md theme-text-primary"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -202,7 +202,7 @@ const HelpCenter = () => {
 
           {selectedCategory !== "all" && (
             <div className="flex items-center justify-center gap-3 text-sm">
-              <span className="text-slate-400">
+              <span className="theme-text-secondary">
                 Filtering by {categories.find((cat) => cat.id === selectedCategory)?.title}
               </span>
               <button
@@ -231,41 +231,41 @@ const HelpCenter = () => {
               <div className="w-16 h-16 rounded-xl bg-blue-500/10 flex items-center justify-center text-[#3B82F6] mb-6 group-hover:scale-110 transition-transform">
                 {cat.icon}
               </div>
-              <h3 className="text-xl font-semibold mb-3">{cat.title}</h3>
-              <p className="text-slate-400 text-sm leading-relaxed">{cat.description}</p>
+              <h3 className="theme-text-primary text-xl font-semibold mb-3">{cat.title}</h3>
+              <p className="theme-text-secondary text-sm leading-relaxed">{cat.description}</p>
             </button>
           ))}
         </div>
 
         <div className="space-y-8 glass p-8 md:p-12 rounded-3xl">
           <div className="text-center md:text-left">
-            <h2 className="text-3xl font-bold mb-2">Frequently Asked Questions</h2>
-            <p className="text-slate-400">Quick answers to common questions about our platform.</p>
+            <h2 className="theme-text-primary text-3xl font-bold mb-2">Frequently Asked Questions</h2>
+            <p className="theme-text-secondary">Quick answers to common questions about our platform.</p>
           </div>
 
           <div className="grid gap-4">
             {filteredFaqs.length === 0 ? (
-              <div className="border border-slate-700/50 rounded-2xl p-6 bg-[#1e293b]/30 text-center">
-                <p className="text-white text-lg font-medium">No matching help articles found.</p>
-                <p className="text-slate-400 mt-2">Try another keyword or clear the category filter.</p>
+              <div className="theme-surface-soft rounded-2xl p-6 text-center">
+                <p className="theme-text-primary text-lg font-medium">No matching help articles found.</p>
+                <p className="theme-text-secondary mt-2">Try another keyword or clear the category filter.</p>
               </div>
             ) : (
               filteredFaqs.map((faq) => (
                 <div
                   key={faq.id}
-                  className={`border border-slate-700/50 rounded-2xl overflow-hidden transition-all duration-300 ${
-                    openFaq === faq.id ? "bg-[#1e293b]/60 border-slate-600/50" : "bg-transparent"
+                  className={`rounded-2xl overflow-hidden transition-all duration-300 ${
+                    openFaq === faq.id ? "theme-surface border border-slate-600/50" : "theme-surface-soft"
                   }`}
                 >
                   <button
                     onClick={() => toggleFaq(faq.id)}
-                    className="w-full p-6 flex items-center justify-between text-left hover:bg-slate-800/30 transition-colors"
+                    className="w-full p-6 flex items-center justify-between text-left transition-colors hover:bg-slate-800/30"
                   >
-                    <span className="text-lg font-medium">{faq.question}</span>
+                    <span className="theme-text-primary text-lg font-medium">{faq.question}</span>
                     {openFaq === faq.id ? (
                       <ChevronUp className="w-5 h-5 text-[#3B82F6]" />
                     ) : (
-                      <ChevronDown className="w-5 h-5 text-slate-500" />
+                      <ChevronDown className="theme-text-muted w-5 h-5" />
                     )}
                   </button>
 
@@ -274,7 +274,7 @@ const HelpCenter = () => {
                       openFaq === faq.id ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
                     }`}
                   >
-                    <div className="p-6 pt-0 text-slate-400 leading-relaxed border-t border-slate-700/30 mt-2">
+                    <div className="theme-text-secondary theme-divider mt-2 border-t p-6 pt-0 leading-relaxed">
                       {faq.answer}
                     </div>
                   </div>
@@ -289,8 +289,8 @@ const HelpCenter = () => {
           className="flex flex-col items-center justify-center space-y-8 py-12 border-t border-slate-800/50 scroll-mt-24"
         >
           <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">Contact Us</h2>
-            <p className="text-slate-400">Our support team is available 24/7 to assist you.</p>
+            <h2 className="theme-text-primary text-2xl font-bold mb-2">Contact Us</h2>
+            <p className="theme-text-secondary">Our support team is available 24/7 to assist you.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="w-full max-w-2xl space-y-4">
@@ -329,7 +329,15 @@ const HelpCenter = () => {
               <button
                 type="submit"
                 disabled={isSubmitting || !isFormValid}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#3B82F6] hover:bg-[#2563eb] disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-white px-8 py-4 rounded-xl font-semibold transition-all transform hover:scale-[1.02] shadow-[0_4px_20px_rgba(59,130,246,0.3)]"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-8 py-4 font-semibold text-white transition-all duration-300 hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-60"
+                style={{
+                  background: isSubmitting || !isFormValid
+                    ? "linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)"
+                    : "linear-gradient(135deg, #2563eb 0%, #0891b2 100%)",
+                  boxShadow: isSubmitting || !isFormValid
+                    ? "none"
+                    : "0 14px 30px rgba(37, 99, 235, 0.22)",
+                }}
               >
                 <Mail className="w-5 h-5" />
                 {isSubmitting ? "Sending..." : "Send Message"}

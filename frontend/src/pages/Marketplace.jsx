@@ -317,8 +317,8 @@ function Marketplace() {
   }, [lightboxImage, lightboxIndex, selectedCarImages]);
 
   return (
-    <div className="min-h-screen bg-[#0f172a] px-6 py-8 md:px-8">
-      <section className="relative overflow-hidden rounded-[28px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/95 p-8 shadow-2xl shadow-slate-950/30 animate-fade-in">
+    <div className="marketplace-page theme-app-bg min-h-screen px-6 py-8 md:px-8">
+      <section className="marketplace-hero relative overflow-hidden rounded-[28px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/95 p-8 shadow-2xl shadow-slate-950/30 animate-fade-in">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.12),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.1),_transparent_28%)]" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-2xl">
@@ -351,7 +351,7 @@ function Marketplace() {
         </div>
       </section>
 
-      <section className="card mt-8 animate-fade-in animate-delay-200 overflow-hidden">
+      <section className="marketplace-panel card mt-8 animate-fade-in animate-delay-200 overflow-hidden">
         <div className="relative p-6 md:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.14),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.12),_transparent_28%)]" />
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
@@ -368,9 +368,30 @@ function Marketplace() {
                 setSubmitState((current) => ({ ...current, error: "", success: "" }));
                 setIsPublishModalOpen(true);
               }}
-              className="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-6 py-3 text-sm font-semibold text-cyan-100 transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-cyan-400/15 hover:shadow-[0_0_30px_rgba(34,211,238,0.18)]"
+              className="marketplace-primary-button marketplace-primary-cta group inline-flex items-center justify-center gap-3 rounded-2xl border px-6 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5"
+              style={{
+                background: "linear-gradient(135deg, #1d4ed8 0%, #0284c7 55%, #0f766e 100%)",
+                color: "#ffffff",
+                borderColor: "rgba(29, 78, 216, 0.42)",
+                boxShadow:
+                  "0 18px 34px rgba(29, 78, 216, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16)",
+              }}
             >
-              {t("marketplace.publish.button")}
+              <span className="marketplace-primary-cta__glow" aria-hidden="true" />
+              <span className="marketplace-primary-cta__icon" aria-hidden="true">
+                <Sparkles className="h-4 w-4" />
+              </span>
+              <span className="relative z-10 flex flex-col items-start leading-tight">
+                <span>{t("marketplace.publish.button")}</span>
+                <span className="marketplace-primary-cta__hint text-[10px] font-medium uppercase tracking-[0.18em]">
+                  Sell your vehicle
+                </span>
+              </span>
+              <span className="marketplace-primary-cta__arrow relative z-10" aria-hidden="true">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-6-6 6 6-6 6" />
+                </svg>
+              </span>
             </button>
           </div>
 
@@ -382,7 +403,7 @@ function Marketplace() {
         </div>
       </section>
 
-      <section className="card mt-8 p-4 md:p-5 animate-fade-in animate-delay-100">
+      <section className="marketplace-panel card mt-8 p-4 md:p-5 animate-fade-in animate-delay-100">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-white">{t("marketplace.inventory.title")}</h2>
@@ -471,9 +492,9 @@ function Marketplace() {
                     setSelectedCarImage(getListingImages(car)[0] || "");
                   }
                 }}
-                className="group overflow-hidden rounded-[24px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
+                className="marketplace-listing-card group overflow-hidden rounded-[24px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
               >
-                <div className="relative h-44 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
+                <div className="marketplace-listing-media relative h-44 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
                   {getListingImages(car)[0] ? (
                     <img
                       src={getListingImages(car)[0]}
@@ -508,7 +529,7 @@ function Marketplace() {
                         {car.seller_name || t("marketplace.fallbacks.private_seller")} {" • "} {car.vehicle_location || t("marketplace.fallbacks.location_not_listed")}
                       </p>
                     </div>
-                    <p className="text-right text-base font-bold text-cyan-300">
+                    <p className="marketplace-price text-right text-base font-bold text-cyan-300">
                       {formatCurrency(car.price, locale)}
                     </p>
                   </div>
@@ -549,7 +570,7 @@ function Marketplace() {
                         setSelectedCar(car);
                         setSelectedCarImage(getListingImages(car)[0] || "");
                       }}
-                      className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
+                      className="marketplace-secondary-button rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
                     >
                       {t("marketplace.card.view_details")}
                     </button>
@@ -568,7 +589,7 @@ function Marketplace() {
             onClick={() => setSelectedCar(null)}
           />
 
-          <section className="relative z-10 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[30px] border border-slate-700/60 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94),rgba(30,41,59,0.96))] shadow-2xl shadow-slate-950/50">
+          <section className="marketplace-detail-modal relative z-10 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[30px] border border-slate-700/60 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94),rgba(30,41,59,0.96))] shadow-2xl shadow-slate-950/50">
             <div className="grid lg:grid-cols-[1.2fr_0.9fr]">
               <div className="relative min-h-[320px] border-b border-slate-800 lg:min-h-[620px] lg:border-b-0 lg:border-r">
                 {selectedCarImage ? (
@@ -619,7 +640,7 @@ function Marketplace() {
 
                 <div className="mt-6 rounded-[24px] border border-cyan-500/15 bg-cyan-500/10 p-5">
                   <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">{t("marketplace.labels.price")}</p>
-                  <p className="mt-2 text-3xl font-bold text-cyan-100">
+                  <p className="marketplace-price mt-2 text-3xl font-bold text-cyan-100">
                     {formatCurrency(selectedCar.price, locale)}
                   </p>
                 </div>
@@ -818,7 +839,7 @@ function Marketplace() {
             className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
             onClick={() => !submitState.saving && setIsPublishModalOpen(false)}
           />
-          <section className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-6 shadow-2xl shadow-slate-950/50 md:p-8">
+          <section className="marketplace-publish-modal relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-6 shadow-2xl shadow-slate-950/50 md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-white">{t("marketplace.publish.modal_title")}</h2>
@@ -968,7 +989,14 @@ function Marketplace() {
                 <button
                   type="submit"
                   disabled={submitState.saving}
-                  className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-cyan-400/15 hover:shadow-[0_0_30px_rgba(34,211,238,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="marketplace-primary-button rounded-xl border px-4 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+                  style={{
+                    background: "linear-gradient(135deg, #1d4ed8 0%, #0284c7 55%, #0f766e 100%)",
+                    color: "#ffffff",
+                    borderColor: "rgba(29, 78, 216, 0.42)",
+                    boxShadow:
+                      "0 18px 34px rgba(29, 78, 216, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16)",
+                  }}
                 >
                   {submitState.saving ? t("marketplace.publish.submitting") : t("marketplace.publish.submit")}
                 </button>
@@ -984,7 +1012,7 @@ function Marketplace() {
 
 function FilterSelect({ label, value, options, onChange }) {
   return (
-    <label className="block">
+    <label className="marketplace-field block">
       <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
       <div className="relative">
         <select
@@ -1010,7 +1038,7 @@ function SelectField({ label, value, options, onChange }) {
 
 function InputField({ label, value, onChange, placeholder, type = "text" }) {
   return (
-    <label className="block">
+    <label className="marketplace-field block">
       <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
       <input
         type={type}
@@ -1026,7 +1054,7 @@ function InputField({ label, value, onChange, placeholder, type = "text" }) {
 
 function TextareaField({ label, value, onChange, placeholder }) {
   return (
-    <label className="block">
+    <label className="marketplace-field block">
       <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
       <textarea
         value={value}
@@ -1056,7 +1084,7 @@ function ImageUploadSlot({ slotIndex, file, onChange, onRemove, t }) {
   }, [file]);
 
   return (
-    <div className="group relative overflow-hidden rounded-[24px] border border-dashed border-slate-600 bg-slate-900/70">
+    <div className="marketplace-upload-slot group relative overflow-hidden rounded-[24px] border border-dashed border-slate-600 bg-slate-900/70">
       <label className="block cursor-pointer">
         <input
           type="file"
@@ -1115,7 +1143,7 @@ function ImageUploadSlot({ slotIndex, file, onChange, onRemove, t }) {
 
 function MarketplaceMeta({ icon, label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-800/80 bg-slate-900/70 p-3">
+    <div className="marketplace-meta rounded-2xl border border-slate-800/80 bg-slate-900/70 p-3">
       <div className="flex items-center gap-2 text-slate-500">
         {icon}
         <span className="text-xs font-medium uppercase tracking-[0.18em]">{label}</span>

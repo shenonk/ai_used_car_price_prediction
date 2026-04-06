@@ -19,6 +19,7 @@ import { getCurrentUser, logout, updatePassword } from "../utils/auth";
 import { useNavigate } from "react-router-dom";
 import { getAlertsStorageKey, getPrefsStorageKey, loadUserAlerts, saveUserAlerts } from "../utils/userAlerts";
 import SuccessToast from "../components/auth/SuccessToast";
+import { getStoredTheme, saveTheme } from "../utils/theme";
 
 function Settings() {
   const { t, i18n } = useTranslation();
@@ -42,6 +43,7 @@ function Settings() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [theme, setTheme] = useState(getStoredTheme());
   const [toast, setToast] = useState({
     isOpen: false,
     type: "success",
@@ -56,6 +58,8 @@ function Settings() {
       setToast((prev) => ({ ...prev, isOpen: false }));
     }, 3000);
   };
+
+  const isLightTheme = theme === "light";
 
   useEffect(() => {
     const initSettings = async () => {
@@ -205,6 +209,12 @@ function Settings() {
     navigate("/login");
   };
 
+  const handleThemeToggle = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    saveTheme(nextTheme);
+  };
+
   const tabs = [
     { id: "profile", label: t("profile"), icon: <User size={20} /> },
     { id: "notifications", label: t("notification_preferences"), icon: <Bell size={20} /> },
@@ -215,14 +225,14 @@ function Settings() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center">
+      <div className="theme-app-bg min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] p-4 md:p-8 animate-fade-in">
+    <div className="theme-app-bg min-h-screen p-4 md:p-8 animate-fade-in">
       <SuccessToast
         isOpen={toast.isOpen && toast.type === "success"}
         message={toast.message}
@@ -230,15 +240,15 @@ function Settings() {
       />
       {toast.isOpen && toast.type === "error" && (
         <div className="fixed top-6 right-6 z-50 animate-slide-in-right">
-          <div className="bg-slate-900 border-l-4 border-rose-500 rounded-r-xl shadow-2xl p-4 min-w-[300px] flex items-start gap-4">
+          <div className="theme-surface rounded-r-xl border-l-4 border-rose-500 p-4 min-w-[300px] flex items-start gap-4">
             <div className="bg-rose-500/10 rounded-full p-2">
               <svg className="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <div>
-              <h4 className="text-white font-semibold text-lg">{toast.message}</h4>
-              {toast.subMessage && <p className="text-slate-400 text-sm mt-1">{toast.subMessage}</p>}
+              <h4 className="theme-text-primary font-semibold text-lg">{toast.message}</h4>
+              {toast.subMessage && <p className="theme-text-secondary text-sm mt-1">{toast.subMessage}</p>}
             </div>
           </div>
         </div>
@@ -247,8 +257,8 @@ function Settings() {
         
         {/* Page Header */}
         <div className="mb-10">
-          <h1 className="text-4xl font-bold text-white mb-2">{t("settings")}</h1>
-          <p className="text-slate-400">Manage your account, preferences, and data security.</p>
+          <h1 className="theme-text-primary text-4xl font-bold mb-2">{t("settings")}</h1>
+          <p className="theme-text-secondary">Manage your account, preferences, and data security.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -261,8 +271,8 @@ function Settings() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl transition-all duration-300 ${
                   activeTab === tab.id 
-                    ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 shadow-[0_0_20px_rgba(59,130,246,0.1)]' 
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                    ? 'settings-tab-button active border' 
+                    : 'settings-tab-button'
                 }`}
               >
                 {tab.icon}
@@ -271,7 +281,7 @@ function Settings() {
               </button>
             ))}
             
-            <div className="pt-4 mt-4 border-t border-slate-800/50">
+            <div className="theme-divider pt-4 mt-4 border-t">
                 <button 
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-rose-400 hover:bg-rose-500/10 transition-all duration-300"
@@ -568,14 +578,14 @@ function Settings() {
               {activeTab === "general" && (
                 <div className="space-y-8 animate-slide-up">
                   <div>
-                    <h2 className="text-2xl font-bold text-white mb-2">{t("language_preferences")}</h2>
-                    <p className="text-slate-400">Configure your interface language and preferences.</p>
+                    <h2 className="theme-text-primary text-2xl font-bold mb-2">{t("language_preferences")}</h2>
+                    <p className="theme-text-secondary">Configure your interface language and preferences.</p>
                   </div>
 
                   <div className="space-y-6">
                     {/* Language Selector */}
-                    <div className="p-6 rounded-2xl bg-slate-800/20 border border-slate-700/30">
-                        <label className="text-white font-semibold mb-4 block flex items-center gap-2">
+                    <div className="theme-surface-soft rounded-2xl p-6">
+                        <label className="theme-text-primary font-semibold mb-4 block flex items-center gap-2">
                              <Globe size={18} className="text-blue-400" />
                              Select Application Language
                         </label>
@@ -591,7 +601,7 @@ function Settings() {
                                     className={`p-4 rounded-xl border font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
                                         i18n.resolvedLanguage === lang.id 
                                             ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20' 
-                                            : 'bg-slate-800/40 text-slate-400 border-slate-700 hover:border-slate-600'
+                                            : 'theme-pill theme-text-secondary hover:border-slate-400'
                                     }`}
                                 >
                                     <span className="text-xs opacity-50">{lang.code}</span>
@@ -602,27 +612,58 @@ function Settings() {
                     </div>
 
                     {/* Appearance */}
-                    <div className="p-6 rounded-2xl bg-slate-800/20 border border-slate-700/30">
-                        <div className="flex items-center justify-between">
+                    <div className="theme-surface-soft rounded-2xl p-6">
+                        <div className="flex items-center justify-between gap-4">
                             <div>
-                                <p className="text-white font-semibold mb-1 flex items-center gap-2">
+                                <p className="theme-text-primary font-semibold mb-1 flex items-center gap-2">
                                     <Moon size={18} className="text-amber-400" />
                                     {t("appearance")}
                                 </p>
-                                <p className="text-sm text-slate-400">Application theme (Dark mode fixed for now)</p>
+                                <p className="theme-text-secondary text-sm">
+                                  {isLightTheme
+                                    ? "Light mode uses a bright white surface with softer slate text."
+                                    : "Dark mode keeps the current AutoValueLK midnight palette."}
+                                </p>
                             </div>
-                            <span className="badge badge-info uppercase">Dark Only</span>
+                            <div className="flex items-center gap-3">
+                              <span className={`text-sm font-semibold ${isLightTheme ? "theme-text-secondary" : "text-blue-400"}`}>
+                                {isLightTheme ? "Light" : "Dark"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={handleThemeToggle}
+                                className={`relative h-8 w-16 rounded-full transition-all duration-300 ${
+                                  isLightTheme ? "bg-amber-400/80" : "bg-slate-700"
+                                }`}
+                                aria-label={`Switch to ${isLightTheme ? "dark" : "light"} mode`}
+                                aria-pressed={isLightTheme}
+                              >
+                                <span
+                                  className={`absolute top-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-md transition-transform duration-300 ${
+                                    isLightTheme ? "translate-x-9" : "translate-x-1"
+                                  }`}
+                                >
+                                  {isLightTheme ? (
+                                    <svg className="h-3.5 w-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                                      <path d="M10 2.5a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V3.25A.75.75 0 0110 2.5zm0 10.25a2.75 2.75 0 100-5.5 2.75 2.75 0 000 5.5zm6.75-3.5a.75.75 0 010 1.5h-1.5a.75.75 0 010-1.5h1.5zM5.25 10a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h1.5a.75.75 0 01.75.75zm8.864-4.614a.75.75 0 011.06 1.06l-1.06 1.061a.75.75 0 01-1.06-1.06l1.06-1.061zm-8.228 8.228a.75.75 0 011.06 1.06l-1.06 1.061a.75.75 0 01-1.06-1.06l1.06-1.061zm9.289 1.061a.75.75 0 01-1.06 1.06l-1.061-1.06a.75.75 0 011.06-1.061l1.061 1.06zm-8.228-8.228a.75.75 0 01-1.06 1.06L4.826 6.447a.75.75 0 011.06-1.06l1.061 1.06zM10 15.25a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V16a.75.75 0 01.75-.75z" />
+                                    </svg>
+                                  ) : (
+                                    <Moon className="h-3.5 w-3.5 text-slate-700" />
+                                  )}
+                                </span>
+                              </button>
+                            </div>
                         </div>
                     </div>
 
                     {/* Danger Zone */}
-                    <div className="pt-8 border-t border-slate-800/50">
+                    <div className="theme-divider pt-8 border-t">
                         <h3 className="text-rose-500 font-bold mb-4 flex items-center gap-2 uppercase tracking-wider text-sm">
                             <Trash2 size={16} />
                             {t("danger_zone")}
                         </h3>
-                        <div className="p-6 rounded-2xl bg-rose-500/5 border border-rose-500/20 space-y-4">
-                            <p className="text-sm text-slate-400">Once you clear your local data, there is no going back. This includes preferences and alerts.</p>
+                        <div className="space-y-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6">
+                            <p className="theme-text-secondary text-sm">Once you clear your local data, there is no going back. This includes preferences and alerts.</p>
                             <button 
                                 onClick={clearAllData}
                                 className="px-6 py-3 rounded-xl bg-transparent border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition-all duration-300 font-semibold"

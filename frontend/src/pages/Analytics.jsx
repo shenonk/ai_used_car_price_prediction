@@ -18,6 +18,14 @@ function Analytics() {
   const [search, setSearch] = useState("")
   const [brandFilter, setBrandFilter] = useState("")
   const [showAll, setShowAll] = useState(false)
+  const themeStyles =
+    typeof window !== "undefined"
+      ? getComputedStyle(document.documentElement)
+      : null
+  const themeTextPrimary = themeStyles?.getPropertyValue("--text-primary")?.trim() || "#f8fafc"
+  const themeTextSecondary = themeStyles?.getPropertyValue("--text-secondary")?.trim() || "#94a3b8"
+  const themeSurface = themeStyles?.getPropertyValue("--bg-surface")?.trim() || "#1e293b"
+  const themeBorder = themeStyles?.getPropertyValue("--border-color")?.trim() || "#334155"
 
   const data = {
     labels: ["2020", "2021", "2022", "2023", "2024"],
@@ -39,12 +47,12 @@ function Analytics() {
   const options = {
     responsive: true,
     plugins: {
-      legend: { labels: { color: '#94a3b8' } },
-      tooltip: { backgroundColor: '#1e293b', titleColor: '#f8fafc', bodyColor: '#94a3b8', borderColor: '#334155', borderWidth: 1, cornerRadius: 12, padding: 12 }
+      legend: { labels: { color: themeTextSecondary } },
+      tooltip: { backgroundColor: themeSurface, titleColor: themeTextPrimary, bodyColor: themeTextSecondary, borderColor: themeBorder, borderWidth: 1, cornerRadius: 12, padding: 12 }
     },
     scales: {
-      x: { grid: { color: 'rgba(71, 85, 105, 0.3)' }, ticks: { color: '#94a3b8' } },
-      y: { grid: { color: 'rgba(71, 85, 105, 0.3)' }, ticks: { color: '#94a3b8' } }
+      x: { grid: { color: themeBorder }, ticks: { color: themeTextSecondary } },
+      y: { grid: { color: themeBorder }, ticks: { color: themeTextSecondary } }
     }
   }
 

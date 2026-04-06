@@ -47,7 +47,7 @@ const MainLayout = () => {
     },
     {
       path: "/marketplace",
-      label: "Marketplace",
+      label: t("marketplace_nav"),
       icon: <ShoppingBag className="w-5 h-5" />,
     },
     {

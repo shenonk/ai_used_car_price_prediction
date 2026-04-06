@@ -1,17 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CalendarRange, ChevronDown, Fuel, Gauge, ShieldCheck, Sparkles } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-const priceRanges = [
-  "All Prices",
-  "Under 3M",
-  "3M - 6M",
-  "6M - 10M",
-  "Above 10M",
-];
+const ALL_BRANDS = "__all_brands__";
+const ALL_MODELS = "__all_models__";
+const ALL_FUEL_TYPES = "__all_fuel_types__";
+
+const priceRangeValues = ["all", "under_3m", "3m_6m", "6m_10m", "above_10m"];
 
 const initialForm = {
   brand: "",
@@ -28,20 +27,32 @@ const initialForm = {
   price: "",
 };
 
-const formatCurrency = (value) =>
-  new Intl.NumberFormat("en-LK", {
+const localeMap = {
+  en: "en-LK",
+  si: "si-LK",
+  ta: "ta-LK",
+};
+
+const getLocale = (language) => localeMap[language] || "en-LK";
+
+const formatCurrency = (value, locale) =>
+  new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "LKR",
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
 
+const formatNumber = (value, locale) => Number(value || 0).toLocaleString(locale);
+
 function Marketplace() {
+  const { t, i18n } = useTranslation();
+  const locale = getLocale(i18n.resolvedLanguage);
   const [cars, setCars] = useState([]);
   const [filters, setFilters] = useState({
-    brand: "All Brands",
-    model: "All Models",
-    priceRange: "All Prices",
-    fuelType: "All Fuel Types",
+    brand: ALL_BRANDS,
+    model: ALL_MODELS,
+    priceRange: "all",
+    fuelType: ALL_FUEL_TYPES,
   });
   const [loadError, setLoadError] = useState("");
   const [form, setForm] = useState(initialForm);
@@ -52,6 +63,43 @@ function Marketplace() {
   const [selectedCarImage, setSelectedCarImage] = useState("");
   const [lightboxImage, setLightboxImage] = useState("");
 
+  const priceRanges = useMemo(
+    () =>
+      priceRangeValues.map((value) => ({
+        value,
+        label: t(`marketplace.price_ranges.${value}`),
+      })),
+    [t]
+  );
+
+  const translatedFuelLabels = useMemo(
+    () => ({
+      Petrol: t("marketplace.fuel_values.petrol"),
+      Diesel: t("marketplace.fuel_values.diesel"),
+      Hybrid: t("marketplace.fuel_values.hybrid"),
+      Electric: t("marketplace.fuel_values.electric"),
+    }),
+    [t]
+  );
+
+  const translatedTransmissionLabels = useMemo(
+    () => ({
+      Automatic: t("marketplace.transmission_values.automatic"),
+      Manual: t("marketplace.transmission_values.manual"),
+      CVT: t("marketplace.transmission_values.cvt"),
+    }),
+    [t]
+  );
+
+  const translatedConditionLabels = useMemo(
+    () => ({
+      Used: t("marketplace.condition_values.used"),
+      Reconditioned: t("marketplace.condition_values.reconditioned"),
+      "Brand New": t("marketplace.condition_values.brand_new"),
+    }),
+    [t]
+  );
+
   const fetchListings = async () => {
     try {
       setLoadError("");
@@ -60,60 +108,77 @@ function Marketplace() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || "Failed to load marketplace listings.");
+        throw new Error(result.error || t("marketplace.errors.load_failed"));
       }
 
       setCars(result.listings || []);
     } catch (error) {
-      setLoadError(error.message || "Failed to load marketplace listings.");
+      setLoadError(error.message || t("marketplace.errors.load_failed"));
     }
   };
 
   useEffect(() => {
     fetchListings();
-  }, []);
+  }, [t]);
 
   const approvedCars = useMemo(() => cars.filter((car) => car.status === "approved"), [cars]);
 
   const brandOptions = useMemo(
-    () => ["All Brands", ...new Set(approvedCars.map((car) => car.brand).filter(Boolean))],
-    [approvedCars]
+    () => [
+      { value: ALL_BRANDS, label: t("marketplace.filters.all_brands") },
+      ...Array.from(new Set(approvedCars.map((car) => car.brand).filter(Boolean))).map((brand) => ({
+        value: brand,
+        label: brand,
+      })),
+    ],
+    [approvedCars, t]
   );
 
   const modelOptions = useMemo(
     () => [
-      "All Models",
-      ...new Set(
+      { value: ALL_MODELS, label: t("marketplace.filters.all_models") },
+      ...Array.from(
+        new Set(
         approvedCars
-          .filter((car) => filters.brand === "All Brands" || car.brand === filters.brand)
+          .filter((car) => filters.brand === ALL_BRANDS || car.brand === filters.brand)
           .map((car) => car.model)
           .filter(Boolean)
-      ),
+        )
+      ).map((model) => ({
+        value: model,
+        label: model,
+      })),
     ],
-    [approvedCars, filters.brand]
+    [approvedCars, filters.brand, t]
   );
 
   const fuelOptions = useMemo(
-    () => ["All Fuel Types", ...new Set(approvedCars.map((car) => car.fuel_type).filter(Boolean))],
-    [approvedCars]
+    () => [
+      { value: ALL_FUEL_TYPES, label: t("marketplace.filters.all_fuel_types") },
+      ...Array.from(new Set(approvedCars.map((car) => car.fuel_type).filter(Boolean))).map((fuel) => ({
+        value: fuel,
+        label: translatedFuelLabels[fuel] || fuel,
+      })),
+    ],
+    [approvedCars, t, translatedFuelLabels]
   );
 
   const filteredCars = useMemo(() => {
     return approvedCars.filter((car) => {
       const matchesBrand =
-        filters.brand === "All Brands" || car.brand === filters.brand;
+        filters.brand === ALL_BRANDS || car.brand === filters.brand;
       const matchesModel =
-        filters.model === "All Models" || car.model === filters.model;
+        filters.model === ALL_MODELS || car.model === filters.model;
       const matchesFuel =
-        filters.fuelType === "All Fuel Types" || car.fuel_type === filters.fuelType;
+        filters.fuelType === ALL_FUEL_TYPES || car.fuel_type === filters.fuelType;
 
       const price = Number(car.price || 0);
       const matchesPriceRange =
-        filters.priceRange === "All Prices" ||
-        (filters.priceRange === "Under 3M" && price < 3000000) ||
-        (filters.priceRange === "3M - 6M" && price >= 3000000 && price <= 6000000) ||
-        (filters.priceRange === "6M - 10M" && price > 6000000 && price <= 10000000) ||
-        (filters.priceRange === "Above 10M" && price > 10000000);
+        filters.priceRange === "all" ||
+        (filters.priceRange === "under_3m" && price < 3000000) ||
+        (filters.priceRange === "3m_6m" && price >= 3000000 && price <= 6000000) ||
+        (filters.priceRange === "6m_10m" && price > 6000000 && price <= 10000000) ||
+        (filters.priceRange === "above_10m" && price > 10000000);
 
       return matchesBrand && matchesModel && matchesFuel && matchesPriceRange;
     });
@@ -123,7 +188,7 @@ function Marketplace() {
     setFilters((current) => ({
       ...current,
       [key]: value,
-      ...(key === "brand" ? { model: "All Models" } : {}),
+      ...(key === "brand" ? { model: ALL_MODELS } : {}),
     }));
   };
 
@@ -176,13 +241,13 @@ function Marketplace() {
 
       const result = await response.json();
       if (!response.ok) {
-        throw new Error(result.error || "Failed to submit listing.");
+        throw new Error(result.error || t("marketplace.errors.submit_failed"));
       }
 
       setSubmitState({
         saving: false,
         error: "",
-        success: "Your car was submitted successfully and is now pending admin review.",
+        success: t("marketplace.success.submitted"),
       });
       setForm(initialForm);
       setSelectedImages([]);
@@ -192,7 +257,7 @@ function Marketplace() {
     } catch (error) {
       setSubmitState({
         saving: false,
-        error: error.message || "Failed to submit listing.",
+        error: error.message || t("marketplace.errors.submit_failed"),
         success: "",
       });
     }
@@ -259,29 +324,28 @@ function Marketplace() {
           <div className="max-w-2xl">
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-sm font-medium text-emerald-300">
               <ShieldCheck className="h-4 w-4" />
-              Live Supabase marketplace
+              {t("marketplace.hero.badge")}
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
-              Browse Verified Vehicles
+              {t("marketplace.hero.title")}
             </h1>
             <p className="mt-3 max-w-xl text-base leading-7 text-slate-300 md:text-lg">
-              Approved listings are loaded from your Supabase `listings` table, and new cars can
-              be submitted directly from this page.
+              {t("marketplace.hero.description")}
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 px-4 py-3 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Approved Listings</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t("marketplace.stats.approved_listings")}</p>
               <p className="mt-2 text-2xl font-semibold text-white">{approvedCars.length}</p>
             </div>
             <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 px-4 py-3 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Storage Bucket</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t("marketplace.stats.storage_bucket")}</p>
               <p className="mt-2 text-2xl font-semibold text-white">car_images</p>
             </div>
             <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 px-4 py-3 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Review Status</p>
-              <p className="mt-2 text-2xl font-semibold text-white">Pending by default</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t("marketplace.stats.review_status")}</p>
+              <p className="mt-2 text-2xl font-semibold text-white">{t("marketplace.stats.pending_default")}</p>
             </div>
           </div>
         </div>
@@ -292,9 +356,9 @@ function Marketplace() {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.14),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.12),_transparent_28%)]" />
           <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-2xl">
-              <h2 className="text-xl font-semibold text-white">List your car</h2>
+              <h2 className="text-xl font-semibold text-white">{t("marketplace.publish.title")}</h2>
               <p className="mt-2 text-sm leading-6 text-slate-400">
-                Open a quick publish flow to upload your car details and send the ad for review.
+                {t("marketplace.publish.description")}
               </p>
             </div>
 
@@ -306,7 +370,7 @@ function Marketplace() {
               }}
               className="inline-flex items-center justify-center rounded-2xl border border-cyan-400/20 bg-cyan-500/10 px-6 py-3 text-sm font-semibold text-cyan-100 transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-cyan-400/15 hover:shadow-[0_0_30px_rgba(34,211,238,0.18)]"
             >
-              Publish Ad
+              {t("marketplace.publish.button")}
             </button>
           </div>
 
@@ -321,38 +385,38 @@ function Marketplace() {
       <section className="card mt-8 p-4 md:p-5 animate-fade-in animate-delay-100">
         <div className="mb-5 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-white">Marketplace inventory</h2>
+            <h2 className="text-xl font-semibold text-white">{t("marketplace.inventory.title")}</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Public buyers only see listings whose status is `approved`.
+              {t("marketplace.inventory.description")}
             </p>
           </div>
           <div className="hidden items-center gap-2 rounded-full border border-slate-700/60 bg-slate-900/70 px-4 py-2 text-sm text-slate-300 md:flex">
             <Sparkles className="h-4 w-4 text-cyan-300" />
-            Synced with Flask API
+            {t("marketplace.inventory.synced")}
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <FilterSelect
-            label="Brand"
+            label={t("marketplace.labels.brand")}
             value={filters.brand}
             options={brandOptions}
             onChange={(value) => handleFilterChange("brand", value)}
           />
           <FilterSelect
-            label="Model"
+            label={t("marketplace.labels.model")}
             value={filters.model}
             options={modelOptions}
             onChange={(value) => handleFilterChange("model", value)}
           />
           <FilterSelect
-            label="Price Range (LKR)"
+            label={t("marketplace.labels.price_range")}
             value={filters.priceRange}
             options={priceRanges}
             onChange={(value) => handleFilterChange("priceRange", value)}
           />
           <FilterSelect
-            label="Fuel Type"
+            label={t("marketplace.labels.fuel_type")}
             value={filters.fuelType}
             options={fuelOptions}
             onChange={(value) => handleFilterChange("fuelType", value)}
@@ -369,13 +433,13 @@ function Marketplace() {
       <section className="mt-8 animate-fade-in animate-delay-200">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-white">Approved cars for buyers</h2>
+            <h2 className="text-2xl font-semibold text-white">{t("marketplace.listings.title")}</h2>
             <p className="mt-1 text-sm text-slate-400">
-              Listings only appear here after admin approval.
+              {t("marketplace.listings.description")}
             </p>
           </div>
           <div className="rounded-full border border-slate-700/60 bg-slate-900/70 px-4 py-2 text-sm text-slate-300">
-            Showing {filteredCars.length} of {approvedCars.length} approved listings
+            {t("marketplace.listings.showing", { filtered: filteredCars.length, total: approvedCars.length })}
           </div>
         </div>
 
@@ -384,9 +448,9 @@ function Marketplace() {
             <div className="rounded-full border border-slate-700/70 bg-slate-900/80 p-4">
               <Sparkles className="h-7 w-7 text-cyan-300" />
             </div>
-            <h3 className="mt-5 text-xl font-semibold text-white">No approved cars match these filters</h3>
+            <h3 className="mt-5 text-xl font-semibold text-white">{t("marketplace.empty.title")}</h3>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
-              Try adjusting the filters, or wait for an admin to approve new seller submissions.
+              {t("marketplace.empty.description")}
             </p>
           </div>
         ) : (
@@ -419,13 +483,13 @@ function Marketplace() {
                   ) : (
                     <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
                       <ShieldCheck className="h-10 w-10 text-cyan-300/70" />
-                      <span className="text-sm text-slate-400">Approved listing</span>
+                      <span className="text-sm text-slate-400">{t("marketplace.card.approved_listing")}</span>
                     </div>
                   )}
 
                   <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    Approved
+                    {t("marketplace.card.approved")}
                   </div>
                 </div>
 
@@ -435,31 +499,35 @@ function Marketplace() {
                       <h3 className="text-lg font-semibold text-white">
                         {car.brand} {car.model}
                       </h3>
-                      <p className="mt-1 text-xs text-slate-400">{car.condition || "Used vehicle"}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {(car.condition && translatedConditionLabels[car.condition]) ||
+                          car.condition ||
+                          t("marketplace.fallbacks.used_vehicle")}
+                      </p>
                       <p className="mt-2 text-xs text-slate-500">
-                        {car.seller_name || "Private seller"} • {car.vehicle_location || "Location not listed"}
+                        {car.seller_name || t("marketplace.fallbacks.private_seller")} {" • "} {car.vehicle_location || t("marketplace.fallbacks.location_not_listed")}
                       </p>
                     </div>
                     <p className="text-right text-base font-bold text-cyan-300">
-                      {formatCurrency(car.price)}
+                      {formatCurrency(car.price, locale)}
                     </p>
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-2.5">
                     <MarketplaceMeta
                       icon={<CalendarRange className="h-4 w-4" />}
-                      label="Year"
+                      label={t("marketplace.labels.year")}
                       value={car.year || "-"}
                     />
                     <MarketplaceMeta
                       icon={<Gauge className="h-4 w-4" />}
-                      label="Mileage"
-                      value={`${Number(car.mileage || 0).toLocaleString()} km`}
+                      label={t("marketplace.labels.mileage")}
+                      value={t("marketplace.values.km", { value: formatNumber(car.mileage, locale) })}
                     />
                     <MarketplaceMeta
                       icon={<Fuel className="h-4 w-4" />}
-                      label="Fuel"
-                      value={car.fuel_type || "-"}
+                      label={t("marketplace.labels.fuel")}
+                      value={translatedFuelLabels[car.fuel_type] || car.fuel_type || "-"}
                     />
                     <MarketplaceMeta
                       icon={
@@ -467,13 +535,13 @@ function Marketplace() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.25 18.75h7.5m-7.5-13.5h7.5M9 7.5h6a2.25 2.25 0 012.25 2.25v4.5A2.25 2.25 0 0115 16.5H9a2.25 2.25 0 01-2.25-2.25v-4.5A2.25 2.25 0 019 7.5z" />
                         </svg>
                       }
-                      label="Gearbox"
-                      value={car.transmission || "-"}
+                      label={t("marketplace.labels.gearbox")}
+                      value={translatedTransmissionLabels[car.transmission] || car.transmission || "-"}
                     />
                   </div>
 
                   <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3">
-                    <p className="text-xs text-slate-400">Tap to expand</p>
+                    <p className="text-xs text-slate-400">{t("marketplace.card.tap_to_expand")}</p>
                     <button
                       type="button"
                       onClick={(event) => {
@@ -483,7 +551,7 @@ function Marketplace() {
                       }}
                       className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
                     >
-                      View details
+                      {t("marketplace.card.view_details")}
                     </button>
                   </div>
                 </div>
@@ -518,25 +586,25 @@ function Marketplace() {
                 ) : (
                   <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-4 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.16),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))] text-slate-500">
                     <ShieldCheck className="h-14 w-14 text-cyan-300/70" />
-                    <p className="text-sm text-slate-300">Approved marketplace listing</p>
+                    <p className="text-sm text-slate-300">{t("marketplace.detail.approved_listing")}</p>
                   </div>
                 )}
 
                 <div className="absolute left-5 top-5 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
                   <ShieldCheck className="h-4 w-4" />
-                  Approved by admin
+                  {t("marketplace.detail.approved_by_admin")}
                 </div>
               </div>
 
               <div className="p-6 md:p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-sm uppercase tracking-[0.24em] text-slate-500">Marketplace listing</p>
+                    <p className="text-sm uppercase tracking-[0.24em] text-slate-500">{t("marketplace.detail.listing")}</p>
                     <h2 className="mt-2 text-3xl font-semibold text-white">
                       {selectedCar.brand} {selectedCar.model}
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Explore the full vehicle details with a larger image preview before contacting the seller.
+                      {t("marketplace.detail.description")}
                     </p>
                   </div>
 
@@ -545,14 +613,14 @@ function Marketplace() {
                     onClick={() => setSelectedCar(null)}
                     className="rounded-full border border-slate-700/70 bg-slate-900/80 px-3 py-2 text-sm text-slate-300 transition hover:border-slate-500/80 hover:text-white"
                   >
-                    Close
+                    {t("marketplace.common.close")}
                   </button>
                 </div>
 
                 <div className="mt-6 rounded-[24px] border border-cyan-500/15 bg-cyan-500/10 p-5">
-                  <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">Price</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-cyan-200/80">{t("marketplace.labels.price")}</p>
                   <p className="mt-2 text-3xl font-bold text-cyan-100">
-                    {formatCurrency(selectedCar.price)}
+                    {formatCurrency(selectedCar.price, locale)}
                   </p>
                 </div>
 
@@ -585,7 +653,7 @@ function Marketplace() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15.75 6.75a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.118a7.5 7.5 0 1115 0A17.933 17.933 0 0112 21.75a17.933 17.933 0 01-7.5-1.632z" />
                       </svg>
                     }
-                    label="Seller"
+                    label={t("marketplace.labels.seller")}
                     value={selectedCar.seller_name || "-"}
                   />
                   <MarketplaceMeta
@@ -594,7 +662,7 @@ function Marketplace() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 6.75c0 7.318 5.932 13.25 13.25 13.25h.75a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.965-.852-1.089l-4.423-1.106a1.125 1.125 0 00-1.173.417l-.97 1.293a1.125 1.125 0 01-1.21.38 10.502 10.502 0 01-6.273-6.273 1.125 1.125 0 01.38-1.21l1.293-.97c.328-.246.5-.652.417-1.173L4.96 3.602A1.125 1.125 0 003.872 2.75H2.5A2.25 2.25 0 00.25 5v1.75z" />
                       </svg>
                     }
-                    label="Phone"
+                    label={t("marketplace.labels.phone")}
                     value={selectedCar.phone_number || "-"}
                   />
                   <MarketplaceMeta
@@ -603,23 +671,23 @@ function Marketplace() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 21a8.967 8.967 0 005.002-1.516A8.967 8.967 0 0021 12c0-4.971-4.029-9-9-9s-9 4.029-9 9a8.967 8.967 0 003.998 7.484A8.967 8.967 0 0012 21zm0-13.5a2.25 2.25 0 110 4.5 2.25 2.25 0 010-4.5z" />
                       </svg>
                     }
-                    label="Location"
+                    label={t("marketplace.labels.location")}
                     value={selectedCar.vehicle_location || "-"}
                   />
                   <MarketplaceMeta
                     icon={<CalendarRange className="h-4 w-4" />}
-                    label="Year"
+                    label={t("marketplace.labels.year")}
                     value={selectedCar.year || "-"}
                   />
                   <MarketplaceMeta
                     icon={<Gauge className="h-4 w-4" />}
-                    label="Mileage"
-                    value={`${Number(selectedCar.mileage || 0).toLocaleString()} km`}
+                    label={t("marketplace.labels.mileage")}
+                    value={t("marketplace.values.km", { value: formatNumber(selectedCar.mileage, locale) })}
                   />
                   <MarketplaceMeta
                     icon={<Fuel className="h-4 w-4" />}
-                    label="Fuel"
-                    value={selectedCar.fuel_type || "-"}
+                    label={t("marketplace.labels.fuel")}
+                    value={translatedFuelLabels[selectedCar.fuel_type] || selectedCar.fuel_type || "-"}
                   />
                   <MarketplaceMeta
                     icon={
@@ -627,40 +695,53 @@ function Marketplace() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.25 18.75h7.5m-7.5-13.5h7.5M9 7.5h6a2.25 2.25 0 012.25 2.25v4.5A2.25 2.25 0 0115 16.5H9a2.25 2.25 0 01-2.25-2.25v-4.5A2.25 2.25 0 019 7.5z" />
                       </svg>
                     }
-                    label="Gearbox"
-                    value={selectedCar.transmission || "-"}
+                    label={t("marketplace.labels.gearbox")}
+                    value={translatedTransmissionLabels[selectedCar.transmission] || selectedCar.transmission || "-"}
                   />
                   <MarketplaceMeta
                     icon={<ShieldCheck className="h-4 w-4" />}
-                    label="Condition"
-                    value={selectedCar.condition || "-"}
+                    label={t("marketplace.labels.condition")}
+                    value={translatedConditionLabels[selectedCar.condition] || selectedCar.condition || "-"}
                   />
                   <MarketplaceMeta
                     icon={<Sparkles className="h-4 w-4" />}
-                    label="Status"
-                    value="Approved and visible"
+                    label={t("marketplace.labels.status")}
+                    value={t("marketplace.detail.approved_visible")}
                   />
                 </div>
 
                 <div className="mt-6 rounded-[24px] border border-slate-800/80 bg-slate-900/70 p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                    Description
+                    {t("marketplace.detail.section_description")}
                   </p>
                   <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-300">
-                    {selectedCar.vehicle_description || "No description provided for this vehicle."}
+                    {selectedCar.vehicle_description || t("marketplace.fallbacks.no_description")}
                   </p>
                 </div>
 
                 <div className="mt-6 rounded-[24px] border border-slate-800/80 bg-slate-900/70 p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                    Listing summary
+                    {t("marketplace.detail.section_summary")}
                   </p>
                   <p className="mt-3 text-sm leading-7 text-slate-300">
-                    {selectedCar.brand} {selectedCar.model} is a {selectedCar.condition || "vehicle"} from{" "}
-                    {selectedCar.year || "an unspecified year"} with{" "}
-                    {Number(selectedCar.mileage || 0).toLocaleString()} km on the odometer, powered by{" "}
-                    {selectedCar.fuel_type || "an unspecified fuel type"} and paired with a{" "}
-                    {selectedCar.transmission || "standard"} transmission.
+                    {t("marketplace.detail.summary_text", {
+                      brand: selectedCar.brand,
+                      model: selectedCar.model,
+                      condition:
+                        translatedConditionLabels[selectedCar.condition] ||
+                        selectedCar.condition ||
+                        t("marketplace.fallbacks.vehicle"),
+                      year: selectedCar.year || t("marketplace.fallbacks.unspecified_year"),
+                      mileage: formatNumber(selectedCar.mileage, locale),
+                      fuel:
+                        translatedFuelLabels[selectedCar.fuel_type] ||
+                        selectedCar.fuel_type ||
+                        t("marketplace.fallbacks.unspecified_fuel"),
+                      transmission:
+                        translatedTransmissionLabels[selectedCar.transmission] ||
+                        selectedCar.transmission ||
+                        t("marketplace.fallbacks.standard_transmission"),
+                    })}
                   </p>
                 </div>
               </div>
@@ -675,7 +756,7 @@ function Marketplace() {
             type="button"
             onClick={() => setLightboxImage("")}
             className="absolute inset-0 cursor-default"
-            aria-label="Close full image view"
+            aria-label={t("marketplace.lightbox.close_full_view")}
           />
 
           <div className="relative z-10 flex h-full w-full max-w-7xl items-center justify-center">
@@ -684,7 +765,7 @@ function Marketplace() {
                 type="button"
                 onClick={showPreviousLightboxImage}
                 className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full border border-slate-700/70 bg-slate-900/90 p-3 text-slate-200 transition hover:border-slate-500/80 hover:text-white md:left-6"
-                aria-label="Previous image"
+                aria-label={t("marketplace.lightbox.previous_image")}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -694,7 +775,7 @@ function Marketplace() {
 
             <img
               src={lightboxImage}
-              alt="Full vehicle view"
+              alt={t("marketplace.lightbox.full_vehicle_view")}
               className="max-h-full max-w-full object-contain"
             />
 
@@ -703,7 +784,7 @@ function Marketplace() {
                 type="button"
                 onClick={showNextLightboxImage}
                 className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full border border-slate-700/70 bg-slate-900/90 p-3 text-slate-200 transition hover:border-slate-500/80 hover:text-white md:right-6"
-                aria-label="Next image"
+                aria-label={t("marketplace.lightbox.next_image")}
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.25 4.5l7.5 7.5-7.5 7.5" />
@@ -716,7 +797,7 @@ function Marketplace() {
                 <span>
                   {lightboxIndex + 1} / {selectedCarImages.length}
                 </span>
-                <span className="text-slate-500">Use ← → keys</span>
+                <span className="text-slate-500">{t("marketplace.lightbox.keyboard_hint")}</span>
               </div>
             )}
 
@@ -725,7 +806,7 @@ function Marketplace() {
               onClick={() => setLightboxImage("")}
               className="absolute right-0 top-0 rounded-full border border-slate-700/70 bg-slate-900/90 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500/80 hover:text-white"
             >
-              Close
+              {t("marketplace.common.close")}
             </button>
           </div>
         </div>
@@ -740,10 +821,9 @@ function Marketplace() {
           <section className="relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-6 shadow-2xl shadow-slate-950/50 md:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold text-white">Publish Ad</h2>
+                <h2 className="text-2xl font-semibold text-white">{t("marketplace.publish.modal_title")}</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
-                  Fill in your car details below. Your ad will be submitted to the backend,
-                  stored in Supabase, and marked as pending until reviewed.
+                  {t("marketplace.publish.modal_description")}
                 </p>
               </div>
               <button
@@ -752,70 +832,83 @@ function Marketplace() {
                 disabled={submitState.saving}
                 className="rounded-full border border-slate-700/70 bg-slate-900/80 px-3 py-2 text-sm text-slate-300 transition hover:border-slate-500/80 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Close
+                {t("marketplace.common.close")}
               </button>
             </div>
 
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <InputField
-                  label="Brand"
+                  label={t("marketplace.labels.brand")}
                   value={form.brand}
                   onChange={(value) => handleInputChange("brand", value)}
                   placeholder="Toyota"
                 />
                 <InputField
-                  label="Model"
+                  label={t("marketplace.labels.model")}
                   value={form.model}
                   onChange={(value) => handleInputChange("model", value)}
                   placeholder="Corolla"
                 />
                 <InputField
-                  label="Your Name"
+                  label={t("marketplace.labels.your_name")}
                   value={form.seller_name}
                   onChange={(value) => handleInputChange("seller_name", value)}
                   placeholder="Kasun Perera"
                 />
                 <InputField
-                  label="Phone Number"
+                  label={t("marketplace.labels.phone_number")}
                   value={form.phone_number}
                   onChange={(value) => handleInputChange("phone_number", value)}
                   placeholder="0771234567"
                 />
                 <InputField
-                  label="Year"
+                  label={t("marketplace.labels.year")}
                   type="number"
                   value={form.year}
                   onChange={(value) => handleInputChange("year", value)}
                   placeholder="2020"
                 />
                 <InputField
-                  label="Mileage (km)"
+                  label={t("marketplace.labels.mileage_km")}
                   type="number"
                   value={form.mileage}
                   onChange={(value) => handleInputChange("mileage", value)}
                   placeholder="45000"
                 />
                 <SelectField
-                  label="Fuel Type"
+                  label={t("marketplace.labels.fuel_type")}
                   value={form.fuel_type}
-                  options={["Petrol", "Diesel", "Hybrid", "Electric"]}
+                  options={[
+                    { value: "Petrol", label: t("marketplace.fuel_values.petrol") },
+                    { value: "Diesel", label: t("marketplace.fuel_values.diesel") },
+                    { value: "Hybrid", label: t("marketplace.fuel_values.hybrid") },
+                    { value: "Electric", label: t("marketplace.fuel_values.electric") },
+                  ]}
                   onChange={(value) => handleInputChange("fuel_type", value)}
                 />
                 <SelectField
-                  label="Transmission"
+                  label={t("marketplace.labels.transmission")}
                   value={form.transmission}
-                  options={["Automatic", "Manual", "CVT"]}
+                  options={[
+                    { value: "Automatic", label: t("marketplace.transmission_values.automatic") },
+                    { value: "Manual", label: t("marketplace.transmission_values.manual") },
+                    { value: "CVT", label: t("marketplace.transmission_values.cvt") },
+                  ]}
                   onChange={(value) => handleInputChange("transmission", value)}
                 />
                 <SelectField
-                  label="Condition"
+                  label={t("marketplace.labels.condition")}
                   value={form.condition}
-                  options={["Used", "Reconditioned", "Brand New"]}
+                  options={[
+                    { value: "Used", label: t("marketplace.condition_values.used") },
+                    { value: "Reconditioned", label: t("marketplace.condition_values.reconditioned") },
+                    { value: "Brand New", label: t("marketplace.condition_values.brand_new") },
+                  ]}
                   onChange={(value) => handleInputChange("condition", value)}
                 />
                 <InputField
-                  label="Price (LKR)"
+                  label={t("marketplace.labels.price_lkr")}
                   type="number"
                   value={form.price}
                   onChange={(value) => handleInputChange("price", value)}
@@ -825,21 +918,21 @@ function Marketplace() {
 
               <div className="grid gap-4">
                 <InputField
-                  label="Vehicle Location"
+                  label={t("marketplace.labels.vehicle_location")}
                   value={form.vehicle_location}
                   onChange={(value) => handleInputChange("vehicle_location", value)}
                   placeholder="Maharagama, Colombo"
                 />
                 <TextareaField
-                  label="Vehicle Description"
+                  label={t("marketplace.labels.vehicle_description")}
                   value={form.vehicle_description}
                   onChange={(value) => handleInputChange("vehicle_description", value)}
-                  placeholder="Share the vehicle condition, service history, special features, and anything buyers should know."
+                  placeholder={t("marketplace.placeholders.vehicle_description")}
                 />
               </div>
 
               <div>
-                <span className="mb-2 block text-sm font-medium text-slate-300">Vehicle Images</span>
+                <span className="mb-2 block text-sm font-medium text-slate-300">{t("marketplace.labels.vehicle_images")}</span>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                   {Array.from({ length: 5 }, (_, index) => (
                     <ImageUploadSlot
@@ -848,11 +941,12 @@ function Marketplace() {
                       file={selectedImages[index] || null}
                       onChange={handleImageChange}
                       onRemove={handleRemoveImage}
+                      t={t}
                     />
                   ))}
                 </div>
                 <p className="mt-3 text-xs text-slate-500">
-                  Optional. Add up to 5 JPG, PNG, or WEBP images. You can publish with none, one, or several photos.
+                  {t("marketplace.publish.image_help")}
                 </p>
               </div>
 
@@ -869,14 +963,14 @@ function Marketplace() {
                   disabled={submitState.saving}
                   className="rounded-xl border border-slate-700/70 bg-slate-900/80 px-4 py-3 text-sm font-medium text-slate-300 transition hover:border-slate-500/80 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Cancel
+                  {t("marketplace.common.cancel")}
                 </button>
                 <button
                   type="submit"
                   disabled={submitState.saving}
                   className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition-all duration-300 hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-cyan-400/15 hover:shadow-[0_0_30px_rgba(34,211,238,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {submitState.saving ? "Submitting listing..." : "Submit Listing"}
+                  {submitState.saving ? t("marketplace.publish.submitting") : t("marketplace.publish.submit")}
                 </button>
               </div>
             </form>
@@ -899,8 +993,8 @@ function FilterSelect({ label, value, options, onChange }) {
           className="w-full appearance-none rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 pr-11 text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
         >
           {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -946,7 +1040,7 @@ function TextareaField({ label, value, onChange, placeholder }) {
   );
 }
 
-function ImageUploadSlot({ slotIndex, file, onChange, onRemove }) {
+function ImageUploadSlot({ slotIndex, file, onChange, onRemove, t }) {
   const [previewUrl, setPreviewUrl] = useState("");
 
   useEffect(() => {
@@ -976,7 +1070,7 @@ function ImageUploadSlot({ slotIndex, file, onChange, onRemove }) {
             <>
               <img
                 src={previewUrl}
-                alt={`Vehicle upload ${slotIndex + 1}`}
+                alt={t("marketplace.upload.preview_alt", { index: slotIndex + 1 })}
                 className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
               />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 to-transparent px-4 pb-3 pt-8">
@@ -991,8 +1085,8 @@ function ImageUploadSlot({ slotIndex, file, onChange, onRemove }) {
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-200">Image {slotIndex + 1}</p>
-                <p className="mt-1 text-xs text-slate-500">Click to add photo</p>
+                <p className="text-sm font-semibold text-slate-200">{t("marketplace.upload.image_label", { index: slotIndex + 1 })}</p>
+                <p className="mt-1 text-xs text-slate-500">{t("marketplace.upload.click_to_add")}</p>
               </div>
             </div>
           )}
@@ -1001,7 +1095,7 @@ function ImageUploadSlot({ slotIndex, file, onChange, onRemove }) {
 
       <div className="flex items-center justify-between border-t border-slate-800/80 px-4 py-3">
         <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
-          Slot {slotIndex + 1}
+          {t("marketplace.upload.slot_label", { index: slotIndex + 1 })}
         </span>
         {file ? (
           <button
@@ -1009,10 +1103,10 @@ function ImageUploadSlot({ slotIndex, file, onChange, onRemove }) {
             onClick={() => onRemove(slotIndex)}
             className="rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/15"
           >
-            Remove
+            {t("marketplace.common.remove")}
           </button>
         ) : (
-          <span className="text-xs text-slate-600">Optional</span>
+          <span className="text-xs text-slate-600">{t("marketplace.common.optional")}</span>
         )}
       </div>
     </div>

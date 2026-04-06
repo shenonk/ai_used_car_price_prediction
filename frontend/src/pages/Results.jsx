@@ -22,6 +22,14 @@ function Results() {
   const [downloading, setDownloading] = useState(false);
   const [loanPlans, setLoanPlans] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const themeStyles =
+    typeof window !== "undefined"
+      ? getComputedStyle(document.documentElement)
+      : null;
+  const themeTextPrimary = themeStyles?.getPropertyValue("--text-primary")?.trim() || "#f8fafc";
+  const themeTextSecondary = themeStyles?.getPropertyValue("--text-secondary")?.trim() || "#94a3b8";
+  const themeSurface = themeStyles?.getPropertyValue("--bg-surface")?.trim() || "#1e293b";
+  const themeBorder = themeStyles?.getPropertyValue("--border-color")?.trim() || "#334155";
 
   const formattedPrice = predictedPrice.toLocaleString('en-LK');
 
@@ -359,8 +367,8 @@ function Results() {
               <Pie data={pieData} cx="50%" cy="50%" outerRadius={100} innerRadius={60} dataKey="value" strokeWidth={0}>
                 {pieData.map((entry, index) => (<Cell key={index} fill={COLORS[index]} />))}
               </Pie>
-              <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px', color: '#f8fafc' }} />
-              <Legend wrapperStyle={{ color: '#94a3b8' }} />
+              <Tooltip contentStyle={{ backgroundColor: themeSurface, border: `1px solid ${themeBorder}`, borderRadius: '12px', color: themeTextPrimary }} />
+              <Legend wrapperStyle={{ color: themeTextSecondary }} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -376,11 +384,11 @@ function Results() {
         </h2>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={downPaymentData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-            <XAxis dataKey="name" stroke="#94a3b8" />
-            <YAxis stroke="#94a3b8" />
-            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '12px', color: '#f8fafc' }} />
-            <Legend wrapperStyle={{ color: '#94a3b8' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={themeBorder} />
+            <XAxis dataKey="name" stroke={themeTextSecondary} />
+            <YAxis stroke={themeTextSecondary} />
+            <Tooltip contentStyle={{ backgroundColor: themeSurface, border: `1px solid ${themeBorder}`, borderRadius: '12px', color: themeTextPrimary }} />
+            <Legend wrapperStyle={{ color: themeTextSecondary }} />
             <Bar dataKey="down" fill="#f59e0b" name="Down Payment" radius={[4, 4, 0, 0]} />
             <Bar dataKey="monthly" fill="#3b82f6" name="Monthly Payment" radius={[4, 4, 0, 0]} />
           </BarChart>

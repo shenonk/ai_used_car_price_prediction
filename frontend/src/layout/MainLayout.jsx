@@ -15,12 +15,12 @@ const MainLayout = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (i18n.resolvedLanguage === 'si' || i18n.resolvedLanguage === 'ta') {
-      document.body.style.letterSpacing = '0.02em';
-      document.body.style.lineHeight = '1.6';
+    if (i18n.resolvedLanguage === "si" || i18n.resolvedLanguage === "ta") {
+      document.body.style.letterSpacing = "0.02em";
+      document.body.style.lineHeight = "1.6";
     } else {
-      document.body.style.letterSpacing = 'normal';
-      document.body.style.lineHeight = 'normal';
+      document.body.style.letterSpacing = "normal";
+      document.body.style.lineHeight = "normal";
     }
   }, [i18n.resolvedLanguage]);
 
@@ -38,7 +38,7 @@ const MainLayout = () => {
       }
     };
     checkAuth();
-  }, [location.pathname]); // Re-check on navigation
+  }, [location.pathname]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -126,15 +126,12 @@ const MainLayout = () => {
         />
       )}
 
-      {/* PREMIUM SIDEBAR */}
       <div
         className={`theme-sidebar fixed left-0 top-0 z-40 flex h-screen w-72 flex-col border-r backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-
-        {/* Logo Section */}
-        <div className="theme-divider p-6 border-b">
+        <div className="theme-divider border-b p-6">
           <div className="flex items-center gap-3">
             <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
             <div>
@@ -144,46 +141,29 @@ const MainLayout = () => {
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 space-y-1 p-4">
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`nav-link ${isActive(item.path) ? 'active' : ''}`}
+              className={`nav-link ${isActive(item.path) ? "active" : ""}`}
               onClick={() => setIsMobileMenuOpen(false)}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="font-medium">{item.label}</span>
-              {isActive(item.path) && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
-              )}
+              {isActive(item.path) && <span className="ml-auto h-2 w-2 animate-pulse rounded-full bg-blue-400"></span>}
             </Link>
           ))}
         </nav>
 
-        {/* Quick Stats */}
-        <div className="theme-divider p-4 border-t">
-          <div className="theme-surface-soft mb-4 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="theme-text-secondary text-xs">Model Accuracy</span>
-              <span className="text-xs font-semibold text-emerald-400">87%</span>
-            </div>
-            <div className="theme-pill h-2 w-full overflow-hidden rounded-full">
-              <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 rounded-full" style={{ width: '87%' }}></div>
-            </div>
-          </div>
-        </div>
-
-        {/* User Section */}
         <div className="theme-divider flex flex-col gap-3 border-t p-4">
           {loggedIn && (
             <div className="flex items-center justify-center gap-3">
               {userInfo.avatar_url && (
-                <img 
-                  src={userInfo.avatar_url} 
-                  alt="Profile" 
-                  className="theme-divider h-8 w-8 rounded-full border object-cover" 
+                <img
+                  src={userInfo.avatar_url}
+                  alt="Profile"
+                  className="theme-divider h-8 w-8 rounded-full border object-cover"
                   referrerPolicy="no-referrer"
                 />
               )}
@@ -193,34 +173,10 @@ const MainLayout = () => {
             </div>
           )}
 
-          {/* Language Switcher */}
-          <div className="theme-pill mx-2 flex items-center justify-center gap-2 rounded-xl p-1.5">
-            <button 
-              onClick={() => i18n.changeLanguage('en')} 
-              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'en' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'theme-text-secondary'}`}
-              style={{ fontFamily: 'Inter, sans-serif' }}
-            >
-              EN
-            </button>
-            <span className="theme-text-muted text-xs">|</span>
-            <button 
-              onClick={() => i18n.changeLanguage('si')} 
-              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'si' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'theme-text-secondary'}`}
-              style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
-            >
-              සිං
-            </button>
-            <span className="theme-text-muted text-xs">|</span>
-            <button 
-              onClick={() => i18n.changeLanguage('ta')} 
-              className={`text-xs px-2 py-1.5 rounded transition-all font-bold ${i18n.resolvedLanguage === 'ta' ? 'bg-clip-text text-transparent bg-gradient-to-r from-[#06b6d4] to-[#3b82f6]' : 'theme-text-secondary'}`}
-              style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
-            >
-              தமிழ்
-            </button>
-          </div>
-
-          <button onClick={handleAuthAction} className={`w-full flex items-center justify-center gap-2 ${loggedIn ? 'btn-secondary' : 'btn-primary'}`}>
+          <button
+            onClick={handleAuthAction}
+            className={`w-full flex items-center justify-center gap-2 ${loggedIn ? "btn-secondary" : "btn-primary"}`}
+          >
             {loggedIn ? (
               <>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -238,18 +194,15 @@ const MainLayout = () => {
             )}
           </button>
         </div>
-
       </div>
 
-      {/* MAIN CONTENT */}
       <div className="min-h-screen w-full lg:ml-72 lg:w-[calc(100%-18rem)]">
         <div className="min-h-screen pt-20 lg:pt-0">
           <Outlet />
         </div>
       </div>
-
     </div>
   );
-}
+};
 
 export default MainLayout;

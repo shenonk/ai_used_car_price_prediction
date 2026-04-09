@@ -32,6 +32,33 @@ const marketplaceEn = {
     description: "Public buyers only see listings whose status is approved.",
     synced: "Synced with Flask API",
   },
+  my_ads: {
+    title: "My submitted ads",
+    description: "Track the review outcome of the ads you submitted before they go live in the marketplace.",
+    empty_title: "No ads submitted yet",
+    empty_description: "Once you submit a vehicle ad here, it will appear in this section with its pending, approved, or rejected status.",
+    review_label: "Review status",
+    submitted_on: "Submitted on {{date}}",
+    photos_count: "{{count}} photo",
+    photos_count_plural: "{{count}} photos",
+    stats: {
+      pending: "Pending",
+      approved: "Approved",
+      rejected: "Rejected",
+    },
+    status: {
+      pending: "Pending review",
+      approved: "Approved",
+      rejected: "Rejected",
+      sold: "Sold",
+    },
+    messages: {
+      pending: "Your ad has been sent to the admin review queue and is waiting for approval before it appears publicly.",
+      approved: "Your ad was approved and is now published in the public marketplace for buyers to see.",
+      rejected: "Your ad was reviewed but not approved for publishing. You can revise the details and submit again if needed.",
+      sold: "Your ad was approved previously and is now marked as sold.",
+    },
+  },
   listings: {
     title: "Approved cars for buyers",
     description: "Listings only appear here after admin approval.",
@@ -143,6 +170,7 @@ const marketplaceEn = {
   },
   errors: {
     load_failed: "Failed to load marketplace listings.",
+    load_my_ads_failed: "Failed to load your submitted ads.",
     submit_failed: "Failed to submit listing.",
   },
   success: {

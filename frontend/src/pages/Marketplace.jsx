@@ -319,54 +319,54 @@ function Marketplace() {
 
   return (
     <div className="marketplace-page theme-app-bg min-h-screen px-6 py-8 md:px-8">
-      <section className="marketplace-hero relative overflow-hidden rounded-[28px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/95 p-8 shadow-2xl shadow-slate-950/30 animate-fade-in">
+      <section className="marketplace-hero relative overflow-hidden rounded-[22px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800/95 p-4 shadow-xl shadow-slate-950/15 animate-fade-in md:p-5">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.12),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.1),_transparent_28%)]" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-1.5 text-sm font-medium text-emerald-300">
-              <ShieldCheck className="h-4 w-4" />
+        <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-xl">
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+              <ShieldCheck className="h-3.5 w-3.5" />
               {t("marketplace.hero.badge")}
             </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
+            <h1 className="text-lg font-bold tracking-tight text-white md:text-xl">
               {t("marketplace.hero.title")}
             </h1>
-            <p className="mt-3 max-w-xl text-base leading-7 text-slate-300 md:text-lg">
+            <p className="mt-1.5 max-w-xl text-xs leading-5 text-slate-300 md:text-sm">
               {t("marketplace.hero.description")}
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 px-4 py-3 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t("marketplace.stats.approved_listings")}</p>
-              <p className="mt-2 text-2xl font-semibold text-white">{approvedCars.length}</p>
+          <div className="grid grid-cols-3 gap-1.5 lg:min-w-[360px]">
+            <div className="rounded-[18px] border border-slate-700/60 bg-slate-900/70 px-2.5 py-2 backdrop-blur">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">{t("marketplace.stats.approved_listings")}</p>
+              <p className="mt-1 text-base font-semibold text-white">{approvedCars.length}</p>
             </div>
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 px-4 py-3 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t("marketplace.stats.storage_bucket")}</p>
-              <p className="mt-2 text-2xl font-semibold text-white">car_images</p>
+            <div className="rounded-[18px] border border-slate-700/60 bg-slate-900/70 px-2.5 py-2 backdrop-blur">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">{t("marketplace.stats.storage_bucket")}</p>
+              <p className="mt-1 text-xs font-semibold text-white md:text-sm">car_images</p>
             </div>
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 px-4 py-3 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t("marketplace.stats.review_status")}</p>
-              <p className="mt-2 text-2xl font-semibold text-white">{t("marketplace.stats.pending_default")}</p>
+            <div className="rounded-[18px] border border-slate-700/60 bg-slate-900/70 px-2.5 py-2 backdrop-blur">
+              <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">{t("marketplace.stats.review_status")}</p>
+              <p className="mt-1 text-xs font-semibold text-white md:text-sm">{t("marketplace.stats.pending_default")}</p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="marketplace-panel card mt-8 animate-fade-in animate-delay-200 overflow-hidden">
-        <div className="relative p-6 md:p-8">
+      <section className="marketplace-panel card mt-4 animate-fade-in animate-delay-200 overflow-hidden">
+        <div className="relative p-3.5 md:p-4">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.14),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.12),_transparent_28%)]" />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl">
-              <h2 className="text-xl font-semibold text-white">{t("marketplace.publish.title")}</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+          <div className="relative flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-lg">
+              <h2 className="text-base font-semibold text-white md:text-lg">{t("marketplace.publish.title")}</h2>
+              <p className="mt-0.5 text-xs leading-4.5 text-slate-400">
                 {t("marketplace.publish.description")}
               </p>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <Link
                 to="/marketplace/my-ads"
-                className="inline-flex items-center justify-center rounded-2xl border border-slate-700/70 bg-slate-900/80 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500/80 hover:text-white"
+                className="inline-flex items-center justify-center rounded-xl border border-slate-700/70 bg-slate-900/80 px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500/80 hover:text-white"
               >
                 {t("marketplace.my_ads.title")}
               </Link>
@@ -377,7 +377,7 @@ function Marketplace() {
                   setSubmitState((current) => ({ ...current, error: "", success: "" }));
                   setIsPublishModalOpen(true);
                 }}
-                className="marketplace-primary-button marketplace-primary-cta group inline-flex items-center justify-center gap-3 rounded-2xl border px-6 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5"
+                className="marketplace-primary-button marketplace-primary-cta group inline-flex items-center justify-center gap-2.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5"
                 style={{
                   background: "linear-gradient(135deg, #1d4ed8 0%, #0284c7 55%, #0f766e 100%)",
                   color: "#ffffff",
@@ -413,7 +413,7 @@ function Marketplace() {
         </div>
       </section>
 
-      <section className="marketplace-panel card mt-8 p-4 md:p-5 animate-fade-in animate-delay-100">
+      <section className="marketplace-panel card mt-4 p-4 md:p-5 animate-fade-in animate-delay-100">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold text-white">{t("marketplace.inventory.title")}</h2>
@@ -461,7 +461,7 @@ function Marketplace() {
         )}
       </section>
 
-      <section className="mt-8 animate-fade-in animate-delay-200">
+      <section className="mt-5 animate-fade-in animate-delay-200">
         <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-white">{t("marketplace.listings.title")}</h2>

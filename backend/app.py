@@ -667,6 +667,28 @@ def get_marketplace_listings():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/marketplace/my-listings", methods=["GET"])
+@token_required
+def get_my_marketplace_listings():
+    try:
+        status = (request.args.get("status") or "all").strip().lower()
+        current_user_id = str(g.current_user.id)
+        query = (
+            supabase.table("listings")
+            .select("*")
+            .eq("user_id", current_user_id)
+            .order("created_at", desc=True)
+        )
+
+        if status != "all":
+            query = query.eq("status", status)
+
+        response = query.execute()
+        return jsonify({"listings": response.data or []})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/marketplace/listings/<string:listing_id>", methods=["GET"])
 def get_marketplace_listing(listing_id):
     try:

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { CalendarRange, ChevronDown, Fuel, Gauge, ShieldCheck, Sparkles } from "lucide-react";
 
@@ -362,37 +363,46 @@ function Marketplace() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                setSubmitState((current) => ({ ...current, error: "", success: "" }));
-                setIsPublishModalOpen(true);
-              }}
-              className="marketplace-primary-button marketplace-primary-cta group inline-flex items-center justify-center gap-3 rounded-2xl border px-6 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5"
-              style={{
-                background: "linear-gradient(135deg, #1d4ed8 0%, #0284c7 55%, #0f766e 100%)",
-                color: "#ffffff",
-                borderColor: "rgba(29, 78, 216, 0.42)",
-                boxShadow:
-                  "0 18px 34px rgba(29, 78, 216, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16)",
-              }}
-            >
-              <span className="marketplace-primary-cta__glow" aria-hidden="true" />
-              <span className="marketplace-primary-cta__icon" aria-hidden="true">
-                <Sparkles className="h-4 w-4" />
-              </span>
-              <span className="relative z-10 flex flex-col items-start leading-tight">
-                <span>{t("marketplace.publish.button")}</span>
-                <span className="marketplace-primary-cta__hint text-[10px] font-medium uppercase tracking-[0.18em]">
-                  Sell your vehicle
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                to="/marketplace/my-ads"
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-700/70 bg-slate-900/80 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-slate-500/80 hover:text-white"
+              >
+                {t("marketplace.my_ads.title")}
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitState((current) => ({ ...current, error: "", success: "" }));
+                  setIsPublishModalOpen(true);
+                }}
+                className="marketplace-primary-button marketplace-primary-cta group inline-flex items-center justify-center gap-3 rounded-2xl border px-6 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5"
+                style={{
+                  background: "linear-gradient(135deg, #1d4ed8 0%, #0284c7 55%, #0f766e 100%)",
+                  color: "#ffffff",
+                  borderColor: "rgba(29, 78, 216, 0.42)",
+                  boxShadow:
+                    "0 18px 34px rgba(29, 78, 216, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16)",
+                }}
+              >
+                <span className="marketplace-primary-cta__glow" aria-hidden="true" />
+                <span className="marketplace-primary-cta__icon" aria-hidden="true">
+                  <Sparkles className="h-4 w-4" />
                 </span>
-              </span>
-              <span className="marketplace-primary-cta__arrow relative z-10" aria-hidden="true">
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-6-6 6 6-6 6" />
-                </svg>
-              </span>
-            </button>
+                <span className="relative z-10 flex flex-col items-start leading-tight">
+                  <span>{t("marketplace.publish.button")}</span>
+                  <span className="marketplace-primary-cta__hint text-[10px] font-medium uppercase tracking-[0.18em]">
+                    Sell your vehicle
+                  </span>
+                </span>
+                <span className="marketplace-primary-cta__arrow relative z-10" aria-hidden="true">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-6-6 6 6-6 6" />
+                  </svg>
+                </span>
+              </button>
+            </div>
           </div>
 
           {submitState.success && (

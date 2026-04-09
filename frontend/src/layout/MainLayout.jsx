@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X, LogIn, LogOut } from "lucide-react";
 import { isLoggedIn, logout, getCurrentUser } from "../utils/auth";
 import logo from "../assets/logo/autovaluelk-logo.png";
 import { useTranslation } from "react-i18next";
@@ -111,7 +111,7 @@ const MainLayout = () => {
       <button
         type="button"
         onClick={() => setIsMobileMenuOpen((open) => !open)}
-        className="theme-surface fixed left-4 top-4 z-50 rounded-xl p-2 theme-text-primary backdrop-blur lg:hidden"
+        className="theme-surface fixed left-4 top-4 z-50 rounded-2xl p-2.5 theme-text-primary backdrop-blur lg:hidden"
         aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
         aria-expanded={isMobileMenuOpen}
       >
@@ -133,15 +133,17 @@ const MainLayout = () => {
       >
         <div className="theme-divider border-b p-6">
           <div className="flex items-center gap-3">
-            <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
+            <div className="sidebar-brand-logo flex h-11 w-11 items-center justify-center rounded-2xl">
+              <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
+            </div>
             <div>
-              <h1 className="theme-text-primary text-lg font-bold">AutoValueLK</h1>
-              <p className="theme-text-muted text-xs">Sri Lankan Market</p>
+              <h1 className="theme-text-primary text-lg font-bold tracking-tight">AutoValueLK</h1>
+              <p className="theme-text-muted text-xs uppercase tracking-[0.24em]">Sri Lankan Market</p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 space-y-1 p-4">
+        <nav className="sidebar-nav flex-1 space-y-1.5 px-4 pb-3 pt-3">
           {navItems.map((item) => (
             <Link
               key={item.path}
@@ -150,48 +152,51 @@ const MainLayout = () => {
               onClick={() => setIsMobileMenuOpen(false)}
             >
               <span className="nav-icon">{item.icon}</span>
-              <span className="font-medium">{item.label}</span>
-              {isActive(item.path) && <span className="ml-auto h-2 w-2 animate-pulse rounded-full bg-blue-400"></span>}
+              <span className="flex-1 font-medium">{item.label}</span>
+              <span className="nav-chevron" aria-hidden="true">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6l6 6-6 6" />
+                </svg>
+              </span>
+              {isActive(item.path) && <span className="nav-active-dot" aria-hidden="true" />}
             </Link>
           ))}
         </nav>
 
-        <div className="theme-divider flex flex-col gap-3 border-t p-4">
-          {loggedIn && (
-            <div className="flex items-center justify-center gap-3">
-              {userInfo.avatar_url && (
-                <img
-                  src={userInfo.avatar_url}
-                  alt="Profile"
-                  className="theme-divider h-8 w-8 rounded-full border object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              )}
-              <p className="theme-text-primary truncate text-sm font-bold">
-                {t("welcome")}, {userInfo.username || userInfo.email}
-              </p>
-            </div>
-          )}
-
+        <div className="theme-divider border-t p-4">
           <button
             onClick={handleAuthAction}
-            className={`w-full flex items-center justify-center gap-2 ${loggedIn ? "btn-secondary" : "btn-primary"}`}
+            className="sidebar-account-card flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left transition-all duration-300"
           >
-            {loggedIn ? (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                <span>{t("logout")}</span>
-              </>
+            {loggedIn && userInfo.avatar_url ? (
+              <img
+                src={userInfo.avatar_url}
+                alt="Profile"
+                className="theme-divider h-11 w-11 rounded-full border object-cover"
+                referrerPolicy="no-referrer"
+              />
             ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <span>Login / Register</span>
-              </>
+              <div className="sidebar-account-avatar flex h-11 w-11 items-center justify-center rounded-full">
+                <span className="text-lg font-semibold text-slate-950">
+                  {loggedIn
+                    ? (userInfo.username || userInfo.email || "U").trim().charAt(0).toUpperCase()
+                    : "A"}
+                </span>
+              </div>
             )}
+
+            <div className="min-w-0 flex-1">
+              <p className="theme-text-primary truncate text-sm font-semibold">
+                {loggedIn ? userInfo.username || "Account" : "Account access"}
+              </p>
+              <p className="theme-text-muted truncate text-xs">
+                {loggedIn ? userInfo.email || "Signed in" : "Login / Register"}
+              </p>
+            </div>
+
+            <span className="sidebar-account-action flex h-9 w-9 items-center justify-center rounded-xl" aria-hidden="true">
+              {loggedIn ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
+            </span>
           </button>
         </div>
       </div>

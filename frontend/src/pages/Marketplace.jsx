@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CalendarRange, ChevronDown, Fuel, Gauge, ShieldCheck, Sparkles } from "lucide-react";
 
@@ -839,7 +839,10 @@ function Marketplace() {
             className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
             onClick={() => !submitState.saving && setIsPublishModalOpen(false)}
           />
-          <section className="marketplace-publish-modal relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-6 shadow-2xl shadow-slate-950/50 md:p-8">
+          <section
+            className="marketplace-publish-modal relative z-10 max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[28px] border border-slate-700/60 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 p-6 shadow-2xl shadow-slate-950/50 md:p-8"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold text-white">{t("marketplace.publish.modal_title")}</h2>
@@ -1070,6 +1073,7 @@ function TextareaField({ label, value, onChange, placeholder }) {
 
 function ImageUploadSlot({ slotIndex, file, onChange, onRemove, t }) {
   const [previewUrl, setPreviewUrl] = useState("");
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (!file) {
@@ -1083,18 +1087,40 @@ function ImageUploadSlot({ slotIndex, file, onChange, onRemove, t }) {
     return () => URL.revokeObjectURL(objectUrl);
   }, [file]);
 
+  const handleRemoveClick = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+
+    onRemove(slotIndex);
+  };
+
+  const handleOpenFilePicker = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    inputRef.current?.click();
+  };
+
   return (
     <div className="marketplace-upload-slot group relative overflow-hidden rounded-[24px] border border-dashed border-slate-600 bg-slate-900/70">
-      <label className="block cursor-pointer">
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/webp"
-          onChange={(event) => onChange(slotIndex, event)}
-          className="hidden"
-        />
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        onChange={(event) => onChange(slotIndex, event)}
+        className="hidden"
+      />
 
+      <button
+        type="button"
+        onClick={handleOpenFilePicker}
+        className="block w-full cursor-pointer text-left"
+      >
         <div className="relative flex h-44 items-center justify-center overflow-hidden">
-          {previewUrl ? (
+          {file && previewUrl ? (
             <>
               <img
                 src={previewUrl}
@@ -1119,7 +1145,7 @@ function ImageUploadSlot({ slotIndex, file, onChange, onRemove, t }) {
             </div>
           )}
         </div>
-      </label>
+      </button>
 
       <div className="flex items-center justify-between border-t border-slate-800/80 px-4 py-3">
         <span className="text-xs uppercase tracking-[0.18em] text-slate-500">
@@ -1128,7 +1154,11 @@ function ImageUploadSlot({ slotIndex, file, onChange, onRemove, t }) {
         {file ? (
           <button
             type="button"
-            onClick={() => onRemove(slotIndex)}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onClick={handleRemoveClick}
             className="rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-200 transition hover:bg-rose-500/15"
           >
             {t("marketplace.common.remove")}

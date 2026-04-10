@@ -64,6 +64,13 @@ const getBoostSticker = (listing) => {
   return null;
 };
 
+const getListingPriority = (listing) => {
+  if (listing?.is_bumped) return 3;
+  if (listing?.is_spotlight) return 2;
+  if (listing?.is_urgent) return 1;
+  return 0;
+};
+
 function Marketplace() {
   const { t, i18n } = useTranslation();
   const locale = getLocale(i18n.resolvedLanguage);
@@ -189,7 +196,22 @@ function Marketplace() {
     fetchListings();
   }, [t]);
 
-  const approvedCars = useMemo(() => cars.filter((car) => car.status === "approved"), [cars]);
+  const approvedCars = useMemo(
+    () =>
+      cars
+        .filter((car) => car.status === "approved")
+        .sort((left, right) => {
+          const priorityDifference = getListingPriority(right) - getListingPriority(left);
+          if (priorityDifference !== 0) {
+            return priorityDifference;
+          }
+
+          const rightCreatedAt = new Date(right.created_at || 0).getTime();
+          const leftCreatedAt = new Date(left.created_at || 0).getTime();
+          return rightCreatedAt - leftCreatedAt;
+        }),
+    [cars]
+  );
 
   const brandOptions = useMemo(
     () => [

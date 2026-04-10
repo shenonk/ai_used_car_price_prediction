@@ -840,6 +840,10 @@ html[data-theme="light"] .marketplace-page .marketplace-boost-card__icon {
   border-color: rgba(148, 163, 184, 0.2) !important;
 }
 
+html[data-theme="light"] .marketplace-page .marketplace-boost-sticker {
+  filter: drop-shadow(0 10px 16px rgba(15, 23, 42, 0.08));
+}
+
 html[data-theme="light"] .marketplace-page .marketplace-listing-card:hover {
   background: rgba(255, 255, 255, 0.98) !important;
   border-color: rgba(34, 211, 238, 0.35) !important;
@@ -1028,6 +1032,11 @@ html[data-theme="light"] .marketplace-page .marketplace-panel .bg-cyan-500\/10 {
     inset 0 1px 0 rgba(255, 255, 255, 0.04),
     0 0 0 1px rgba(59, 130, 246, 0.16),
     0 20px 40px rgba(30, 64, 175, 0.24);
+}
+
+.marketplace-boost-sticker {
+  pointer-events: none;
+  filter: drop-shadow(0 12px 18px rgba(2, 6, 23, 0.2));
 }
 
 .marketplace-primary-button {

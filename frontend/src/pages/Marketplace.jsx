@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { CalendarRange, ChevronDown, Fuel, Gauge, Search, ShieldCheck, Sparkles, X } from "lucide-react";
+import { ArrowUp, CalendarRange, ChevronDown, Fuel, Gauge, Search, ShieldCheck, Sparkles, Star, X, Zap } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
 
@@ -62,6 +62,9 @@ function Marketplace() {
   const [selectedImages, setSelectedImages] = useState([]);
   const [submitState, setSubmitState] = useState({ saving: false, error: "", success: "" });
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [isUrgent, setIsUrgent] = useState(false);
+  const [isSpotlight, setIsSpotlight] = useState(false);
+  const [isBumped, setIsBumped] = useState(false);
   const [selectedCar, setSelectedCar] = useState(null);
   const [selectedCarImage, setSelectedCarImage] = useState("");
   const [lightboxImage, setLightboxImage] = useState("");
@@ -102,6 +105,49 @@ function Marketplace() {
     }),
     [t]
   );
+
+  const boostOptions = useMemo(
+    () => [
+      {
+        key: "urgent",
+        selected: isUrgent,
+        toggle: () => setIsUrgent((current) => !current),
+        icon: Zap,
+        title: t("marketplace.boost.urgent.title", { defaultValue: "Urgent Ad" }),
+        description: t("marketplace.boost.urgent.description", { defaultValue: "Sell 2x faster with urgent visibility." }),
+        price: 500,
+        accentClassName: "marketplace-boost-card-urgent",
+      },
+      {
+        key: "spotlight",
+        selected: isSpotlight,
+        toggle: () => setIsSpotlight((current) => !current),
+        icon: Star,
+        title: t("marketplace.boost.spotlight.title", { defaultValue: "Spotlight" }),
+        description: t("marketplace.boost.spotlight.description", { defaultValue: "Stay featured in the premium spotlight area." }),
+        price: 750,
+        accentClassName: "marketplace-boost-card-spotlight",
+      },
+      {
+        key: "bumped",
+        selected: isBumped,
+        toggle: () => setIsBumped((current) => !current),
+        icon: ArrowUp,
+        title: t("marketplace.boost.bumped.title", { defaultValue: "Bump Up" }),
+        description: t("marketplace.boost.bumped.description", { defaultValue: "Push your listing higher in recent results." }),
+        price: 300,
+        accentClassName: "marketplace-boost-card-bumped",
+      },
+    ],
+    [isBumped, isSpotlight, isUrgent, t]
+  );
+
+  const totalBoostPrice = useMemo(
+    () => boostOptions.reduce((sum, option) => sum + (option.selected ? option.price : 0), 0),
+    [boostOptions]
+  );
+
+  const hasPremiumSelection = totalBoostPrice > 0;
 
   const fetchListings = async () => {
     try {
@@ -239,6 +285,9 @@ function Marketplace() {
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => formData.append(key, value));
+      formData.append("is_urgent", String(isUrgent));
+      formData.append("is_spotlight", String(isSpotlight));
+      formData.append("is_bumped", String(isBumped));
       selectedImages.filter(Boolean).forEach((file) => formData.append("images", file));
 
       const {
@@ -267,6 +316,9 @@ function Marketplace() {
       });
       setForm(initialForm);
       setSelectedImages([]);
+      setIsUrgent(false);
+      setIsSpotlight(false);
+      setIsBumped(false);
       setIsPublishModalOpen(false);
       event.target.reset();
       fetchListings();
@@ -1016,6 +1068,57 @@ function Marketplace() {
                 </p>
               </div>
 
+              <div className="rounded-[26px] border border-slate-700/60 bg-slate-950/50 p-4 md:p-5">
+                <div className="flex flex-col gap-2">
+                  <h3 className="text-lg font-semibold text-white">
+                    {t("marketplace.boost.title", { defaultValue: "Boost Your Ad" })}
+                  </h3>
+                  <p className="text-sm text-slate-400">
+                    {t("marketplace.boost.description", {
+                      defaultValue: "Choose premium placement options to help your vehicle get more attention.",
+                    })}
+                  </p>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  {boostOptions.map((option) => {
+                    const Icon = option.icon;
+
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={option.toggle}
+                        className={`marketplace-boost-card ${option.accentClassName} ${
+                          option.selected ? "marketplace-boost-card-active" : ""
+                        }`}
+                        aria-pressed={option.selected}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="marketplace-boost-card__icon">
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <span className="rounded-full border border-slate-700/70 bg-slate-900/80 px-3 py-1 text-xs font-semibold text-slate-200">
+                            {formatCurrency(option.price, locale)}
+                          </span>
+                        </div>
+                        <div className="mt-4 text-left">
+                          <h4 className="text-base font-semibold text-white">{option.title}</h4>
+                          <p className="mt-1 text-sm leading-6 text-slate-400">{option.description}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 flex items-center justify-between rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-3">
+                  <span className="text-sm font-medium text-slate-300">
+                    {t("marketplace.boost.total", { defaultValue: "Total to Pay" })}
+                  </span>
+                  <span className="text-lg font-semibold text-white">{formatCurrency(totalBoostPrice, locale)}</span>
+                </div>
+              </div>
+
               {submitState.error && (
                 <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
                   {submitState.error}
@@ -1043,7 +1146,11 @@ function Marketplace() {
                       "0 18px 34px rgba(29, 78, 216, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16)",
                   }}
                 >
-                  {submitState.saving ? t("marketplace.publish.submitting") : t("marketplace.publish.submit")}
+                  {submitState.saving
+                    ? t("marketplace.publish.submitting")
+                    : hasPremiumSelection
+                      ? t("marketplace.publish.pay_and_submit", { defaultValue: "Pay & Publish" })
+                      : t("marketplace.publish.submit")}
                 </button>
               </div>
             </form>

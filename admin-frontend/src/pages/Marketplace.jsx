@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  ArrowUp,
   BadgeCheck,
   CheckCircle2,
   CircleDashed,
@@ -8,10 +9,12 @@ import {
   Eye,
   Search,
   ShieldCheck,
+  Star,
   Store,
   Tag,
   Trash2,
   XCircle,
+  Zap,
 } from 'lucide-react';
 import api from '../services/api';
 
@@ -35,6 +38,9 @@ const fallbackListings = [
     status: 'pending',
     image_url: '',
     image_urls: [],
+    is_urgent: false,
+    is_spotlight: false,
+    is_bumped: false,
     created_at: '2026-03-31T08:00:00Z',
     user_id: 'user_104',
   },
@@ -55,6 +61,9 @@ const fallbackListings = [
     status: 'approved',
     image_url: '',
     image_urls: [],
+    is_urgent: false,
+    is_spotlight: true,
+    is_bumped: false,
     created_at: '2026-03-29T10:30:00Z',
     user_id: 'user_087',
   },
@@ -75,6 +84,9 @@ const fallbackListings = [
     status: 'rejected',
     image_url: '',
     image_urls: [],
+    is_urgent: false,
+    is_spotlight: false,
+    is_bumped: false,
     created_at: '2026-03-28T14:15:00Z',
     user_id: 'user_055',
   },
@@ -95,6 +107,9 @@ const fallbackListings = [
     status: 'sold',
     image_url: '',
     image_urls: [],
+    is_urgent: true,
+    is_spotlight: false,
+    is_bumped: true,
     created_at: '2026-03-25T12:45:00Z',
     user_id: 'user_021',
   },
@@ -161,6 +176,39 @@ const getListingImages = (listing) => {
   const images = Array.isArray(listing?.image_urls) ? listing.image_urls.filter(Boolean) : [];
   if (images.length > 0) return images;
   return listing?.image_url ? [listing.image_url] : [];
+};
+
+const getBoostOptions = (listing) => {
+  const options = [];
+
+  if (listing?.is_bumped) {
+    options.push({
+      key: 'bumped',
+      label: 'Bump Up',
+      icon: ArrowUp,
+      className: 'border-blue-500/20 bg-blue-500/10 text-blue-200',
+    });
+  }
+
+  if (listing?.is_spotlight) {
+    options.push({
+      key: 'spotlight',
+      label: 'Spotlight',
+      icon: Star,
+      className: 'border-amber-500/20 bg-amber-500/10 text-amber-200',
+    });
+  }
+
+  if (listing?.is_urgent) {
+    options.push({
+      key: 'urgent',
+      label: 'Urgent',
+      icon: Zap,
+      className: 'border-rose-500/20 bg-rose-500/10 text-rose-200',
+    });
+  }
+
+  return options;
 };
 
 function Marketplace() {
@@ -440,6 +488,13 @@ function Marketplace() {
                       <span>{Number(listing.mileage || 0).toLocaleString()} km</span>
                       <span>{formatRelativeTime(listing.created_at)}</span>
                     </div>
+                    {getBoostOptions(listing).length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {getBoostOptions(listing).map((option) => (
+                          <BoostBadge key={option.key} option={option} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </button>
               ))
@@ -540,6 +595,19 @@ function ListingDetail({ listing, selectedImage, onSelectImage, busy, onStatusCh
       </div>
 
       <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Boost Options</p>
+        {getBoostOptions(listing).length > 0 ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {getBoostOptions(listing).map((option) => (
+              <BoostBadge key={option.key} option={option} />
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm leading-7 text-slate-300">No paid boost options were selected for this ad.</p>
+        )}
+      </div>
+
+      <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Seller Description</p>
         <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-300">
           {listing.vehicle_description || 'No description was included with this listing.'}
@@ -607,6 +675,17 @@ function DetailCard({ label, value }) {
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">{label}</p>
       <p className="mt-2 text-sm font-medium text-white">{value}</p>
     </div>
+  );
+}
+
+function BoostBadge({ option }) {
+  const Icon = option.icon;
+
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${option.className}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {option.label}
+    </span>
   );
 }
 

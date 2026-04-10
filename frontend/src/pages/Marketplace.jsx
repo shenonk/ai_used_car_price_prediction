@@ -4,6 +4,9 @@ import { useTranslation } from "react-i18next";
 import { ArrowUp, CalendarRange, ChevronDown, Fuel, Gauge, Search, ShieldCheck, Sparkles, Star, X, Zap } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
+import bumpedSticker from "../assets/marketplace-stickers/bumped.png";
+import spotlightSticker from "../assets/marketplace-stickers/spotlight.png";
+import urgentSticker from "../assets/marketplace-stickers/urgent.png";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -44,6 +47,22 @@ const formatCurrency = (value, locale) =>
   }).format(Number(value || 0));
 
 const formatNumber = (value, locale) => Number(value || 0).toLocaleString(locale);
+
+const getBoostSticker = (listing) => {
+  if (listing?.is_urgent) {
+    return { src: urgentSticker, alt: "Urgent ad sticker" };
+  }
+
+  if (listing?.is_spotlight) {
+    return { src: spotlightSticker, alt: "Spotlight ad sticker" };
+  }
+
+  if (listing?.is_bumped) {
+    return { src: bumpedSticker, alt: "Bumped ad sticker" };
+  }
+
+  return null;
+};
 
 function Marketplace() {
   const { t, i18n } = useTranslation();
@@ -623,9 +642,18 @@ function Marketplace() {
                         {car.seller_name || t("marketplace.fallbacks.private_seller")} {" • "} {car.vehicle_location || t("marketplace.fallbacks.location_not_listed")}
                       </p>
                     </div>
-                    <p className="marketplace-price text-right text-base font-bold text-cyan-300">
-                      {formatCurrency(car.price, locale)}
-                    </p>
+                    <div className="flex shrink-0 flex-col items-end gap-3">
+                      <p className="marketplace-price text-right text-base font-bold text-cyan-300">
+                        {formatCurrency(car.price, locale)}
+                      </p>
+                      {getBoostSticker(car) && (
+                        <img
+                          src={getBoostSticker(car).src}
+                          alt={getBoostSticker(car).alt}
+                          className="marketplace-boost-sticker h-16 w-auto object-contain"
+                        />
+                      )}
+                    </div>
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-2.5">

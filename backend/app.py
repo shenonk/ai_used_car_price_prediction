@@ -238,6 +238,14 @@ def parse_int_field(field_name, raw_value, *, minimum=None, maximum=None):
     return value
 
 
+def parse_bool_field(raw_value):
+    if isinstance(raw_value, bool):
+        return raw_value
+
+    normalized = str(raw_value or "").strip().lower()
+    return normalized in {"true", "1", "yes", "on"}
+
+
 def get_request_payload():
     if request.content_type and "multipart/form-data" in request.content_type:
         return request.form.to_dict()
@@ -259,6 +267,9 @@ def normalize_listing_payload(data):
         "year": parse_int_field("year", data.get("year"), minimum=1900, maximum=current_year),
         "mileage": parse_int_field("mileage", data.get("mileage"), minimum=0),
         "price": parse_int_field("price", data.get("price"), minimum=0),
+        "is_urgent": parse_bool_field(data.get("is_urgent")),
+        "is_spotlight": parse_bool_field(data.get("is_spotlight")),
+        "is_bumped": parse_bool_field(data.get("is_bumped")),
     }
 
     missing = [key for key, value in payload.items() if value == ""]

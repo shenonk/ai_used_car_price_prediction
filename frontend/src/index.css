@@ -795,6 +795,12 @@ html[data-theme="light"] .marketplace-page .marketplace-search-shell {
   box-shadow: 0 20px 46px rgba(15, 23, 42, 0.08) !important;
 }
 
+html[data-theme="light"] .marketplace-page .marketplace-payment-modal {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96), rgba(239, 246, 255, 0.95)) !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.1) !important;
+}
+
 html[data-theme="light"] .marketplace-page .marketplace-search-input-group {
   background: rgba(248, 250, 252, 0.96) !important;
   border-color: rgba(148, 163, 184, 0.28) !important;
@@ -826,6 +832,16 @@ html[data-theme="light"] .marketplace-page .marketplace-search-clear:hover {
   background: rgba(239, 246, 255, 0.98) !important;
   border-color: rgba(59, 130, 246, 0.28) !important;
   color: #0f172a !important;
+}
+
+html[data-theme="light"] .marketplace-page .marketplace-payment-input {
+  background: rgba(248, 250, 252, 0.98) !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .marketplace-page .marketplace-payment-input::placeholder {
+  color: #94a3b8 !important;
 }
 
 html[data-theme="light"] .marketplace-page .marketplace-boost-card {

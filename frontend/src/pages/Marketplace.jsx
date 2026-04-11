@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { loadStripe } from "@stripe/stripe-js";
 import {
   ArrowUp,
   CalendarRange,
-  CheckCircle2,
   ChevronDown,
-  CreditCard,
   Fuel,
   Gauge,
-  LoaderCircle,
-  LockKeyhole,
   Search,
   ShieldCheck,
   Sparkles,
@@ -25,6 +22,11 @@ import spotlightSticker from "../assets/marketplace-stickers/spotlight.png";
 import urgentSticker from "../assets/marketplace-stickers/urgent.png";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const STRIPE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
+  globalThis.process?.env?.REACT_APP_STRIPE_PUBLISHABLE_KEY ||
+  "";
+const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY) : Promise.resolve(null);
 
 const ALL_BRANDS = "__all_brands__";
 const ALL_MODELS = "__all_models__";
@@ -45,13 +47,6 @@ const initialForm = {
   transmission: "Automatic",
   condition: "Used",
   price: "",
-};
-
-const initialPaymentForm = {
-  cardNumber: "",
-  expiry: "",
-  cvv: "",
-  cardholderName: "",
 };
 
 const localeMap = {
@@ -87,6 +82,58 @@ const getBoostSticker = (listing) => {
   return null;
 };
 
+const parseApiResponse = async (response, fallbackMessage) => {
+  const rawText = await response.text();
+  let result = {};
+
+  if (rawText) {
+    try {
+      result = JSON.parse(rawText);
+    } catch {
+      throw new Error(fallbackMessage || "The server returned a non-JSON response.");
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(result.error || fallbackMessage || "Request failed.");
+  }
+
+  return result;
+};
+
+export const handlePayment = async (boostType, listingId) => {
+  const stripe = await stripePromise;
+
+  if (!stripe) {
+    throw new Error("Stripe is not configured on the frontend.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(
+      Array.isArray(boostType)
+        ? {
+            boost_types: boostType,
+            listing_id: listingId,
+          }
+        : {
+            boost_type: boostType,
+            listing_id: listingId,
+          }
+    ),
+  });
+
+  const result = await parseApiResponse(response, "Unable to create Stripe checkout session.");
+
+  const redirectResult = await stripe.redirectToCheckout({ sessionId: result.sessionId });
+  if (redirectResult.error) {
+    throw new Error(redirectResult.error.message || "Stripe checkout redirection failed.");
+  }
+};
+
 const getListingPriority = (listing) => {
   if (listing?.is_bumped) return 3;
   if (listing?.is_spotlight) return 2;
@@ -114,9 +161,6 @@ function Marketplace() {
   const [isUrgent, setIsUrgent] = useState(false);
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [isBumped, setIsBumped] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentForm, setPaymentForm] = useState(initialPaymentForm);
-  const [paymentState, setPaymentState] = useState({ status: "idle", error: "" });
   const [selectedCar, setSelectedCar] = useState(null);
   const [selectedCarImage, setSelectedCarImage] = useState("");
   const [lightboxImage, setLightboxImage] = useState("");
@@ -200,6 +244,13 @@ function Marketplace() {
   );
 
   const hasPremiumSelection = totalBoostPrice > 0;
+  const selectedBoostTypes = useMemo(() => {
+    const next = [];
+    if (isUrgent) next.push("urgent");
+    if (isSpotlight) next.push("spotlight");
+    if (isBumped) next.push("bump");
+    return next;
+  }, [isBumped, isSpotlight, isUrgent]);
 
   const resetPublishFlow = () => {
     setForm(initialForm);
@@ -207,18 +258,15 @@ function Marketplace() {
     setIsUrgent(false);
     setIsSpotlight(false);
     setIsBumped(false);
-    setPaymentForm(initialPaymentForm);
-    setPaymentState({ status: "idle", error: "" });
-    setIsPaymentModalOpen(false);
     setIsPublishModalOpen(false);
   };
 
-  const createListing = async () => {
+  const createListing = async (boostOverrides) => {
     const formData = new FormData();
     Object.entries(form).forEach(([key, value]) => formData.append(key, value));
-    formData.append("is_urgent", String(isUrgent));
-    formData.append("is_spotlight", String(isSpotlight));
-    formData.append("is_bumped", String(isBumped));
+    formData.append("is_urgent", String(boostOverrides?.is_urgent ?? isUrgent));
+    formData.append("is_spotlight", String(boostOverrides?.is_spotlight ?? isSpotlight));
+    formData.append("is_bumped", String(boostOverrides?.is_bumped ?? isBumped));
     selectedImages.filter(Boolean).forEach((file) => formData.append("images", file));
 
     const {
@@ -235,36 +283,9 @@ function Marketplace() {
       body: formData,
     });
 
-    const result = await response.json();
-    if (!response.ok) {
-      throw new Error(result.error || t("marketplace.errors.submit_failed"));
-    }
+    const result = await parseApiResponse(response, t("marketplace.errors.submit_failed"));
 
     return result;
-  };
-
-  const recordMockPayment = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const paymentPayload = {
-      amount_lkr: totalBoostPrice,
-      card_last4: paymentForm.cardNumber.replace(/\D/g, "").slice(-4),
-      cardholder_name: paymentForm.cardholderName.trim(),
-      is_urgent: isUrgent,
-      is_spotlight: isSpotlight,
-      is_bumped: isBumped,
-      payment_status: "paid",
-      user_id: session?.user?.id || null,
-      vehicle_brand: form.brand.trim(),
-      vehicle_model: form.model.trim(),
-    };
-
-    const { error } = await supabase.from("marketplace_payments").insert(paymentPayload);
-    if (error) {
-      throw new Error(error.message || "Unable to record marketplace payment.");
-    }
   };
 
   const fetchListings = async () => {
@@ -272,11 +293,7 @@ function Marketplace() {
       setLoadError("");
 
       const response = await fetch(`${API_BASE_URL}/api/marketplace/listings`);
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || t("marketplace.errors.load_failed"));
-      }
+      const result = await parseApiResponse(response, t("marketplace.errors.load_failed"));
 
       setCars(result.listings || []);
     } catch (error) {
@@ -436,59 +453,35 @@ function Marketplace() {
     event.preventDefault();
 
     if (hasPremiumSelection) {
-      setSubmitState({ saving: false, error: "", success: "" });
-      setPaymentState({ status: "idle", error: "" });
-      setIsPaymentModalOpen(true);
+      setSubmitState({ saving: true, error: "", success: "" });
+
+      try {
+        const result = await createListing({
+          is_urgent: false,
+          is_spotlight: false,
+          is_bumped: false,
+        });
+        const createdListingId = result?.listing?.id;
+
+        if (!createdListingId) {
+          throw new Error("Listing was created without an id for payment.");
+        }
+
+        await handlePayment(selectedBoostTypes, createdListingId);
+        setSubmitState({ saving: false, error: "", success: "" });
+      } catch (error) {
+        setSubmitState({
+          saving: false,
+          error: error.message || "Unable to start Stripe checkout.",
+          success: "",
+        });
+      }
       return;
     }
 
     await handleSubmit();
   };
 
-  const handlePaymentInputChange = (key, value) => {
-    let nextValue = value;
-
-    if (key === "cardNumber") {
-      const digits = value.replace(/\D/g, "").slice(0, 16);
-      nextValue = digits.replace(/(\d{4})(?=\d)/g, "$1 ").trim();
-    }
-
-    if (key === "expiry") {
-      const digits = value.replace(/\D/g, "").slice(0, 4);
-      nextValue = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
-    }
-
-    if (key === "cvv") {
-      nextValue = value.replace(/\D/g, "").slice(0, 4);
-    }
-
-    setPaymentForm((current) => ({
-      ...current,
-      [key]: nextValue,
-    }));
-  };
-
-  const handlePaymentSubmit = async (event) => {
-    event.preventDefault();
-
-    setPaymentState({ status: "processing", error: "" });
-
-    try {
-      await new Promise((resolve) => window.setTimeout(resolve, 2000));
-      setPaymentState({ status: "success", error: "" });
-      await new Promise((resolve) => window.setTimeout(resolve, 900));
-      await recordMockPayment();
-      setIsPaymentModalOpen(false);
-      setPaymentForm(initialPaymentForm);
-      setPaymentState({ status: "idle", error: "" });
-      await handleSubmit();
-    } catch (error) {
-      setPaymentState({
-        status: "idle",
-        error: error.message || "Payment could not be completed.",
-      });
-    }
-  };
 
   const getListingImages = (car) => {
     const images = Array.isArray(car?.image_urls) ? car.image_urls.filter(Boolean) : [];
@@ -542,6 +535,59 @@ function Marketplace() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [lightboxImage, lightboxIndex, selectedCarImages]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paymentStatus = params.get("payment");
+    const sessionId = params.get("session_id");
+
+    if (paymentStatus !== "success" || !sessionId) return;
+
+    let cancelled = false;
+
+    const syncStripePayment = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/verify-payment`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+
+        const result = await parseApiResponse(response, "Unable to verify Stripe payment.");
+
+        if (cancelled) return;
+
+        setSubmitState({
+          saving: false,
+          error: "",
+          success: "Payment successful. Your boosted listing was published and synced.",
+        });
+        resetPublishFlow();
+        fetchListings();
+
+        params.delete("payment");
+        params.delete("session_id");
+        const nextQuery = params.toString();
+        const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}`;
+        window.history.replaceState({}, "", nextUrl);
+      } catch (error) {
+        if (cancelled) return;
+
+        setSubmitState({
+          saving: false,
+          error: error.message || "Stripe payment verification failed.",
+          success: "",
+        });
+      }
+    };
+
+    syncStripePayment();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="marketplace-page theme-app-bg min-h-screen px-6 py-8 md:px-8">
@@ -1095,132 +1141,6 @@ function Marketplace() {
         </div>
       )}
 
-      {isPaymentModalOpen && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm"
-            onClick={() => paymentState.status === "idle" && setIsPaymentModalOpen(false)}
-          />
-          <section
-            className="marketplace-payment-modal relative z-10 w-full max-w-xl overflow-hidden rounded-[30px] border border-slate-700/60 bg-[linear-gradient(145deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94),rgba(8,47,73,0.92))] p-6 shadow-2xl shadow-slate-950/50 md:p-7"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.14),_transparent_28%),radial-gradient(circle_at_bottom_left,_rgba(59,130,246,0.14),_transparent_24%)]" />
-            <div className="relative">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200">
-                    <LockKeyhole className="h-3.5 w-3.5" />
-                    AutoValueLK Secure Checkout
-                  </div>
-                  <h2 className="mt-4 text-2xl font-semibold text-white">Complete your premium ad payment</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">
-                    Your bank is simulated here for demo purposes. Once approved, your boosted ad will be published automatically.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPaymentModalOpen(false)}
-                  disabled={paymentState.status === "processing"}
-                  className="rounded-full border border-slate-700/70 bg-slate-900/80 px-3 py-2 text-sm text-slate-300 transition hover:border-slate-500/80 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {t("marketplace.common.close")}
-                </button>
-              </div>
-
-              <div className="mt-6 rounded-[26px] border border-slate-700/70 bg-slate-950/55 p-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">Total payable</p>
-                    <p className="mt-2 text-3xl font-semibold text-white">{formatCurrency(totalBoostPrice, locale)}</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-700/70 bg-slate-900/75 p-3 text-cyan-200">
-                    <CreditCard className="h-7 w-7" />
-                  </div>
-                </div>
-              </div>
-
-              {paymentState.status === "success" ? (
-                <div className="mt-6 rounded-[28px] border border-emerald-500/25 bg-emerald-500/10 p-8 text-center">
-                  <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-500/15 text-emerald-200">
-                    <CheckCircle2 className="h-10 w-10" />
-                  </div>
-                  <h3 className="mt-5 text-2xl font-semibold text-white">Payment Successful</h3>
-                  <p className="mt-2 text-sm leading-6 text-emerald-100/90">
-                    Your premium placement is confirmed. Publishing your ad now.
-                  </p>
-                </div>
-              ) : (
-                <form className="mt-6 space-y-4" onSubmit={handlePaymentSubmit}>
-                  <div className="space-y-4">
-                    <PaymentInput
-                      label="Card Number"
-                      value={paymentForm.cardNumber}
-                      onChange={(value) => handlePaymentInputChange("cardNumber", value)}
-                      placeholder="4242 4242 4242 4242"
-                    />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <PaymentInput
-                        label="Expiry"
-                        value={paymentForm.expiry}
-                        onChange={(value) => handlePaymentInputChange("expiry", value)}
-                        placeholder="08/28"
-                      />
-                      <PaymentInput
-                        label="CVV"
-                        value={paymentForm.cvv}
-                        onChange={(value) => handlePaymentInputChange("cvv", value)}
-                        placeholder="123"
-                      />
-                    </div>
-                    <PaymentInput
-                      label="Cardholder Name"
-                      value={paymentForm.cardholderName}
-                      onChange={(value) => handlePaymentInputChange("cardholderName", value)}
-                      placeholder="Kasun Perera"
-                    />
-                  </div>
-
-                  {paymentState.error && (
-                    <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                      {paymentState.error}
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setIsPaymentModalOpen(false)}
-                      disabled={paymentState.status === "processing"}
-                      className="rounded-xl border border-slate-700/70 bg-slate-900/80 px-4 py-3 text-sm font-medium text-slate-300 transition hover:border-slate-500/80 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={paymentState.status === "processing"}
-                      className="marketplace-primary-button inline-flex items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {paymentState.status === "processing" ? (
-                        <>
-                          <LoaderCircle className="h-4 w-4 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <LockKeyhole className="h-4 w-4" />
-                          Pay {formatCurrency(totalBoostPrice, locale)}
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </section>
-        </div>
-      )}
-
       {isPublishModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -1493,22 +1413,6 @@ function InputField({ label, value, onChange, placeholder, type = "text" }) {
         placeholder={placeholder}
         required
         className="w-full rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
-      />
-    </label>
-  );
-}
-
-function PaymentInput({ label, value, onChange, placeholder }) {
-  return (
-    <label className="marketplace-field block">
-      <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
-      <input
-        type="text"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        required
-        className="marketplace-payment-input w-full rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
       />
     </label>
   );

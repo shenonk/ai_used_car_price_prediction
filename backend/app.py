@@ -69,9 +69,9 @@ STRIPE_SUCCESS_URL = os.environ.get(
 )
 STRIPE_CANCEL_URL = os.environ.get("STRIPE_CANCEL_URL", "http://localhost:3000/marketplace?payment=cancelled")
 BOOST_TYPE_PRICES = {
-    "urgent": {"amount_cents": 500, "label": "Urgent Boost"},
-    "spotlight": {"amount_cents": 1000, "label": "Spotlight Boost"},
-    "bump": {"amount_cents": 300, "label": "Bump Boost"},
+    "urgent": {"amount_cents": 160, "label": "Urgent Boost"},
+    "spotlight": {"amount_cents": 240, "label": "Spotlight Boost"},
+    "bump": {"amount_cents": 90, "label": "Bump Boost"},
 }
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")

@@ -7,17 +7,35 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import psycopg2
+import stripe
 from dotenv import load_dotenv
+from werkzeug.exceptions import HTTPException, RequestEntityTooLarge
 from flask import Flask, g, jsonify, request
 from flask_cors import CORS
 from supabase import Client, create_client
 
 # Load environment variables
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 app = Flask(__name__)
 CORS(app)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_entity_too_large(_error):
+    return jsonify({"error": "Upload is too large. Please keep total file size under 10 MB."}), 413
+
+
+@app.errorhandler(HTTPException)
+def handle_http_exception(error):
+    return jsonify({"error": error.description or "Request failed"}), error.code
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(error):
+    print(f"[FAIL] Unhandled backend error: {error}", flush=True)
+    return jsonify({"error": "An unexpected server error occurred."}), 500
 
 # ============================================
 # SUPABASE CONFIG
@@ -44,6 +62,20 @@ except Exception as e:
     supabase = None
 
 MARKETPLACE_BUCKET = os.environ.get("SUPABASE_MARKETPLACE_BUCKET", "car_images")
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_SUCCESS_URL = os.environ.get(
+    "STRIPE_SUCCESS_URL",
+    "http://localhost:3000/marketplace?payment=success&session_id={CHECKOUT_SESSION_ID}",
+)
+STRIPE_CANCEL_URL = os.environ.get("STRIPE_CANCEL_URL", "http://localhost:3000/marketplace?payment=cancelled")
+BOOST_TYPE_PRICES = {
+    "urgent": {"amount_cents": 500, "label": "Urgent Boost"},
+    "spotlight": {"amount_cents": 1000, "label": "Spotlight Boost"},
+    "bump": {"amount_cents": 300, "label": "Bump Boost"},
+}
+
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
 MARKETPLACE_ALLOWED_IMAGE_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -250,6 +282,20 @@ def get_request_payload():
     if request.content_type and "multipart/form-data" in request.content_type:
         return request.form.to_dict()
     return request.get_json(silent=True) or {}
+
+
+def get_listing_by_id(listing_id):
+    if not listing_id:
+        return None
+
+    response = (
+        supabase.table("listings")
+        .select("id,brand,model,status")
+        .eq("id", listing_id)
+        .limit(1)
+        .execute()
+    )
+    return response.data[0] if response.data else None
 
 
 def normalize_listing_payload(data):
@@ -850,6 +896,126 @@ def admin_delete_marketplace_listing(listing_id):
 
         supabase.table("listings").delete().eq("id", listing_id).execute()
         return jsonify({"message": "Listing deleted successfully"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/create-checkout-session", methods=["POST"])
+def create_checkout_session():
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"error": "Stripe is not configured on the backend"}), 500
+
+    if not supabase:
+        return jsonify({"error": "Supabase client is not configured"}), 500
+
+    data = request.get_json(silent=True) or {}
+    raw_boost_type = data.get("boost_type")
+    boost_types = data.get("boost_types")
+    listing_id = str(data.get("listing_id") or "").strip()
+
+    if isinstance(raw_boost_type, list):
+        selected_boost_types = [str(item).strip().lower() for item in raw_boost_type if str(item).strip()]
+    else:
+        boost_type = str(raw_boost_type or "").strip().lower()
+
+        if isinstance(boost_types, str):
+            selected_boost_types = [item.strip().lower() for item in boost_types.split(",") if item.strip()]
+        elif isinstance(boost_types, list):
+            selected_boost_types = [str(item).strip().lower() for item in boost_types if str(item).strip()]
+        elif boost_type:
+            selected_boost_types = [boost_type]
+        else:
+            selected_boost_types = []
+
+    invalid_boost_types = [item for item in selected_boost_types if item not in BOOST_TYPE_PRICES]
+    if invalid_boost_types or not selected_boost_types:
+        return jsonify({"error": "boost_type must be one of: urgent, spotlight, bump"}), 400
+
+    if not listing_id:
+        return jsonify({"error": "listing_id is required"}), 400
+
+    try:
+        listing = get_listing_by_id(listing_id)
+        if not listing:
+            return jsonify({"error": "Listing not found"}), 404
+
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            success_url=STRIPE_SUCCESS_URL,
+            cancel_url=STRIPE_CANCEL_URL,
+            metadata={
+                "listing_id": listing_id,
+                "boost_type": ",".join(selected_boost_types),
+            },
+            line_items=[
+                {
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {
+                            "name": f"{BOOST_TYPE_PRICES[selected_boost_type]['label']} for {listing.get('brand', 'Vehicle')} {listing.get('model', '')}".strip(),
+                            "description": f"Premium marketplace placement for listing {listing_id}",
+                        },
+                        "unit_amount": BOOST_TYPE_PRICES[selected_boost_type]["amount_cents"],
+                    },
+                    "quantity": 1,
+                }
+                for selected_boost_type in selected_boost_types
+            ],
+        )
+
+        return jsonify({"sessionId": session.id, "url": session.url})
+    except stripe.error.StripeError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/verify-payment", methods=["POST"])
+def verify_payment():
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"error": "Stripe is not configured on the backend"}), 500
+
+    data = request.get_json(silent=True) or {}
+    session_id = (data.get("session_id") or "").strip()
+    if not session_id:
+        return jsonify({"error": "session_id is required"}), 400
+
+    try:
+        session = stripe.checkout.Session.retrieve(session_id)
+        if session.payment_status != "paid":
+            return jsonify({"error": "Payment is not completed"}), 400
+
+        metadata = session.metadata or {}
+        listing_id = (metadata.get("listing_id") or "").strip()
+        boost_types = [
+            item.strip().lower()
+            for item in (metadata.get("boost_type") or "").split(",")
+            if item.strip()
+        ]
+
+        if not listing_id:
+            return jsonify({"error": "Checkout session is missing listing metadata"}), 400
+
+        update_payload = {
+            "is_urgent": "urgent" in boost_types,
+            "is_spotlight": "spotlight" in boost_types,
+            "is_bumped": "bump" in boost_types,
+        }
+
+        response = supabase.table("listings").update(update_payload).eq("id", listing_id).execute()
+        if not response.data:
+            return jsonify({"error": "Listing not found"}), 404
+
+        return jsonify(
+            {
+                "message": "Payment verified successfully",
+                "listing": response.data[0],
+                "boost_types": boost_types,
+            }
+        )
+    except stripe.error.StripeError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

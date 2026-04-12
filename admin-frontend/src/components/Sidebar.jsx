@@ -33,6 +33,15 @@ function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
             ),
         },
         {
+            to: '/admin/payments',
+            label: 'Payments',
+            icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M2.25 8.25h19.5M3.75 6h16.5A1.5 1.5 0 0121.75 7.5v9A1.5 1.5 0 0120.25 18H3.75a1.5 1.5 0 01-1.5-1.5v-9A1.5 1.5 0 013.75 6zm2.25 7.5h3.75" />
+                </svg>
+            ),
+        },
+        {
             to: '/admin/financing',
             label: 'Financing',
             icon: (

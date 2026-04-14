@@ -30,7 +30,7 @@ FEATURE_COLUMNS = [
 ]
 
 TARGET_COLUMN = "price_lkr"
-DEFAULT_DATA_PATH = Path("ml/data/active/finalized_vehicle_prices.csv")
+DEFAULT_DATA_PATH = Path("ml/data/active/AutoValueLK_Finalized_Dataset.csv")
 DEFAULT_MODEL_PATH = Path("ml/models/price_model.joblib")
 
 

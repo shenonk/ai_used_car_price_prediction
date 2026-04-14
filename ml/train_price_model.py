@@ -60,6 +60,12 @@ def parse_args() -> argparse.Namespace:
         default=42,
         help="Random seed for reproducibility.",
     )
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=1,
+        help="Number of CPU workers for RandomForest training. Use 1 for safer Windows compatibility.",
+    )
     return parser.parse_args()
 
 
@@ -71,7 +77,7 @@ def load_dataset(csv_path: Path) -> pd.DataFrame:
     return df
 
 
-def build_pipeline() -> Pipeline:
+def build_pipeline(n_jobs: int) -> Pipeline:
     categorical_features = ["brand", "model", "gear_type", "fuel_type", "condition", "town"]
     numeric_features = ["year", "engine_cc", "mileage_km", "listing_month", "listing_year"]
 
@@ -98,7 +104,7 @@ def build_pipeline() -> Pipeline:
     model = RandomForestRegressor(
         n_estimators=300,
         random_state=42,
-        n_jobs=-1,
+        n_jobs=n_jobs,
     )
 
     return Pipeline(
@@ -123,7 +129,7 @@ def main() -> None:
         random_state=args.random_state,
     )
 
-    pipeline = build_pipeline()
+    pipeline = build_pipeline(args.n_jobs)
     pipeline.fit(X_train, y_train)
 
     pred_log = pipeline.predict(X_test)

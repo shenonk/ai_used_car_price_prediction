@@ -30,6 +30,8 @@ FEATURE_COLUMNS = [
 ]
 
 TARGET_COLUMN = "price_lkr"
+DEFAULT_DATA_PATH = Path("ml/data/active/finalized_vehicle_prices.csv")
+DEFAULT_MODEL_PATH = Path("ml/models/price_model.joblib")
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,13 +39,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--data",
         type=Path,
-        required=True,
+        default=DEFAULT_DATA_PATH,
         help="Path to the training CSV file.",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("ml/models/price_model.joblib"),
+        default=DEFAULT_MODEL_PATH,
         help="Path to save the trained model.",
     )
     parser.add_argument(

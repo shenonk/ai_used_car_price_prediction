@@ -137,3 +137,13 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Python cache and artifacts
+__pycache__/
+*.pyc
+
+# ML model artifacts
+*.joblib
+*.pkl
+ml/models/
+!ml/models/.gitkeep

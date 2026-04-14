@@ -10,9 +10,10 @@ function PriceCheck() {
     year: "",
     engine: "",
     mileage: "",
-    fuel: "",
-    transmission: "",
-    condition: "",
+    fuel_type: "",
+    gear_type: "",
+    condition: "USED",
+    town: "Colombo",
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
@@ -28,8 +29,8 @@ function PriceCheck() {
     if (!form.model.trim()) errs.model = "Model is required"
     if (!form.year) errs.year = "Year is required"
     if (!form.engine) errs.engine = "Engine capacity is required"
-    if (!form.fuel) errs.fuel = "Select a fuel type"
-    if (!form.transmission) errs.transmission = "Select a transmission"
+    if (!form.fuel_type) errs.fuel_type = "Select a fuel type"
+    if (!form.gear_type) errs.gear_type = "Select a transmission"
     return errs
   }
 
@@ -53,6 +54,10 @@ function PriceCheck() {
           year: parseInt(form.year),
           engine: parseInt(form.engine),
           mileage: parseInt(form.mileage) || 0,
+          fuel_type: form.fuel_type,
+          gear_type: form.gear_type,
+          condition: form.condition,
+          town: form.town,
         }),
       })
 
@@ -65,7 +70,11 @@ function PriceCheck() {
 
       navigate("/results", {
         state: {
-          vehicle: form,
+          vehicle: {
+            ...form,
+            fuel: form.fuel_type,
+            transmission: form.gear_type,
+          },
           predictedPrice: data.predicted_price,
           predictedAt: Date.now(),
           predictionKey: `pred-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -185,9 +194,9 @@ function PriceCheck() {
               <div className="animate-fade-in animate-delay-300">
                 <label className="label">Fuel Type *</label>
                 <select
-                  className={`input ${errors.fuel ? 'border-rose-500/50' : ''}`}
-                  value={form.fuel}
-                  onChange={(e) => handleChange('fuel', e.target.value)}
+                  className={`input ${errors.fuel_type ? 'border-rose-500/50' : ''}`}
+                  value={form.fuel_type}
+                  onChange={(e) => handleChange('fuel_type', e.target.value)}
                 >
                   <option value="">Select fuel type</option>
                   <option value="petrol">Petrol</option>
@@ -195,37 +204,54 @@ function PriceCheck() {
                   <option value="diesel">Diesel</option>
                   <option value="electric">Electric</option>
                 </select>
-                {errors.fuel && <p className="text-rose-400 text-xs mt-1">{errors.fuel}</p>}
+                {errors.fuel_type && <p className="text-rose-400 text-xs mt-1">{errors.fuel_type}</p>}
               </div>
 
               {/* Transmission */}
               <div className="animate-fade-in animate-delay-400">
                 <label className="label">Transmission *</label>
                 <select
-                  className={`input ${errors.transmission ? 'border-rose-500/50' : ''}`}
-                  value={form.transmission}
-                  onChange={(e) => handleChange('transmission', e.target.value)}
+                  className={`input ${errors.gear_type ? 'border-rose-500/50' : ''}`}
+                  value={form.gear_type}
+                  onChange={(e) => handleChange('gear_type', e.target.value)}
                 >
                   <option value="">Select transmission</option>
                   <option value="automatic">Automatic</option>
                   <option value="manual">Manual</option>
                 </select>
-                {errors.transmission && <p className="text-rose-400 text-xs mt-1">{errors.transmission}</p>}
+                {errors.gear_type && <p className="text-rose-400 text-xs mt-1">{errors.gear_type}</p>}
               </div>
 
-              {/* Condition - Full Width */}
-              <div className="md:col-span-2 animate-fade-in animate-delay-400">
+              {/* Condition */}
+              <div className="animate-fade-in animate-delay-400">
                 <label className="label">Vehicle Condition</label>
                 <select
                   className="input"
                   value={form.condition}
                   onChange={(e) => handleChange('condition', e.target.value)}
                 >
-                  <option value="">Select condition</option>
-                  <option value="excellent">Excellent - Like new</option>
-                  <option value="good">Good - Minor wear</option>
-                  <option value="average">Average - Normal wear</option>
+                  <option value="USED">Used</option>
+                  <option value="BRAND NEW">Brand New</option>
+                  <option value="RECONDITIONED">Reconditioned</option>
                 </select>
+              </div>
+
+              {/* Town */}
+              <div className="animate-fade-in animate-delay-400">
+                <label className="label">Town</label>
+                <input
+                  className="input"
+                  placeholder="e.g., Colombo"
+                  value={form.town}
+                  onChange={(e) => handleChange('town', e.target.value)}
+                />
+              </div>
+
+              {/* Full Width Note */}
+              <div className="md:col-span-2">
+                <p className="text-xs text-slate-500">
+                  Matching fuel type, transmission, condition, and town to the training data helps the model give more realistic estimates.
+                </p>
               </div>
 
             </div>

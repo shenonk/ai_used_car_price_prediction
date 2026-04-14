@@ -8,13 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency manifest first (Docker layer cache optimisation)
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
-COPY . .
+# Copy backend code and trained ML artifacts into the image
+COPY backend/ .
+COPY ml /ml
 
 EXPOSE 5000
 

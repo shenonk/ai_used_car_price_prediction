@@ -39,8 +39,8 @@ services:
   # ── Backend API (Flask + Gunicorn) ──
   backend-api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "5000:5000"
     env_file:

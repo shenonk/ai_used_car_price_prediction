@@ -8,19 +8,22 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, r2_score, root_mean_squared_error
 
+DEFAULT_DATA_PATH = Path("ml/data/active/finalized_vehicle_prices.csv")
+DEFAULT_MODEL_PATH = Path("ml/models/price_model.joblib")
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a trained price model.")
     parser.add_argument(
         "--data",
         type=Path,
-        required=True,
+        default=DEFAULT_DATA_PATH,
         help="Path to the evaluation CSV file.",
     )
     parser.add_argument(
         "--model",
         type=Path,
-        default=Path("ml/models/price_model.joblib"),
+        default=DEFAULT_MODEL_PATH,
         help="Path to the saved model artifact.",
     )
     return parser.parse_args()

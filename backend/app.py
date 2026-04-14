@@ -3,9 +3,13 @@ import os
 from datetime import datetime
 from decimal import Decimal
 from functools import wraps
+from pathlib import Path
 from urllib.parse import urlparse
 from uuid import uuid4
 
+import joblib
+import numpy as np
+import pandas as pd
 import psycopg2
 import stripe
 from dotenv import load_dotenv
@@ -81,6 +85,11 @@ MARKETPLACE_ALLOWED_IMAGE_TYPES = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
+
+PRICE_MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
+PRICE_MODEL_ARTIFACT = None
+PRICE_MODEL = None
+PRICE_MODEL_FEATURES = []
 
 # ============================================
 # DIRECT POSTGRESQL CONNECTION (bypasses PostgREST)
@@ -395,7 +404,26 @@ def get_storage_path_from_public_url(image_url):
 # ============================================
 # PRICE PREDICTION
 # ============================================
-def predict_price(brand, model, year, engine, mileage):
+def load_price_model():
+    global PRICE_MODEL_ARTIFACT, PRICE_MODEL, PRICE_MODEL_FEATURES
+
+    if not PRICE_MODEL_PATH.exists():
+        print(f"[WARN] Price model not found at {PRICE_MODEL_PATH}", flush=True)
+        return
+
+    try:
+        PRICE_MODEL_ARTIFACT = joblib.load(PRICE_MODEL_PATH)
+        PRICE_MODEL = PRICE_MODEL_ARTIFACT.get("model")
+        PRICE_MODEL_FEATURES = PRICE_MODEL_ARTIFACT.get("feature_columns", [])
+        print(f"[OK] Loaded price model from {PRICE_MODEL_PATH}", flush=True)
+    except Exception as error:
+        PRICE_MODEL_ARTIFACT = None
+        PRICE_MODEL = None
+        PRICE_MODEL_FEATURES = []
+        print(f"[FAIL] Failed to load price model: {error}", flush=True)
+
+
+def predict_price_fallback(brand, model, year, engine, mileage):
     brand_prices = {
         "toyota": 5200000,
         "honda": 5500000,
@@ -457,6 +485,56 @@ def predict_price(brand, model, year, engine, mileage):
     return round(price / 10000) * 10000
 
 
+def build_prediction_features(data):
+    now = datetime.utcnow()
+    raw_condition = str(data.get("condition", "USED")).strip().lower()
+    normalized_condition = {
+        "used": "USED",
+        "excellent": "USED",
+        "good": "USED",
+        "average": "USED",
+        "brand new": "BRAND NEW",
+        "new": "BRAND NEW",
+        "reconditioned": "RECONDITIONED",
+    }.get(raw_condition, "USED")
+
+    return {
+        "brand": str(data.get("brand", "")).strip().upper(),
+        "model": str(data.get("model", "")).strip().upper(),
+        "year": int(data.get("year", now.year)),
+        "engine_cc": float(data.get("engine", data.get("engine_cc", 1500))),
+        "gear_type": str(data.get("gear_type", data.get("transmission", "automatic"))).strip().lower() or "automatic",
+        "fuel_type": str(data.get("fuel_type", data.get("fuel", "petrol"))).strip().lower() or "petrol",
+        "mileage_km": float(data.get("mileage", data.get("mileage_km", 0))),
+        "condition": normalized_condition,
+        "town": str(data.get("town", "Colombo")).strip() or "Colombo",
+        "listing_month": int(data.get("listing_month", now.month)),
+        "listing_year": int(data.get("listing_year", now.year)),
+    }
+
+
+def predict_price(data):
+    features = build_prediction_features(data)
+
+    if not PRICE_MODEL or not PRICE_MODEL_FEATURES:
+        predicted_price = predict_price_fallback(
+            features["brand"],
+            features["model"],
+            features["year"],
+            int(features["engine_cc"]),
+            int(features["mileage_km"]),
+        )
+        return predicted_price, features, "fallback"
+
+    feature_frame = pd.DataFrame([{column: features[column] for column in PRICE_MODEL_FEATURES}])
+    predicted_log_price = PRICE_MODEL.predict(feature_frame)[0]
+    predicted_price = max(0, round(float(np.expm1(predicted_log_price))))
+    return predicted_price, features, "ml_model"
+
+
+load_price_model()
+
+
 @app.route("/api/predict", methods=["POST"])
 def predict():
     try:
@@ -466,17 +544,21 @@ def predict():
 
         brand = data.get("brand", "")
         model = data.get("model", "")
-        year = data.get("year", 2020)
-        engine = data.get("engine", 1500)
-        mileage = data.get("mileage", 0)
 
         if not brand or not model:
             return jsonify({"error": "Brand and model are required"}), 400
 
-        predicted_price = predict_price(brand, model, int(year), int(engine), int(mileage))
-        save_prediction_to_db(brand, model, int(year), int(engine), int(mileage), predicted_price)
+        predicted_price, features, prediction_source = predict_price(data)
+        save_prediction_to_db(
+            features["brand"],
+            features["model"],
+            int(features["year"]),
+            int(features["engine_cc"]),
+            int(features["mileage_km"]),
+            predicted_price,
+        )
 
-        return jsonify({"predicted_price": predicted_price})
+        return jsonify({"predicted_price": predicted_price, "prediction_source": prediction_source})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

@@ -31,7 +31,7 @@ class VehiclePredictionRequest(BaseModel):
     brand: str = Field(..., min_length=1)
     model: str = Field(..., min_length=1)
     year: int = Field(..., ge=1900, le=2100)
-    engine_cc: float = Field(..., gt=0)
+    engine_cc: float = Field(..., ge=0)
     gear_type: str = Field(..., min_length=1)
     fuel_type: str = Field(..., min_length=1)
     mileage_km: float = Field(..., ge=0)

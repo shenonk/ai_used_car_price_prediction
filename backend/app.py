@@ -9,11 +9,14 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 
 MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
+REFERENCE_LISTING_MONTH = 1
+REFERENCE_LISTING_YEAR = 2025
 
 
 class PriceModelState:
@@ -75,6 +78,19 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="AI Used Car Price Prediction API", version="1.0.0", lifespan=lifespan)
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(_request, exc: RequestValidationError):
@@ -108,6 +124,8 @@ def predict_price(payload: VehiclePredictionRequest) -> dict[str, float]:
         )
 
     raw_features = payload.model_dump()
+    raw_features["listing_month"] = REFERENCE_LISTING_MONTH
+    raw_features["listing_year"] = REFERENCE_LISTING_YEAR
     feature_frame = pd.DataFrame(
         [{column: raw_features[column] for column in price_model_state.feature_columns}]
     )

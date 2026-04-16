@@ -2,6 +2,27 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import logo from "../assets/logo/autovaluelk-logo.png"
 
+const GEAR_TYPE_OPTIONS = [
+  { label: "Automatic", value: "automatic" },
+  { label: "Manual", value: "manual" },
+]
+
+const FUEL_TYPE_OPTIONS = [
+  { label: "Petrol", value: "petrol" },
+  { label: "Hybrid", value: "hybrid" },
+  { label: "Diesel", value: "diesel" },
+  { label: "Electric", value: "electric" },
+]
+
+const CONDITION_OPTIONS = [
+  { label: "Used", value: "USED" },
+  { label: "Brand New", value: "BRAND NEW" },
+  { label: "Reconditioned", value: "RECONDITIONED" },
+]
+
+const MODEL_REFERENCE_LISTING_MONTH = 1
+const MODEL_REFERENCE_LISTING_YEAR = 2025
+
 function PriceCheck() {
   const navigate = useNavigate()
   const [form, setForm] = useState({
@@ -45,19 +66,21 @@ function PriceCheck() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("http://localhost:5000/api/predict", {
+      const response = await fetch("http://localhost:8000/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           brand: form.brand,
           model: form.model,
           year: parseInt(form.year),
-          engine: parseInt(form.engine),
-          mileage: parseInt(form.mileage) || 0,
+          engine_cc: parseFloat(form.engine),
+          mileage_km: parseFloat(form.mileage) || 0,
           fuel_type: form.fuel_type,
           gear_type: form.gear_type,
           condition: form.condition,
           town: form.town,
+          listing_month: MODEL_REFERENCE_LISTING_MONTH,
+          listing_year: MODEL_REFERENCE_LISTING_YEAR,
         }),
       })
 
@@ -75,7 +98,7 @@ function PriceCheck() {
             fuel: form.fuel_type,
             transmission: form.gear_type,
           },
-          predictedPrice: data.predicted_price,
+          predictedPrice: data.predicted_price_lkr,
           predictedAt: Date.now(),
           predictionKey: `pred-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         },
@@ -83,7 +106,7 @@ function PriceCheck() {
     } catch (error) {
       setIsLoading(false)
       if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
-        alert("Server not connected. Please make sure the backend is running at http://localhost:5000")
+        alert("Server not connected. Please make sure the backend is running at http://localhost:8000")
       } else {
         alert("Prediction failed: " + error.message)
       }
@@ -199,10 +222,11 @@ function PriceCheck() {
                   onChange={(e) => handleChange('fuel_type', e.target.value)}
                 >
                   <option value="">Select fuel type</option>
-                  <option value="petrol">Petrol</option>
-                  <option value="hybrid">Hybrid</option>
-                  <option value="diesel">Diesel</option>
-                  <option value="electric">Electric</option>
+                  {FUEL_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
                 {errors.fuel_type && <p className="text-rose-400 text-xs mt-1">{errors.fuel_type}</p>}
               </div>
@@ -216,8 +240,11 @@ function PriceCheck() {
                   onChange={(e) => handleChange('gear_type', e.target.value)}
                 >
                   <option value="">Select transmission</option>
-                  <option value="automatic">Automatic</option>
-                  <option value="manual">Manual</option>
+                  {GEAR_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
                 {errors.gear_type && <p className="text-rose-400 text-xs mt-1">{errors.gear_type}</p>}
               </div>
@@ -230,9 +257,11 @@ function PriceCheck() {
                   value={form.condition}
                   onChange={(e) => handleChange('condition', e.target.value)}
                 >
-                  <option value="USED">Used</option>
-                  <option value="BRAND NEW">Brand New</option>
-                  <option value="RECONDITIONED">Reconditioned</option>
+                  {CONDITION_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 

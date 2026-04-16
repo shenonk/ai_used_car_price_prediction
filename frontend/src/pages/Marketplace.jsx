@@ -101,6 +101,20 @@ const parseApiResponse = async (response, fallbackMessage) => {
   return result;
 };
 
+const fetchApprovedListingsFromSupabase = async () => {
+  const { data, error } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || "Failed to load marketplace listings.");
+  }
+
+  return data || [];
+};
+
 export const handlePayment = async (boostType, listingId) => {
   const stripe = await stripePromise;
 
@@ -292,10 +306,14 @@ function Marketplace() {
     try {
       setLoadError("");
 
-      const response = await fetch(`${API_BASE_URL}/api/marketplace/listings`);
-      const result = await parseApiResponse(response, t("marketplace.errors.load_failed"));
-
-      setCars(result.listings || []);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/marketplace/listings`);
+        const result = await parseApiResponse(response, t("marketplace.errors.load_failed"));
+        setCars(result.listings || []);
+      } catch {
+        const listings = await fetchApprovedListingsFromSupabase();
+        setCars(listings);
+      }
     } catch (error) {
       setLoadError(error.message || t("marketplace.errors.load_failed"));
     }

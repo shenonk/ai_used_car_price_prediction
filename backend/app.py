@@ -15,8 +15,10 @@ from pydantic import BaseModel, Field
 
 
 MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
-REFERENCE_LISTING_MONTH = 1
-REFERENCE_LISTING_YEAR = 2025
+OLDER_REFERENCE_LISTING_MONTH = 1
+OLDER_REFERENCE_LISTING_YEAR = 2025
+RECENT_REFERENCE_LISTING_MONTH = 4
+RECENT_REFERENCE_LISTING_YEAR = 2026
 
 
 class PriceModelState:
@@ -42,6 +44,12 @@ class VehiclePredictionRequest(BaseModel):
     town: str = Field(..., min_length=1)
     listing_month: int = Field(..., ge=1, le=12)
     listing_year: int = Field(..., ge=1900, le=2100)
+
+
+def resolve_reference_listing_period(payload: VehiclePredictionRequest) -> tuple[int, int]:
+    if payload.condition == "BRAND NEW" or payload.year >= 2023:
+        return RECENT_REFERENCE_LISTING_MONTH, RECENT_REFERENCE_LISTING_YEAR
+    return OLDER_REFERENCE_LISTING_MONTH, OLDER_REFERENCE_LISTING_YEAR
 
 
 def load_price_model() -> None:
@@ -124,8 +132,9 @@ def predict_price(payload: VehiclePredictionRequest) -> dict[str, float]:
         )
 
     raw_features = payload.model_dump()
-    raw_features["listing_month"] = REFERENCE_LISTING_MONTH
-    raw_features["listing_year"] = REFERENCE_LISTING_YEAR
+    listing_month, listing_year = resolve_reference_listing_period(payload)
+    raw_features["listing_month"] = listing_month
+    raw_features["listing_year"] = listing_year
     feature_frame = pd.DataFrame(
         [{column: raw_features[column] for column in price_model_state.feature_columns}]
     )

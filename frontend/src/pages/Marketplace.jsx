@@ -101,6 +101,20 @@ const parseApiResponse = async (response, fallbackMessage) => {
   return result;
 };
 
+const fetchApprovedListingsFromSupabase = async () => {
+  const { data, error } = await supabase
+    .from("listings")
+    .select("*")
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || "Failed to load marketplace listings.");
+  }
+
+  return data || [];
+};
+
 export const handlePayment = async (boostType, listingId) => {
   const stripe = await stripePromise;
 
@@ -292,10 +306,14 @@ function Marketplace() {
     try {
       setLoadError("");
 
-      const response = await fetch(`${API_BASE_URL}/api/marketplace/listings`);
-      const result = await parseApiResponse(response, t("marketplace.errors.load_failed"));
-
-      setCars(result.listings || []);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/marketplace/listings`);
+        const result = await parseApiResponse(response, t("marketplace.errors.load_failed"));
+        setCars(result.listings || []);
+      } catch {
+        const listings = await fetchApprovedListingsFromSupabase();
+        setCars(listings);
+      }
     } catch (error) {
       setLoadError(error.message || t("marketplace.errors.load_failed"));
     }
@@ -774,7 +792,7 @@ function Marketplace() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredCars.map((car) => (
               <article
                 key={car.id}
@@ -791,9 +809,9 @@ function Marketplace() {
                     setSelectedCarImage(getListingImages(car)[0] || "");
                   }
                 }}
-                className="marketplace-listing-card group overflow-hidden rounded-[24px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
+                className="marketplace-listing-card group overflow-hidden rounded-[20px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
               >
-                <div className="marketplace-listing-media relative h-44 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
+                <div className="marketplace-listing-media relative h-36 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
                   {getListingImages(car)[0] ? (
                     <img
                       src={getListingImages(car)[0]}
@@ -807,16 +825,16 @@ function Marketplace() {
                     </div>
                   )}
 
-                  <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                  <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-200">
                     <ShieldCheck className="h-3.5 w-3.5" />
                     {t("marketplace.card.approved")}
                   </div>
                 </div>
 
-                <div className="p-4">
+                <div className="p-3.5">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-lg font-semibold text-white">
+                      <h3 className="text-base font-semibold text-white">
                         {car.brand} {car.model}
                       </h3>
                       <p className="mt-1 text-xs text-slate-400">
@@ -829,20 +847,20 @@ function Marketplace() {
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-3">
-                      <p className="marketplace-price text-right text-base font-bold text-cyan-300">
+                      <p className="marketplace-price text-right text-sm font-bold text-cyan-300">
                         {formatCurrency(car.price, locale)}
                       </p>
                       {getBoostSticker(car) && (
                         <img
                           src={getBoostSticker(car).src}
                           alt={getBoostSticker(car).alt}
-                          className="marketplace-boost-sticker h-16 w-auto object-contain"
+                          className="marketplace-boost-sticker h-12 w-auto object-contain"
                         />
                       )}
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-2 gap-2.5">
+                  <div className="mt-3 grid grid-cols-2 gap-2">
                     <MarketplaceMeta
                       icon={<CalendarRange className="h-4 w-4" />}
                       label={t("marketplace.labels.year")}
@@ -869,7 +887,7 @@ function Marketplace() {
                     />
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between border-t border-slate-800/80 pt-3">
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-3">
                     <p className="text-xs text-slate-400">{t("marketplace.card.tap_to_expand")}</p>
                     <button
                       type="button"

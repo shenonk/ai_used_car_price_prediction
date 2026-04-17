@@ -9,6 +9,7 @@ import {
   ChevronUp,
   Mail,
 } from "lucide-react";
+import { supabase } from "../utils/supabaseClient";
 
 const HelpCenter = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -143,18 +144,31 @@ const HelpCenter = () => {
     };
 
     try {
-      const response = await fetch("http://localhost:5000/api/support-ticket", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      try {
+        const response = await fetch("http://localhost:5000/api/support-ticket", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
 
-      const result = await response.json();
+        const result = await response.json();
 
-      if (!response.ok) {
-        throw new Error(result.error || "Failed to send support ticket.");
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to send support ticket.");
+        }
+      } catch {
+        const { error } = await supabase.from("support_tickets").insert({
+          user_name: payload.user_name,
+          user_email: payload.user_email,
+          message: payload.message,
+          status: payload.status,
+        });
+
+        if (error) {
+          throw new Error(error.message || "Failed to send support ticket.");
+        }
       }
     } catch (error) {
       setSubmitError(error.message || "We couldn't send your message right now. Please try again in a moment.");

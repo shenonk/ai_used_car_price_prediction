@@ -46,6 +46,15 @@ class VehiclePredictionRequest(BaseModel):
     listing_year: int = Field(..., ge=1900, le=2100)
 
 
+def normalize_input(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **data,
+        "brand": data["brand"].strip().upper(),
+        "model": data["model"].strip().upper(),
+        "town": data["town"].strip(),
+    }
+
+
 def resolve_reference_listing_period(payload: VehiclePredictionRequest) -> tuple[int, int]:
     if payload.condition == "BRAND NEW" or payload.year >= 2023:
         return RECENT_REFERENCE_LISTING_MONTH, RECENT_REFERENCE_LISTING_YEAR
@@ -131,10 +140,11 @@ def predict_price(payload: VehiclePredictionRequest) -> dict[str, float]:
             detail=f"Price model is not available. {price_model_state.load_error or ''}".strip(),
         )
 
-    raw_features = payload.model_dump()
+    raw_features = normalize_input(payload.model_dump())
     listing_month, listing_year = resolve_reference_listing_period(payload)
     raw_features["listing_month"] = listing_month
     raw_features["listing_year"] = listing_year
+    print(f"Normalized input: {raw_features}", flush=True)
     feature_frame = pd.DataFrame(
         [{column: raw_features[column] for column in price_model_state.feature_columns}]
     )

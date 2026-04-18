@@ -1,0 +1,32 @@
+brand,model,brand_clean,model_clean,issue_brand_equals_model,issue_model_contains_brand_prefix,issue_model_contains_brand_suffix,issue_brand_needs_normalization,issue_model_needs_normalization
+CHERY,CHERY,CHERY,CHERY,True,False,False,False,False
+DAEWOO,DAEWOO,DAEWOO,DAEWOO,True,False,False,False,False
+DAIHATSU,DAIHATSU,DAIHATSU,DAIHATSU,True,False,False,False,False
+DATSUN,DATSUN,DATSUN,DATSUN,True,False,False,False,False
+FORD,FORD,FORD,FORD,True,False,False,False,False
+FORD,FORD RANGER,FORD,FORD RANGER,False,True,False,False,False
+HONDA,HONDA,HONDA,HONDA,True,False,False,False,False
+HYUNDAI,HYUNDAI,HYUNDAI,HYUNDAI,True,False,False,False,False
+KIA,KIA,KIA,KIA,True,False,False,False,False
+MAHINDRA,MAHINDRA,MAHINDRA,MAHINDRA,True,False,False,False,False
+MAZDA,MAZDA,MAZDA,MAZDA,True,False,False,False,False
+MAZDA,MAZDA 2 SKYACTIV G,MAZDA,MAZDA 2 SKYACTIV G,False,True,False,False,False
+MAZDA,MAZDA 3 SKYACTIV G,MAZDA,MAZDA 3 SKYACTIV G,False,True,False,False,False
+MG,MG 5 COMFORT,MG,MG 5 COMFORT,False,True,False,False,False
+MG,MG 5 LUXURY,MG,MG 5 LUXURY,False,True,False,False,False
+MG,MG HS PHEV HIGH,MG,MG HS PHEV HIGH,False,True,False,False,False
+MG,MG HS PHEV LUX,MG,MG HS PHEV LUX,False,True,False,False,False
+MG,MG S5 EV,MG,MG S5 EV,False,True,False,False,False
+MG,MG ZS MCE ESSENCE,MG,MG ZS MCE ESSENCE,False,True,False,False,False
+MG,MG ZS MCE LUX,MG,MG ZS MCE LUX,False,True,False,False,False
+MICRO,MICRO,MICRO,MICRO,True,False,False,False,False
+MITSUBISHI,MITSUBISHI,MITSUBISHI,MITSUBISHI,True,False,False,False,False
+OPEL,OPEL,OPEL,OPEL,True,False,False,False,False
+RENAULT,RENAULT,RENAULT,RENAULT,True,False,False,False,False
+SUBARU,SUBARU,SUBARU,SUBARU,True,False,False,False,False
+SUZUKI,SUZUKI,SUZUKI,SUZUKI,True,False,False,False,False
+TATA,TATA,TATA,TATA,True,False,False,False,False
+TOYOTA,TOYOTA,TOYOTA,TOYOTA,True,False,False,False,False
+VOLVO,VOLVO,VOLVO,VOLVO,True,False,False,False,False
+WILLYS,AMERICAN WILLYS,WILLYS,AMERICAN WILLYS,False,False,True,False,False
+ZOTYE,ZOTYE,ZOTYE,ZOTYE,True,False,False,False,False

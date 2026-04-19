@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 
 MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
+REFERENCE_DATASET_PATH = Path(__file__).resolve().parents[1] / "ml" / "data" / "active" / "AutoValueLK_Finalized_Dataset_v2.csv"
 OLDER_REFERENCE_LISTING_MONTH = 1
 OLDER_REFERENCE_LISTING_YEAR = 2025
 RECENT_REFERENCE_LISTING_MONTH = 4
@@ -27,6 +28,7 @@ class PriceModelState:
     feature_columns: list[str] = []
     target_column: str | None = None
     load_error: str | None = None
+    reference_df: pd.DataFrame | None = None
 
 
 price_model_state = PriceModelState()
@@ -55,10 +57,27 @@ def normalize_input(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def normalize_reference_text(value: object) -> str:
+    return str(value or "").strip().upper()
+
+
 def resolve_reference_listing_period(payload: VehiclePredictionRequest) -> tuple[int, int]:
     if payload.condition == "BRAND NEW" or payload.year >= 2023:
         return RECENT_REFERENCE_LISTING_MONTH, RECENT_REFERENCE_LISTING_YEAR
     return OLDER_REFERENCE_LISTING_MONTH, OLDER_REFERENCE_LISTING_YEAR
+
+
+def load_reference_dataset() -> None:
+    if not REFERENCE_DATASET_PATH.exists():
+        print(f"[WARN] Reference dataset not found at {REFERENCE_DATASET_PATH}", flush=True)
+        price_model_state.reference_df = None
+        return
+
+    reference_df = pd.read_csv(REFERENCE_DATASET_PATH)
+    reference_df["brand_norm"] = reference_df["brand"].map(normalize_reference_text)
+    reference_df["model_norm"] = reference_df["model"].map(normalize_reference_text)
+    reference_df["town_norm"] = reference_df["town"].astype(str).str.strip()
+    price_model_state.reference_df = reference_df
 
 
 def load_price_model() -> None:
@@ -83,6 +102,7 @@ def load_price_model() -> None:
 async def lifespan(_app: FastAPI):
     try:
         load_price_model()
+        load_reference_dataset()
         print(f"[OK] Loaded price model from {MODEL_PATH}", flush=True)
         print(f"[OK] Feature columns: {price_model_state.feature_columns}", flush=True)
         print(f"[OK] Target column: {price_model_state.target_column}", flush=True)
@@ -132,6 +152,64 @@ def health_check() -> dict[str, Any]:
     }
 
 
+def get_targeted_reference_price(features: dict[str, Any]) -> float | None:
+    reference_df = price_model_state.reference_df
+    if reference_df is None or reference_df.empty:
+        return None
+
+    brand = features["brand"]
+    model = features["model"]
+    family_rows: pd.DataFrame | None = None
+
+    if brand == "BMW" and "520" in model:
+        family_rows = reference_df[
+            reference_df["brand_norm"].eq("BMW") & reference_df["model_norm"].str.contains("520", na=False)
+        ].copy()
+    elif brand == "TESLA" and "MODEL 3" in model:
+        family_rows = reference_df[
+            reference_df["brand_norm"].eq("TESLA") & reference_df["model_norm"].str.contains("MODEL 3", na=False)
+        ].copy()
+
+    if family_rows is None or family_rows.empty:
+        return None
+
+    subset = family_rows.copy()
+    subset = subset[subset["condition"].astype(str).eq(features["condition"])]
+    if subset.empty:
+        subset = family_rows.copy()
+
+    fuel_subset = subset[subset["fuel_type"].astype(str).str.lower().eq(features["fuel_type"])]
+    if not fuel_subset.empty:
+        subset = fuel_subset
+
+    if features["engine_cc"] == 0:
+        engine_subset = subset[subset["engine_cc"].fillna(-1).eq(0)]
+    else:
+        engine_subset = subset[subset["engine_cc"].sub(float(features["engine_cc"])).abs() <= 250]
+    if not engine_subset.empty:
+        subset = engine_subset
+
+    exact_year = subset[subset["year"].eq(int(features["year"]))]
+    if len(exact_year) >= 3:
+        return float(exact_year["price_lkr"].median())
+
+    nearby_year = subset[subset["year"].sub(int(features["year"])).abs() <= 2]
+    if len(nearby_year) >= 3:
+        return float(nearby_year["price_lkr"].median())
+
+    family_median_price = float(subset["price_lkr"].median())
+    family_median_year = float(subset["year"].median())
+    input_year = float(features["year"])
+
+    if input_year < family_median_year:
+        year_factor = 0.93 ** (family_median_year - input_year)
+    else:
+        year_factor = 1.04 ** (input_year - family_median_year)
+
+    adjusted_price = family_median_price * year_factor
+    return float(max(0.0, adjusted_price))
+
+
 @app.post("/predict")
 def predict_price(payload: VehiclePredictionRequest) -> dict[str, float]:
     if price_model_state.model is None:
@@ -154,5 +232,14 @@ def predict_price(payload: VehiclePredictionRequest) -> dict[str, float]:
         predicted_price = float(np.expm1(predicted_log_price))
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {error}") from error
+
+    targeted_reference_price = get_targeted_reference_price(raw_features)
+    if targeted_reference_price is not None:
+        print(
+            f"Applying targeted reference calibration for {raw_features['brand']} {raw_features['model']}: "
+            f"{predicted_price:,.2f} -> {targeted_reference_price:,.2f}",
+            flush=True,
+        )
+        predicted_price = targeted_reference_price
 
     return {"predicted_price_lkr": round(predicted_price, 2)}

@@ -1,0 +1,8 @@
+Vehicle,Year,Input_Type,Brand_Input,Model_Input,Predicted_Price_LKR,Notes
+Toyota Aqua,2014,API Clean,TOYOTA,AQUA,7835861.52,Accurate market range (Swagger API test)
+Toyota Aqua,2013,Frontend Clean,TOYOTA,AQUA,7584645.89,Frontend prediction consistent for common car
+BMW 520I,2015,Clean,BMW,520I,16804073.87,Premium vehicle prediction reasonable
+BMW 520I,2015,Messy,bMw,520i,16804073.87,Matches clean → normalization works
+Tesla Model 3,2021,Clean,TESLA,MODEL 3,29757000,EV prediction handled correctly
+Land Rover Defender Octa,2025,Clean,LAND ROVER,DEFENDER OCTA,135437901.89,High-end premium vehicle handled
+Land Rover Defender Octa,2025,Messy,Land Rover,Defender Octa,135437901.89,Matches clean → normalization works

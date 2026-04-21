@@ -36,6 +36,10 @@ function buildMarketTrendKey(prediction) {
   return `${prediction.brand}|||${prediction.model}|||${prediction.year}`
 }
 
+function isSuzukiWagonFamily(prediction) {
+  return prediction.brand === "SUZUKI" && (prediction.model.includes("WAGON R") || prediction.model.includes("STINGRAY"))
+}
+
 function normalizeModelTokens(value) {
   return String(value)
     .trim()
@@ -166,15 +170,40 @@ function buildFullAnnualTrend(prediction, basePoints, sourceLabel, baseNote) {
   }
 }
 
+function filterPlausibleMarketPoints(prediction, points) {
+  if (!isSuzukiWagonFamily(prediction)) {
+    return points
+  }
+
+  return points.filter((point) => {
+    const value = Number(point.marketValueLkr ?? point.medianPrice ?? 0)
+    return value >= 1_000_000 && value <= 20_000_000
+  })
+}
+
 function buildVariantMarketTrendSeries(prediction) {
   const prefix = `${prediction.brand}|||`
-  const yearSuffix = `|||${prediction.year}`
-  const candidateEntries = Object.entries(marketTrends.exactTrends || {}).filter(([key]) => {
-    if (!key.startsWith(prefix) || !key.endsWith(yearSuffix)) {
+  const targetYear = Number(prediction.year)
+  const candidateEntries = Object.entries(marketTrends.exactTrends || {}).filter(([key, points]) => {
+    if (!key.startsWith(prefix)) {
       return false
     }
 
-    const [, candidateModel] = key.split("|||")
+    const [, candidateModel, candidateYear] = key.split("|||")
+    const manufactureYear = Number(candidateYear)
+    const yearMatches = isSuzukiWagonFamily(prediction)
+      ? Math.abs(manufactureYear - targetYear) <= 2
+      : manufactureYear === targetYear
+
+    if (!yearMatches) {
+      return false
+    }
+
+    if (isSuzukiWagonFamily(prediction)) {
+      const familyMatch = candidateModel.includes("WAGON R") || candidateModel.includes("STINGRAY")
+      return familyMatch && filterPlausibleMarketPoints(prediction, points).length > 0
+    }
+
     return isRelatedModelVariant(prediction.model, candidateModel)
   })
 
@@ -185,7 +214,7 @@ function buildVariantMarketTrendSeries(prediction) {
   const aggregated = new Map()
 
   candidateEntries.forEach(([, points]) => {
-    points.forEach((point) => {
+    filterPlausibleMarketPoints(prediction, points).forEach((point) => {
       const year = Number(point.trendYear)
       const value = Number(point.marketValueLkr)
       const yearValues = aggregated.get(year) || []
@@ -213,8 +242,10 @@ function buildVariantMarketTrendSeries(prediction) {
   return {
     labels: combinedPoints.map((point) => String(point.trendYear)),
     values: combinedPoints.map((point) => Math.round(point.marketValueLkr)),
-    source: "market_variant",
-    note: `Based on related ${prediction.brand} ${prediction.model} variant rows from the market trends dataset for manufacture year ${prediction.year}.`,
+    source: isSuzukiWagonFamily(prediction) ? "market_family" : "market_variant",
+    note: isSuzukiWagonFamily(prediction)
+      ? `Based on plausible ${prediction.brand} Wagon R / Stingray family trend rows from the market trends dataset, using nearby manufacture years where needed.`
+      : `Based on related ${prediction.brand} ${prediction.model} variant rows from the market trends dataset for manufacture year ${prediction.year}.`,
   }
 }
 
@@ -223,7 +254,10 @@ function roundToTwo(value) {
 }
 
 function getDatasetTrendSeries(prediction) {
-  const marketTrend = marketTrends.exactTrends?.[buildMarketTrendKey(prediction)] || []
+  const marketTrend = filterPlausibleMarketPoints(
+    prediction,
+    marketTrends.exactTrends?.[buildMarketTrendKey(prediction)] || []
+  )
   if (marketTrend.length >= 1) {
     return {
       labels: marketTrend.map((point) => String(point.trendYear)),
@@ -299,6 +333,18 @@ function Analytics() {
     () => (selectedPrediction ? getDatasetTrendSeries(selectedPrediction) : { labels: [], values: [], source: "none", note: "" }),
     [selectedPrediction]
   )
+
+  const displayCurrentValue = useMemo(() => {
+    if (!selectedPrediction) {
+      return 0
+    }
+
+    if (chartSeries.values.length > 0 && chartSeries.source !== "projection") {
+      return chartSeries.values[chartSeries.values.length - 1]
+    }
+
+    return Math.round(selectedPrediction.predictedPrice)
+  }, [chartSeries.source, chartSeries.values, selectedPrediction])
 
   const data = {
     labels: chartSeries.labels,
@@ -415,7 +461,7 @@ function Analytics() {
               <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Estimated Current Value</p>
                 <p className="mt-2 text-lg font-semibold text-amber-400">
-                  LKR {CURRENCY_FORMATTER.format(Math.round(selectedPrediction.predictedPrice))}
+                  LKR {CURRENCY_FORMATTER.format(displayCurrentValue)}
                 </p>
               </div>
               <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">

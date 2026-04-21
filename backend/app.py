@@ -160,6 +160,8 @@ def get_targeted_reference_price(features: dict[str, Any]) -> float | None:
     brand = features["brand"]
     model = features["model"]
     family_rows: pd.DataFrame | None = None
+    minimum_exact_matches = 3
+    minimum_nearby_matches = 3
 
     if brand == "BMW" and "520" in model:
         family_rows = reference_df[
@@ -169,6 +171,13 @@ def get_targeted_reference_price(features: dict[str, Any]) -> float | None:
         family_rows = reference_df[
             reference_df["brand_norm"].eq("TESLA") & reference_df["model_norm"].str.contains("MODEL 3", na=False)
         ].copy()
+    elif brand == "SUZUKI" and ("WAGON R" in model or "STINGRAY" in model):
+        family_rows = reference_df[
+            reference_df["brand_norm"].eq("SUZUKI")
+            & reference_df["model_norm"].str.contains("WAGON R|STINGRAY", na=False)
+        ].copy()
+        minimum_exact_matches = 2
+        minimum_nearby_matches = 2
 
     if family_rows is None or family_rows.empty:
         return None
@@ -189,12 +198,27 @@ def get_targeted_reference_price(features: dict[str, Any]) -> float | None:
     if not engine_subset.empty:
         subset = engine_subset
 
+    if brand == "SUZUKI" and ("WAGON R" in model or "STINGRAY" in model):
+        plausible_price_subset = subset[subset["price_lkr"].between(1_000_000, 20_000_000)]
+        if not plausible_price_subset.empty:
+            subset = plausible_price_subset
+
+        if len(subset) >= 4:
+            q1 = float(subset["price_lkr"].quantile(0.25))
+            q3 = float(subset["price_lkr"].quantile(0.75))
+            iqr = q3 - q1
+            lower_bound = max(0.0, q1 - (1.5 * iqr))
+            upper_bound = q3 + (1.5 * iqr)
+            iqr_filtered_subset = subset[subset["price_lkr"].between(lower_bound, upper_bound)]
+            if not iqr_filtered_subset.empty:
+                subset = iqr_filtered_subset
+
     exact_year = subset[subset["year"].eq(int(features["year"]))]
-    if len(exact_year) >= 3:
+    if len(exact_year) >= minimum_exact_matches:
         return float(exact_year["price_lkr"].median())
 
     nearby_year = subset[subset["year"].sub(int(features["year"])).abs() <= 2]
-    if len(nearby_year) >= 3:
+    if len(nearby_year) >= minimum_nearby_matches:
         return float(nearby_year["price_lkr"].median())
 
     family_median_price = float(subset["price_lkr"].median())

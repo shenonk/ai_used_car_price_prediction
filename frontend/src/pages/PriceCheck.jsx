@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import logo from "../assets/logo/autovaluelk-logo.png"
 import brandModelOptions from "../data/brand_model_options.json"
+import { savePredictionHistoryEntry } from "../utils/predictionHistory"
 
 const GEAR_TYPE_OPTIONS = [
   { label: "Automatic", value: "automatic" },
@@ -104,6 +105,18 @@ function PriceCheck() {
       }
 
       const data = await response.json()
+      const predictedAt = Date.now()
+      const predictionKey = `pred-${predictedAt}-${Math.random().toString(36).slice(2, 8)}`
+
+      savePredictionHistoryEntry({
+        id: predictionKey,
+        brand: form.brand.trim().toUpperCase(),
+        model: form.model.trim().toUpperCase(),
+        year: parseInt(form.year),
+        predictedPrice: data.predicted_price_lkr,
+        predictedAt,
+      })
+
       setIsLoading(false)
 
       navigate("/results", {
@@ -114,8 +127,8 @@ function PriceCheck() {
             transmission: form.gear_type,
           },
           predictedPrice: data.predicted_price_lkr,
-          predictedAt: Date.now(),
-          predictionKey: `pred-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          predictedAt,
+          predictionKey,
         },
       })
     } catch (error) {

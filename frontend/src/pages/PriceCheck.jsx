@@ -1,6 +1,8 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import logo from "../assets/logo/autovaluelk-logo.png"
+import brandModelOptions from "../data/brand_model_options.json"
+import { savePredictionHistoryEntry } from "../utils/predictionHistory"
 
 const GEAR_TYPE_OPTIONS = [
   { label: "Automatic", value: "automatic" },
@@ -22,6 +24,7 @@ const CONDITION_OPTIONS = [
 
 const MODEL_REFERENCE_LISTING_MONTH = 1
 const MODEL_REFERENCE_LISTING_YEAR = 2025
+const BRAND_OPTIONS = Object.keys(brandModelOptions).sort()
 
 function PriceCheck() {
   const navigate = useNavigate()
@@ -38,10 +41,23 @@ function PriceCheck() {
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+  const availableModels = useMemo(
+    () => (form.brand ? (brandModelOptions[form.brand] || []) : []),
+    [form.brand]
+  )
 
   const handleChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }))
+    setForm(prev => {
+      if (field === "brand") {
+        return { ...prev, brand: value, model: "" }
+      }
+
+      return { ...prev, [field]: value }
+    })
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: "" }))
+    if (field === "brand" && errors.model) {
+      setErrors(prev => ({ ...prev, model: "" }))
+    }
   }
 
   const validate = () => {
@@ -89,6 +105,18 @@ function PriceCheck() {
       }
 
       const data = await response.json()
+      const predictedAt = Date.now()
+      const predictionKey = `pred-${predictedAt}-${Math.random().toString(36).slice(2, 8)}`
+
+      savePredictionHistoryEntry({
+        id: predictionKey,
+        brand: form.brand.trim().toUpperCase(),
+        model: form.model.trim().toUpperCase(),
+        year: parseInt(form.year),
+        predictedPrice: data.predicted_price_lkr,
+        predictedAt,
+      })
+
       setIsLoading(false)
 
       navigate("/results", {
@@ -99,8 +127,8 @@ function PriceCheck() {
             transmission: form.gear_type,
           },
           predictedPrice: data.predicted_price_lkr,
-          predictedAt: Date.now(),
-          predictionKey: `pred-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          predictedAt,
+          predictionKey,
         },
       })
     } catch (error) {
@@ -152,12 +180,18 @@ function PriceCheck() {
               {/* Brand */}
               <div className="animate-fade-in animate-delay-100">
                 <label className="label">Brand *</label>
-                <input
+                <select
                   className={`input ${errors.brand ? 'border-rose-500/50' : ''}`}
-                  placeholder="e.g., Toyota, Honda, Nissan"
                   value={form.brand}
                   onChange={(e) => handleChange('brand', e.target.value)}
-                />
+                >
+                  <option value="">Select brand</option>
+                  {BRAND_OPTIONS.map((brand) => (
+                    <option key={brand} value={brand}>
+                      {brand}
+                    </option>
+                  ))}
+                </select>
                 {errors.brand && <p className="text-rose-400 text-xs mt-1">{errors.brand}</p>}
               </div>
 
@@ -165,11 +199,18 @@ function PriceCheck() {
               <div className="animate-fade-in animate-delay-200">
                 <label className="label">Model *</label>
                 <input
+                  list="price-check-model-options"
                   className={`input ${errors.model ? 'border-rose-500/50' : ''}`}
-                  placeholder="e.g., Aqua, Vezel, Swift"
+                  placeholder={form.brand ? "Select or search model" : "Select a brand first"}
                   value={form.model}
                   onChange={(e) => handleChange('model', e.target.value)}
+                  disabled={!form.brand}
                 />
+                <datalist id="price-check-model-options">
+                  {availableModels.map((model) => (
+                    <option key={model} value={model} />
+                  ))}
+                </datalist>
                 {errors.model && <p className="text-rose-400 text-xs mt-1">{errors.model}</p>}
               </div>
 

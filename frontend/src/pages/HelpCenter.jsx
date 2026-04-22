@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Search,
   BookOpen,
@@ -9,11 +9,14 @@ import {
   ChevronUp,
   Mail,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../utils/supabaseClient";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 const HelpCenter = () => {
+  const navigate = useNavigate();
+  const faqSectionRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [openFaq, setOpenFaq] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -118,6 +121,12 @@ const HelpCenter = () => {
   const handleCategoryClick = (category) => {
     setSelectedCategory(category.id);
     setOpenFaq(null);
+    faqSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleCategoryOpen = (event, route) => {
+    event.stopPropagation();
+    navigate(route);
   };
 
   const toggleFaq = (id) => {
@@ -234,10 +243,17 @@ const HelpCenter = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredCategories.map((cat) => (
-            <button
-              type="button"
+            <div
               key={cat.id}
+              role="button"
+              tabIndex={0}
               onClick={() => handleCategoryClick(cat)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  handleCategoryClick(cat);
+                }
+              }}
               className={`group p-8 rounded-2xl border backdrop-blur-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] text-left ${
                 selectedCategory === cat.id
                   ? "border-[#3B82F6]/60 bg-[#1e293b]/70"
@@ -249,11 +265,23 @@ const HelpCenter = () => {
               </div>
               <h3 className="theme-text-primary text-xl font-semibold mb-3">{cat.title}</h3>
               <p className="theme-text-secondary text-sm leading-relaxed">{cat.description}</p>
-            </button>
+              <div className="mt-5 flex items-center justify-between gap-3">
+                <span className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                  Filter FAQs
+                </span>
+                <button
+                  type="button"
+                  onClick={(event) => handleCategoryOpen(event, cat.route)}
+                  className="rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#7dd3fc] transition hover:border-[#3B82F6]/50 hover:bg-[#3B82F6]/15"
+                >
+                  Open Page
+                </button>
+              </div>
+            </div>
           ))}
         </div>
 
-        <div className="space-y-8 glass p-8 md:p-12 rounded-3xl">
+        <div ref={faqSectionRef} className="space-y-8 glass p-8 md:p-12 rounded-3xl">
           <div className="text-center md:text-left">
             <h2 className="theme-text-primary text-3xl font-bold mb-2">Frequently Asked Questions</h2>
             <p className="theme-text-secondary">Quick answers to common questions about our platform.</p>

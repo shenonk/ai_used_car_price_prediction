@@ -172,10 +172,29 @@ const formatRelativeTime = (value) => {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 };
 
+const normalizeImageCollection = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === 'string' && item.trim());
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => typeof item === 'string' && item.trim());
+      }
+    } catch {
+      return [value];
+    }
+  }
+
+  return [];
+};
+
 const getListingImages = (listing) => {
-  const images = Array.isArray(listing?.image_urls) ? listing.image_urls.filter(Boolean) : [];
+  const images = normalizeImageCollection(listing?.image_urls);
   if (images.length > 0) return images;
-  return listing?.image_url ? [listing.image_url] : [];
+  return normalizeImageCollection(listing?.image_url);
 };
 
 const getBoostOptions = (listing) => {

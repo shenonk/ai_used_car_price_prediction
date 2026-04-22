@@ -1,0 +1,117 @@
+{
+  "stats": {
+    "total_predictions": 1248,
+    "r2_score": 0.9234,
+    "mae": 285000,
+    "last_training_date": "2026-02-28"
+  },
+  "loan_rate": {
+    "interest_rate": 12.5,
+    "min_down_payment": 20,
+    "max_duration": 60,
+    "updated_at": "2026-04-22T14:25:52Z"
+  },
+  "notifications": [
+    {
+      "id": 1,
+      "title": "System Maintenance",
+      "message": "Scheduled maintenance on March 5th.",
+      "active": true,
+      "created_at": "2026-02-28T00:00:00Z"
+    },
+    {
+      "id": 2,
+      "title": "New Model Deployed",
+      "message": "Updated ML model with improved accuracy.",
+      "active": true,
+      "created_at": "2026-02-25T00:00:00Z"
+    }
+  ],
+  "support_tickets": [
+    {
+      "id": 1,
+      "user_name": "Kasun Jayasekara",
+      "user_email": "kasun@example.com",
+      "message": "I need help understanding why my valuation changed after editing mileage.",
+      "status": "open",
+      "created_at": "2026-04-20T10:15:00Z"
+    },
+    {
+      "id": 2,
+      "user_name": "Dilani Perera",
+      "user_email": "dilani@example.com",
+      "message": "Please check my account verification. I submitted documents yesterday.",
+      "status": "read",
+      "created_at": "2026-04-19T08:30:00Z"
+    }
+  ],
+  "marketplace_listings": [
+    {
+      "id": "mock-1",
+      "brand": "Toyota",
+      "model": "Corolla Cross",
+      "seller_name": "Kavindu Perera",
+      "phone_number": "0771234567",
+      "vehicle_location": "Kandy",
+      "vehicle_description": "Single-owner vehicle with full service history and a clean interior.",
+      "year": 2022,
+      "mileage": 18000,
+      "fuel_type": "Hybrid",
+      "transmission": "Automatic",
+      "condition": "Used",
+      "price": 11250000,
+      "status": "pending",
+      "image_url": "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/97487278-4862-4789-867e-302c93691a91/ba45f37a86c74ec4a84dec300a9d8bb6.jpg",
+      "image_urls": [
+        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/97487278-4862-4789-867e-302c93691a91/ba45f37a86c74ec4a84dec300a9d8bb6.jpg"
+      ],
+      "is_urgent": false,
+      "is_spotlight": false,
+      "is_bumped": false,
+      "created_at": "2026-03-31T08:00:00Z",
+      "user_id": "user_104"
+    },
+    {
+      "id": "mock-2",
+      "brand": "Honda",
+      "model": "Vezel",
+      "seller_name": "Dinesh Fernando",
+      "phone_number": "0719988776",
+      "vehicle_location": "Nugegoda",
+      "vehicle_description": "Fresh import with original paint, reverse camera, and low mileage.",
+      "year": 2021,
+      "mileage": 32000,
+      "fuel_type": "Hybrid",
+      "transmission": "Automatic",
+      "condition": "Reconditioned",
+      "price": 12900000,
+      "status": "approved",
+      "image_url": "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/31183d3d-53e6-4ad1-b8e6-b8cb4db1226e/ab18dfc25f0b4516894276c3aa6919cf.jpg",
+      "image_urls": [
+        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/31183d3d-53e6-4ad1-b8e6-b8cb4db1226e/ab18dfc25f0b4516894276c3aa6919cf.jpg"
+      ],
+      "is_urgent": false,
+      "is_spotlight": true,
+      "is_bumped": false,
+      "created_at": "2026-03-29T10:30:00Z",
+      "user_id": "user_087"
+    }
+  ],
+  "payments": [
+    {
+      "id": "pi_mock_01",
+      "payer_name": "Nadeesha Perera",
+      "login_name": "nadeesha_p",
+      "ad_title": "Toyota Aqua 2018",
+      "boost_option": "Spotlight",
+      "amount": 4500,
+      "currency": "LKR",
+      "payment_status": "confirmed",
+      "stripe_status": "succeeded",
+      "payment_method": "Visa ending 4242",
+      "confirmed_at": "2026-04-12T08:20:00Z",
+      "ad_reference": "AD-24018",
+      "notes": "Ad boost activated after Stripe confirmation."
+    }
+  ]
+}

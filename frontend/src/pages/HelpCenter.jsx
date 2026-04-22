@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { supabase } from "../utils/supabaseClient";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
 const HelpCenter = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [openFaq, setOpenFaq] = useState(null);
@@ -145,7 +147,7 @@ const HelpCenter = () => {
 
     try {
       try {
-        const response = await fetch("http://localhost:5000/api/support-ticket", {
+        const response = await fetch(`${API_BASE_URL}/api/support-ticket`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

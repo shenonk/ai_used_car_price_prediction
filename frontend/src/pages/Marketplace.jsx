@@ -21,7 +21,7 @@ import bumpedSticker from "../assets/marketplace-stickers/bumped.png";
 import spotlightSticker from "../assets/marketplace-stickers/spotlight.png";
 import urgentSticker from "../assets/marketplace-stickers/urgent.png";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const STRIPE_PUBLISHABLE_KEY =
   import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ||
   globalThis.process?.env?.REACT_APP_STRIPE_PUBLISHABLE_KEY ||
@@ -65,6 +65,25 @@ const formatCurrency = (value, locale) =>
   }).format(Number(value || 0));
 
 const formatNumber = (value, locale) => Number(value || 0).toLocaleString(locale);
+
+const normalizeImageCollection = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === "string" && item.trim());
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => typeof item === "string" && item.trim());
+      }
+    } catch {
+      return [value];
+    }
+  }
+
+  return [];
+};
 
 const getBoostSticker = (listing) => {
   if (listing?.is_urgent) {
@@ -306,14 +325,59 @@ function Marketplace() {
     try {
       setLoadError("");
 
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/marketplace/listings`);
-        const result = await parseApiResponse(response, t("marketplace.errors.load_failed"));
-        setCars(result.listings || []);
-      } catch {
-        const listings = await fetchApprovedListingsFromSupabase();
-        setCars(listings);
+      const [supabaseResult, backendResult] = await Promise.allSettled([
+        fetchApprovedListingsFromSupabase(),
+        fetch(`${API_BASE_URL}/api/marketplace/listings`)
+          .then((response) => parseApiResponse(response, t("marketplace.errors.load_failed")))
+          .then((result) => result.listings || []),
+      ]);
+
+      const supabaseListings =
+        supabaseResult.status === "fulfilled" ? supabaseResult.value : [];
+      const backendApprovedListings =
+        backendResult.status === "fulfilled"
+          ? backendResult.value.filter((listing) => listing.status === "approved")
+          : [];
+
+      const mergedListings = [...supabaseListings];
+      const seenKeys = new Set(
+        supabaseListings.map((listing) =>
+          [
+            listing.brand,
+            listing.model,
+            listing.year,
+            listing.price,
+            listing.seller_name,
+            listing.phone_number,
+          ]
+            .map((value) => String(value || "").trim().toLowerCase())
+            .join("|")
+        )
+      );
+
+      backendApprovedListings.forEach((listing) => {
+        const key = [
+          listing.brand,
+          listing.model,
+          listing.year,
+          listing.price,
+          listing.seller_name,
+          listing.phone_number,
+        ]
+          .map((value) => String(value || "").trim().toLowerCase())
+          .join("|");
+
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          mergedListings.push(listing);
+        }
+      });
+
+      if (mergedListings.length === 0) {
+        throw new Error(t("marketplace.errors.load_failed"));
       }
+
+      setCars(mergedListings);
     } catch (error) {
       setLoadError(error.message || t("marketplace.errors.load_failed"));
     }
@@ -502,9 +566,9 @@ function Marketplace() {
 
 
   const getListingImages = (car) => {
-    const images = Array.isArray(car?.image_urls) ? car.image_urls.filter(Boolean) : [];
+    const images = normalizeImageCollection(car?.image_urls);
     if (images.length > 0) return images;
-    return car?.image_url ? [car.image_url] : [];
+    return normalizeImageCollection(car?.image_url);
   };
 
   const selectedCarImages = useMemo(() => getListingImages(selectedCar), [selectedCar]);

@@ -121,17 +121,27 @@ const parseApiResponse = async (response, fallbackMessage) => {
 };
 
 const fetchApprovedListingsFromSupabase = async () => {
-  const { data, error } = await supabase
+  const marketplaceResult = await supabase
+    .from("marketplace_listings")
+    .select("*")
+    .eq("status", "approved")
+    .order("created_at", { ascending: false });
+
+  if (!marketplaceResult.error) {
+    return marketplaceResult.data || [];
+  }
+
+  const legacyResult = await supabase
     .from("listings")
     .select("*")
     .eq("status", "approved")
     .order("created_at", { ascending: false });
 
-  if (error) {
-    throw new Error(error.message || "Failed to load marketplace listings.");
+  if (legacyResult.error) {
+    throw new Error(legacyResult.error.message || marketplaceResult.error.message || "Failed to load marketplace listings.");
   }
 
-  return data || [];
+  return legacyResult.data || [];
 };
 
 export const handlePayment = async (boostType, listingId) => {

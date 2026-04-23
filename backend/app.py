@@ -281,6 +281,10 @@ def admin_error(message: str, status_code: int = 400) -> HTTPException:
     return HTTPException(status_code=status_code, detail={"error": message})
 
 
+def log_warning(message: str) -> None:
+    print(f"[WARN] {message}", flush=True)
+
+
 def get_admin_credentials() -> tuple[str, str]:
     return (
         os.getenv("ADMIN_EMAIL", "admin@example.com"),
@@ -445,6 +449,25 @@ def make_supabase_rest_request(
     return json.loads(raw)
 
 
+def merge_records_by_id(*collections: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for collection in collections:
+        for item in collection or []:
+            item_id = str(item.get("id") or "").strip()
+            if not item_id:
+                continue
+            if item_id in merged:
+                merged[item_id].update(item)
+            else:
+                merged[item_id] = dict(item)
+
+    return sorted(
+        merged.values(),
+        key=lambda item: item.get("confirmed_at") or item.get("created_at") or "",
+        reverse=True,
+    )
+
+
 def sync_marketplace_listing_to_supabase(listing: dict[str, Any]) -> None:
     try:
         make_supabase_rest_request(
@@ -456,8 +479,8 @@ def sync_marketplace_listing_to_supabase(listing: dict[str, Any]) -> None:
                 "Prefer": "resolution=merge-duplicates",
             },
         )
-    except Exception:
-        pass
+    except Exception as error:
+        log_warning(f"Failed to sync marketplace listing {listing.get('id')} to Supabase: {error}")
 
 
 def delete_marketplace_listing_from_supabase(listing_id: str) -> None:
@@ -467,8 +490,8 @@ def delete_marketplace_listing_from_supabase(listing_id: str) -> None:
             method="DELETE",
             headers={"Prefer": "return=minimal"},
         )
-    except Exception:
-        pass
+    except Exception as error:
+        log_warning(f"Failed to delete marketplace listing {listing_id} from Supabase: {error}")
 
 
 def fetch_marketplace_listings_from_supabase(status: str = "all") -> list[dict[str, Any]]:
@@ -477,6 +500,14 @@ def fetch_marketplace_listings_from_supabase(status: str = "all") -> list[dict[s
         query += f"&status=eq.{quote(status)}"
     query += "&order=created_at.desc"
     rows = make_supabase_rest_request(query, method="GET")
+    return rows if isinstance(rows, list) else []
+
+
+def fetch_marketplace_listings_for_user_from_supabase(user_id: str) -> list[dict[str, Any]]:
+    rows = make_supabase_rest_request(
+        f"/rest/v1/marketplace_listings?select=*&user_id=eq.{quote(user_id)}&order=created_at.desc",
+        method="GET",
+    )
     return rows if isinstance(rows, list) else []
 
 
@@ -491,8 +522,8 @@ def sync_marketplace_payment_to_supabase(payment: dict[str, Any]) -> None:
                 "Prefer": "resolution=merge-duplicates",
             },
         )
-    except Exception:
-        pass
+    except Exception as error:
+        log_warning(f"Failed to sync marketplace payment {payment.get('id')} to Supabase: {error}")
 
 
 def fetch_marketplace_payments_from_supabase() -> list[dict[str, Any]]:
@@ -501,6 +532,34 @@ def fetch_marketplace_payments_from_supabase() -> list[dict[str, Any]]:
         method="GET",
     )
     return rows if isinstance(rows, list) else []
+
+
+def hydrate_admin_store_from_supabase() -> None:
+    try:
+        supabase_listings = fetch_marketplace_listings_from_supabase("all")
+    except Exception as error:
+        log_warning(f"Unable to load marketplace listings from Supabase during startup: {error}")
+        supabase_listings = []
+
+    try:
+        supabase_payments = fetch_marketplace_payments_from_supabase()
+    except Exception as error:
+        log_warning(f"Unable to load marketplace payments from Supabase during startup: {error}")
+        supabase_payments = []
+
+    if not supabase_listings and not supabase_payments:
+        return
+
+    with price_model_state.admin_lock:
+        price_model_state.admin_store["marketplace_listings"] = merge_records_by_id(
+            price_model_state.admin_store.get("marketplace_listings", []),
+            supabase_listings,
+        )
+        price_model_state.admin_store["payments"] = merge_records_by_id(
+            price_model_state.admin_store.get("payments", []),
+            supabase_payments,
+        )
+        persist_admin_store()
 
 
 def get_marketplace_listing_by_id(listing_id: str) -> dict[str, Any] | None:
@@ -737,6 +796,7 @@ async def lifespan(_app: FastAPI):
         load_price_model()
         load_reference_dataset()
         load_admin_store()
+        hydrate_admin_store_from_supabase()
         print(f"[OK] Loaded price model from {MODEL_PATH}", flush=True)
         print(f"[OK] Feature columns: {price_model_state.feature_columns}", flush=True)
         print(f"[OK] Target column: {price_model_state.target_column}", flush=True)
@@ -829,11 +889,14 @@ def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]
 
 @app.get("/api/marketplace/listings")
 def get_public_marketplace_listings() -> dict[str, Any]:
-    listings = sorted(
-        price_model_state.admin_store["marketplace_listings"],
-        key=lambda item: item.get("created_at", ""),
-        reverse=True,
-    )
+    local_listings = price_model_state.admin_store["marketplace_listings"]
+    try:
+        supabase_listings = fetch_marketplace_listings_from_supabase("all")
+    except Exception as error:
+        log_warning(f"Unable to load public marketplace listings from Supabase: {error}")
+        supabase_listings = []
+
+    listings = merge_records_by_id(local_listings, supabase_listings)
     return {"listings": listings}
 
 
@@ -899,12 +962,22 @@ async def create_marketplace_listing(
 
 @app.get("/api/marketplace/my-listings")
 def get_my_marketplace_listings(requester: dict[str, Any] = Depends(get_requester_identity)) -> dict[str, Any]:
-    listings = [
+    local_listings = [
         item
         for item in price_model_state.admin_store["marketplace_listings"]
         if requester["is_authenticated"] and item.get("user_id") == requester["user_id"]
     ]
-    listings.sort(key=lambda item: item.get("created_at", ""), reverse=True)
+
+    if requester["is_authenticated"]:
+        try:
+            supabase_listings = fetch_marketplace_listings_for_user_from_supabase(requester["user_id"])
+        except Exception as error:
+            log_warning(f"Unable to load user marketplace listings from Supabase: {error}")
+            supabase_listings = []
+    else:
+        supabase_listings = []
+
+    listings = merge_records_by_id(local_listings, supabase_listings)
     return {"listings": listings}
 
 
@@ -1156,16 +1229,17 @@ def get_marketplace_listings(
     status: str = Query(default="all"),
     _token: str = Depends(require_admin),
 ) -> dict[str, Any]:
-    try:
-        listings = fetch_marketplace_listings_from_supabase(status)
-        if listings:
-            return {"listings": listings}
-    except Exception:
-        pass
-
-    listings = price_model_state.admin_store["marketplace_listings"]
+    local_listings = price_model_state.admin_store["marketplace_listings"]
     if status != "all":
-        listings = [item for item in listings if item.get("status") == status]
+        local_listings = [item for item in local_listings if item.get("status") == status]
+
+    try:
+        supabase_listings = fetch_marketplace_listings_from_supabase(status)
+    except Exception as error:
+        log_warning(f"Unable to load admin marketplace listings from Supabase: {error}")
+        supabase_listings = []
+
+    listings = merge_records_by_id(local_listings, supabase_listings)
     return {"listings": listings}
 
 
@@ -1205,18 +1279,14 @@ def delete_marketplace_listing(listing_id: str, _token: str = Depends(require_ad
 
 @app.get("/api/admin/payments")
 def get_payments(_token: str = Depends(require_admin)) -> dict[str, Any]:
+    local_payments = price_model_state.admin_store["payments"]
     try:
-        payments = fetch_marketplace_payments_from_supabase()
-        if payments:
-            return {"payments": payments}
-    except Exception:
-        pass
+        supabase_payments = fetch_marketplace_payments_from_supabase()
+    except Exception as error:
+        log_warning(f"Unable to load admin payments from Supabase: {error}")
+        supabase_payments = []
 
-    payments = sorted(
-        price_model_state.admin_store["payments"],
-        key=lambda item: item.get("confirmed_at") or item.get("created_at") or "",
-        reverse=True,
-    )
+    payments = merge_records_by_id(local_payments, supabase_payments)
     return {"payments": payments}
 
 

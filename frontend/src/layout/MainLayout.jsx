@@ -137,7 +137,7 @@ const MainLayout = () => {
               <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
             </div>
             <div>
-              <h1 className="theme-text-primary text-lg font-bold tracking-tight">AutoValueLK</h1>
+              <h1 className="heading-display theme-text-primary text-lg font-bold tracking-tight">AutoValueLK</h1>
               <p className="theme-text-muted text-xs uppercase tracking-[0.24em]">Sri Lankan Market</p>
             </div>
           </div>

@@ -20,6 +20,8 @@ const fallbackPayments = [
     id: 'pi_mock_01',
     payer_name: 'Nadeesha Perera',
     login_name: 'nadeesha_p',
+    phone_number: '0771234567',
+    account_email: 'nadeesha@example.com',
     ad_title: 'Toyota Aqua 2018',
     boost_option: 'Spotlight',
     amount: 4500,
@@ -35,6 +37,8 @@ const fallbackPayments = [
     id: 'pi_mock_02',
     payer_name: 'Tharindu Silva',
     login_name: 'tharindu_s',
+    phone_number: '0714455667',
+    account_email: 'tharindu@example.com',
     ad_title: 'Honda Vezel Hybrid 2020',
     boost_option: 'Urgent',
     amount: 3000,
@@ -50,6 +54,8 @@ const fallbackPayments = [
     id: 'pi_mock_03',
     payer_name: 'Kavishka Fernando',
     login_name: 'kavishka_f',
+    phone_number: '0757788990',
+    account_email: 'kavishka@example.com',
     ad_title: 'BMW 320d 2019',
     boost_option: 'Bump Up',
     amount: 2000,
@@ -140,6 +146,8 @@ function Payments() {
         payment.login_name,
         payment.ad_title,
         payment.boost_option,
+        payment.phone_number,
+        payment.account_email,
         payment.ad_reference,
         payment.payment_status,
         payment.stripe_status,
@@ -198,11 +206,11 @@ function Payments() {
               Stripe payment monitor
             </div>
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-              Confirmed boost payments will appear here for admin review
+              Track paid marketplace boosts with the seller account details attached
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-              This page is prepared for the Stripe integration so admins can quickly see the login
-              name, ad, selected boost option, and amount after user payment confirmation.
+              Every confirmed Stripe payment can now surface the seller username, phone number,
+              logged-in account email, selected boost option, and linked ad in one place.
             </p>
           </div>
 
@@ -229,7 +237,7 @@ function Payments() {
               <div>
                 <h2 className="text-xl font-semibold text-white">Payment activity</h2>
                 <p className="mt-1 text-sm text-slate-400">
-                  Review confirmed and pending boost payments before we connect live Stripe events.
+                  Review confirmed and pending boost payments with the linked seller account details.
                 </p>
               </div>
 
@@ -326,7 +334,9 @@ function PaymentDetail({ payment }) {
 
       <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
         <DetailCard label="Login Name" value={payment.login_name ? `@${payment.login_name}` : '-'} />
+        <DetailCard label="Phone Number" value={payment.phone_number || '-'} />
         <DetailCard label="Customer Name" value={payment.payer_name || '-'} />
+        <DetailCard label="Logged-in Account" value={payment.account_email || '-'} />
         <DetailCard label="Ad Reference" value={payment.ad_reference || '-'} />
         <DetailCard label="Amount" value={formatCurrency(payment.amount, payment.currency)} />
         <DetailCard label="Stripe Status" value={payment.stripe_status || '-'} />

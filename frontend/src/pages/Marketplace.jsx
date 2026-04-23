@@ -136,15 +136,23 @@ const fetchApprovedListingsFromSupabase = async () => {
 
 export const handlePayment = async (boostType, listingId) => {
   const stripe = await stripePromise;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!stripe) {
     throw new Error("Stripe is not configured on the frontend.");
+  }
+
+  if (!session?.access_token) {
+    throw new Error("Please log in before paying for a boosted marketplace ad.");
   }
 
   const response = await fetch(`${API_BASE_URL}/api/create-checkout-session`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify(
       Array.isArray(boostType)
@@ -538,6 +546,14 @@ function Marketplace() {
       setSubmitState({ saving: true, error: "", success: "" });
 
       try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session?.access_token) {
+          throw new Error("Please log in before adding a paid boost to your marketplace ad.");
+        }
+
         const result = await createListing({
           is_urgent: false,
           is_spotlight: false,
@@ -629,10 +645,18 @@ function Marketplace() {
 
     const syncStripePayment = async () => {
       try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         const response = await fetch(`${API_BASE_URL}/api/verify-payment`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            ...(session?.access_token
+              ? {
+                  Authorization: `Bearer ${session.access_token}`,
+                }
+              : {}),
           },
           body: JSON.stringify({ session_id: sessionId }),
         });

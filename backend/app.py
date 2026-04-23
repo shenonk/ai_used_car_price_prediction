@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import json
@@ -8,8 +9,8 @@ from pathlib import Path
 import secrets
 from threading import Lock
 from typing import Any
-from urllib.parse import quote
-from urllib.request import Request, urlopen
+from urllib.parse import quote, urlencode
+from urllib.request import Request as UrlRequest, urlopen
 from uuid import uuid4
 
 import joblib
@@ -92,6 +93,16 @@ class MarketplaceStatusPayload(BaseModel):
     status: str = Field(..., pattern="^(pending|approved|rejected|sold)$")
 
 
+class StripeCheckoutPayload(BaseModel):
+    listing_id: str = Field(..., min_length=1)
+    boost_type: str | None = None
+    boost_types: list[str] | None = None
+
+
+class StripeVerifyPayload(BaseModel):
+    session_id: str = Field(..., min_length=1)
+
+
 def normalize_input(data: dict[str, Any]) -> dict[str, Any]:
     return {
         **data,
@@ -107,6 +118,13 @@ def normalize_reference_text(value: object) -> str:
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+BOOST_PRICING = {
+    "urgent": {"label": "Urgent", "amount": 500},
+    "spotlight": {"label": "Spotlight", "amount": 750},
+    "bump": {"label": "Bump Up", "amount": 300},
+}
 
 
 def get_default_admin_store() -> dict[str, Any]:
@@ -214,6 +232,8 @@ def get_default_admin_store() -> dict[str, Any]:
                 "id": "pi_mock_01",
                 "payer_name": "Nadeesha Perera",
                 "login_name": "nadeesha_p",
+                "phone_number": "0771234567",
+                "account_email": "nadeesha@example.com",
                 "ad_title": "Toyota Aqua 2018",
                 "boost_option": "Spotlight",
                 "amount": 4500,
@@ -296,6 +316,353 @@ def get_requester_token(authorization: str | None = Header(default=None)) -> str
     return authorization.removeprefix("Bearer ").strip() or "anonymous"
 
 
+def get_supabase_base_url() -> str:
+    return os.getenv("SUPABASE_URL", "").rstrip("/")
+
+
+def get_supabase_api_key() -> str:
+    return os.getenv("SUPABASE_KEY", "") or os.getenv("VITE_SUPABASE_ANON_KEY", "")
+
+
+def decode_jwt_payload(token: str) -> dict[str, Any]:
+    parts = token.split(".")
+    if len(parts) < 2:
+        return {}
+
+    payload = parts[1]
+    padding = "=" * (-len(payload) % 4)
+    try:
+        decoded = base64.urlsafe_b64decode(f"{payload}{padding}".encode("utf-8"))
+        data = json.loads(decoded.decode("utf-8"))
+    except Exception:
+        return {}
+
+    return data if isinstance(data, dict) else {}
+
+
+def fetch_supabase_user(access_token: str) -> dict[str, Any]:
+    supabase_url = get_supabase_base_url()
+    supabase_key = get_supabase_api_key()
+    if not supabase_url or not supabase_key or not access_token:
+        return {}
+
+    request = UrlRequest(
+        f"{supabase_url}/auth/v1/user",
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "apikey": supabase_key,
+        },
+    )
+
+    try:
+        with urlopen(request) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return {}
+
+    return payload if isinstance(payload, dict) else {}
+
+
+def resolve_requester_identity(authorization: str | None = None) -> dict[str, Any]:
+    requester_token = get_requester_token(authorization)
+    if requester_token == "anonymous":
+        return {
+            "access_token": "anonymous",
+            "is_authenticated": False,
+            "user_id": "anonymous",
+            "email": "",
+            "username": "",
+            "display_name": "",
+        }
+
+    user_payload = fetch_supabase_user(requester_token)
+    token_payload = decode_jwt_payload(requester_token)
+    metadata = user_payload.get("user_metadata") or token_payload.get("user_metadata") or {}
+    identities = user_payload.get("identities") or token_payload.get("identities") or []
+    email = str(user_payload.get("email") or token_payload.get("email") or "").strip()
+    username = str(
+        metadata.get("username")
+        or metadata.get("user_name")
+        or token_payload.get("preferred_username")
+        or ""
+    ).strip()
+    full_name = str(
+        metadata.get("full_name")
+        or metadata.get("name")
+        or user_payload.get("full_name")
+        or ""
+    ).strip()
+    provider = ""
+    if identities and isinstance(identities, list):
+        provider = str((identities[0] or {}).get("provider") or "").strip()
+    display_name = full_name or username or (email.split("@")[0] if email else "")
+
+    return {
+        "access_token": requester_token,
+        "is_authenticated": True,
+        "user_id": str(user_payload.get("id") or token_payload.get("sub") or requester_token).strip(),
+        "email": email,
+        "username": username,
+        "display_name": display_name,
+        "provider": provider,
+    }
+
+
+def get_requester_identity(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    return resolve_requester_identity(authorization)
+
+
+def make_supabase_rest_request(
+    path: str,
+    *,
+    method: str = "GET",
+    data: bytes | None = None,
+    headers: dict[str, str] | None = None,
+) -> Any:
+    supabase_url = get_supabase_base_url()
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("Supabase database sync is not configured.")
+
+    request = UrlRequest(
+        f"{supabase_url}{path}",
+        method=method,
+        data=data,
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            **(headers or {}),
+        },
+    )
+
+    with urlopen(request) as response:
+        raw = response.read().decode("utf-8")
+
+    if not raw:
+        return None
+
+    return json.loads(raw)
+
+
+def sync_marketplace_listing_to_supabase(listing: dict[str, Any]) -> None:
+    try:
+        make_supabase_rest_request(
+            "/rest/v1/marketplace_listings?on_conflict=id",
+            method="POST",
+            data=json.dumps(listing).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates",
+            },
+        )
+    except Exception:
+        pass
+
+
+def delete_marketplace_listing_from_supabase(listing_id: str) -> None:
+    try:
+        make_supabase_rest_request(
+            f"/rest/v1/marketplace_listings?id=eq.{quote(listing_id)}",
+            method="DELETE",
+            headers={"Prefer": "return=minimal"},
+        )
+    except Exception:
+        pass
+
+
+def fetch_marketplace_listings_from_supabase(status: str = "all") -> list[dict[str, Any]]:
+    query = "/rest/v1/marketplace_listings?select=*"
+    if status != "all":
+        query += f"&status=eq.{quote(status)}"
+    query += "&order=created_at.desc"
+    rows = make_supabase_rest_request(query, method="GET")
+    return rows if isinstance(rows, list) else []
+
+
+def sync_marketplace_payment_to_supabase(payment: dict[str, Any]) -> None:
+    try:
+        make_supabase_rest_request(
+            "/rest/v1/marketplace_payments?on_conflict=id",
+            method="POST",
+            data=json.dumps(payment).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates",
+            },
+        )
+    except Exception:
+        pass
+
+
+def fetch_marketplace_payments_from_supabase() -> list[dict[str, Any]]:
+    rows = make_supabase_rest_request(
+        "/rest/v1/marketplace_payments?select=*&order=confirmed_at.desc.nullslast,created_at.desc",
+        method="GET",
+    )
+    return rows if isinstance(rows, list) else []
+
+
+def get_marketplace_listing_by_id(listing_id: str) -> dict[str, Any] | None:
+    return next(
+        (item for item in price_model_state.admin_store["marketplace_listings"] if str(item.get("id")) == listing_id),
+        None,
+    )
+
+
+def normalize_selected_boosts(boost_type: str | None = None, boost_types: list[str] | None = None) -> list[str]:
+    raw_values = boost_types or ([boost_type] if boost_type else [])
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    alias_map = {
+        "urgent": "urgent",
+        "spotlight": "spotlight",
+        "bump": "bump",
+        "bumped": "bump",
+        "bump up": "bump",
+    }
+
+    for value in raw_values:
+        key = alias_map.get(str(value or "").strip().lower())
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        normalized.append(key)
+
+    return normalized
+
+
+def format_boost_option_label(boost_keys: list[str]) -> str:
+    labels = [BOOST_PRICING[key]["label"] for key in boost_keys if key in BOOST_PRICING]
+    return ", ".join(labels)
+
+
+def calculate_boost_total(boost_keys: list[str]) -> int:
+    return sum(int(BOOST_PRICING[key]["amount"]) for key in boost_keys if key in BOOST_PRICING)
+
+
+def get_stripe_secret_key() -> str:
+    return os.getenv("STRIPE_SECRET_KEY", "").strip()
+
+
+def stripe_request(path: str, *, method: str = "GET", params: dict[str, Any] | None = None) -> dict[str, Any]:
+    secret_key = get_stripe_secret_key()
+    if not secret_key:
+        raise admin_error("Stripe is not configured on the backend.", status_code=500)
+
+    encoded_data = None
+    headers = {"Authorization": f"Bearer {secret_key}"}
+    if method != "GET":
+        encoded_data = urlencode(params or {}, doseq=True).encode("utf-8")
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+    request = UrlRequest(
+        f"https://api.stripe.com{path}",
+        method=method,
+        data=encoded_data,
+        headers=headers,
+    )
+
+    try:
+        with urlopen(request) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as error:
+        raise admin_error(f"Stripe request failed: {error}", status_code=502) from error
+
+    return payload if isinstance(payload, dict) else {}
+
+
+def resolve_marketplace_success_url() -> str:
+    explicit = os.getenv("STRIPE_SUCCESS_URL", "").strip()
+    if explicit:
+        return explicit
+
+    frontend_origin = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    return f"{frontend_origin}/marketplace?payment=success&session_id={{CHECKOUT_SESSION_ID}}"
+
+
+def resolve_marketplace_cancel_url() -> str:
+    explicit = os.getenv("STRIPE_CANCEL_URL", "").strip()
+    if explicit:
+        return explicit
+
+    frontend_origin = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    return f"{frontend_origin}/marketplace?payment=cancelled"
+
+
+def build_payment_method_summary(payment_intent: dict[str, Any]) -> str:
+    latest_charge = payment_intent.get("latest_charge")
+    if not isinstance(latest_charge, dict):
+        return "Stripe card payment"
+
+    payment_method_details = latest_charge.get("payment_method_details") or {}
+    card = payment_method_details.get("card") or {}
+    brand = str(card.get("brand") or "Card").strip().title()
+    last4 = str(card.get("last4") or "").strip()
+    if last4:
+        return f"{brand} ending {last4}"
+    return brand
+
+
+def build_payment_record(
+    *,
+    listing: dict[str, Any],
+    boost_keys: list[str],
+    checkout_session: dict[str, Any],
+    payment_intent: dict[str, Any],
+) -> dict[str, Any]:
+    payment_intent_id = str(payment_intent.get("id") or checkout_session.get("payment_intent") or checkout_session.get("id"))
+    amount_total = checkout_session.get("amount_total")
+    if amount_total is None:
+        amount_total = calculate_boost_total(boost_keys) * 100
+
+    return {
+        "id": payment_intent_id,
+        "checkout_session_id": str(checkout_session.get("id") or "").strip(),
+        "listing_id": str(listing.get("id") or "").strip(),
+        "user_id": str(listing.get("user_id") or "").strip(),
+        "payer_name": str(listing.get("seller_name") or "").strip(),
+        "login_name": str(listing.get("username") or "").strip(),
+        "phone_number": str(listing.get("phone_number") or "").strip(),
+        "account_email": str(listing.get("account_email") or "").strip(),
+        "ad_title": " ".join(
+            [
+                str(listing.get("brand") or "").strip(),
+                str(listing.get("model") or "").strip(),
+                str(listing.get("year") or "").strip(),
+            ]
+        ).strip(),
+        "boost_option": format_boost_option_label(boost_keys),
+        "boost_types": boost_keys,
+        "amount": round(float(amount_total) / 100, 2),
+        "currency": str(checkout_session.get("currency") or "LKR").upper(),
+        "payment_status": "confirmed" if checkout_session.get("payment_status") == "paid" else "pending",
+        "stripe_status": str(payment_intent.get("status") or checkout_session.get("payment_status") or "").strip(),
+        "payment_method": build_payment_method_summary(payment_intent),
+        "confirmed_at": utc_now_iso() if checkout_session.get("payment_status") == "paid" else None,
+        "ad_reference": str(listing.get("id") or "").strip(),
+        "notes": "Ad boost activated after Stripe confirmation.",
+        "created_at": utc_now_iso(),
+    }
+
+
+def upsert_payment_record(payment_record: dict[str, Any]) -> dict[str, Any]:
+    with price_model_state.admin_lock:
+        payments = price_model_state.admin_store["payments"]
+        existing = next((item for item in payments if str(item.get("id")) == str(payment_record.get("id"))), None)
+        if existing is None:
+            payments.append(payment_record)
+            saved_record = payment_record
+        else:
+            existing.update(payment_record)
+            saved_record = existing
+        persist_admin_store()
+
+    sync_marketplace_payment_to_supabase(saved_record)
+    return saved_record
+
+
 def upload_marketplace_images(listing_id: str, images: list[UploadFile]) -> list[str]:
     supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
     supabase_key = os.getenv("SUPABASE_KEY", "")
@@ -309,7 +676,7 @@ def upload_marketplace_images(listing_id: str, images: list[UploadFile]) -> list
         object_path = f"listings/{listing_id}/{uuid4().hex}{suffix}"
         upload_url = f"{supabase_url}/storage/v1/object/car_images/{quote(object_path, safe='/')}"
         content = image.file.read()
-        request = Request(
+        request = UrlRequest(
             upload_url,
             data=content,
             method="POST",
@@ -394,6 +761,7 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5174",
     ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -487,7 +855,7 @@ async def create_marketplace_listing(
     is_spotlight: str = Form(default="false"),
     is_bumped: str = Form(default="false"),
     images: list[UploadFile] | None = File(default=None),
-    requester_token: str = Depends(get_requester_token),
+    requester: dict[str, Any] = Depends(get_requester_identity),
 ) -> dict[str, Any]:
     valid_images = [file for file in (images or []) if getattr(file, "filename", "")]
     listing_id = f"listing-{uuid4().hex}"
@@ -517,23 +885,127 @@ async def create_marketplace_listing(
             "is_spotlight": parse_boolean_flag(is_spotlight),
             "is_bumped": parse_boolean_flag(is_bumped),
             "created_at": utc_now_iso(),
-            "user_id": requester_token if requester_token != "anonymous" else "anonymous",
+            "user_id": requester["user_id"],
+            "account_email": requester["email"],
+            "username": requester["username"],
+            "logged_in_account": requester["email"] or requester["username"] or "anonymous",
         }
         listings.append(listing)
         persist_admin_store()
 
+    sync_marketplace_listing_to_supabase(listing)
     return {"message": "Marketplace listing created successfully.", "listing": listing}
 
 
 @app.get("/api/marketplace/my-listings")
-def get_my_marketplace_listings(requester_token: str = Depends(get_requester_token)) -> dict[str, Any]:
+def get_my_marketplace_listings(requester: dict[str, Any] = Depends(get_requester_identity)) -> dict[str, Any]:
     listings = [
         item
         for item in price_model_state.admin_store["marketplace_listings"]
-        if requester_token != "anonymous" and item.get("user_id") == requester_token
+        if requester["is_authenticated"] and item.get("user_id") == requester["user_id"]
     ]
     listings.sort(key=lambda item: item.get("created_at", ""), reverse=True)
     return {"listings": listings}
+
+
+@app.post("/api/create-checkout-session")
+def create_checkout_session(
+    payload: StripeCheckoutPayload,
+    requester: dict[str, Any] = Depends(get_requester_identity),
+) -> dict[str, Any]:
+    boost_keys = normalize_selected_boosts(payload.boost_type, payload.boost_types)
+    if not boost_keys:
+        raise admin_error("Please select at least one boost option.", status_code=422)
+
+    listing = get_marketplace_listing_by_id(payload.listing_id)
+    if listing is None:
+        raise admin_error("Marketplace listing not found for payment.", status_code=404)
+
+    if not requester["is_authenticated"]:
+        raise admin_error("Please sign in before paying for a boosted marketplace ad.", status_code=401)
+
+    if listing.get("user_id") != requester["user_id"]:
+        raise admin_error("You can only pay for your own marketplace listing.", status_code=403)
+
+    total_amount = calculate_boost_total(boost_keys)
+    product_name = f"Marketplace boost: {format_boost_option_label(boost_keys)}"
+    stripe_payload = {
+        "mode": "payment",
+        "success_url": resolve_marketplace_success_url(),
+        "cancel_url": resolve_marketplace_cancel_url(),
+        "payment_method_types[]": "card",
+        "line_items[0][quantity]": 1,
+        "line_items[0][price_data][currency]": "lkr",
+        "line_items[0][price_data][product_data][name]": product_name,
+        "line_items[0][price_data][unit_amount]": total_amount * 100,
+        "metadata[listing_id]": str(listing.get("id") or "").strip(),
+        "metadata[user_id]": str(listing.get("user_id") or "").strip(),
+        "metadata[boost_types]": ",".join(boost_keys),
+    }
+    if listing.get("account_email"):
+        stripe_payload["customer_email"] = str(listing["account_email"])
+
+    session = stripe_request("/v1/checkout/sessions", method="POST", params=stripe_payload)
+    session_id = str(session.get("id") or "").strip()
+    if not session_id:
+        raise admin_error("Stripe did not return a checkout session id.", status_code=502)
+
+    return {"sessionId": session_id}
+
+
+@app.post("/api/verify-payment")
+def verify_payment(
+    payload: StripeVerifyPayload,
+    requester: dict[str, Any] = Depends(get_requester_identity),
+) -> dict[str, Any]:
+    checkout_session = stripe_request(
+        f"/v1/checkout/sessions/{quote(payload.session_id)}",
+        method="GET",
+    )
+    listing_id = str((checkout_session.get("metadata") or {}).get("listing_id") or "").strip()
+    boost_keys = normalize_selected_boosts(boost_types=str((checkout_session.get("metadata") or {}).get("boost_types") or "").split(","))
+    listing = get_marketplace_listing_by_id(listing_id)
+
+    if listing is None:
+        raise admin_error("Listing linked to this Stripe session was not found.", status_code=404)
+
+    if not requester["is_authenticated"]:
+        raise admin_error("Please sign in before confirming a boosted payment.", status_code=401)
+
+    if listing.get("user_id") != requester["user_id"]:
+        raise admin_error("You can only confirm payments for your own marketplace listing.", status_code=403)
+
+    if checkout_session.get("payment_status") != "paid":
+        raise admin_error("Stripe payment is not confirmed yet.", status_code=409)
+
+    payment_intent_id = str(checkout_session.get("payment_intent") or "").strip()
+    payment_intent = {}
+    if payment_intent_id:
+        payment_intent = stripe_request(
+            f"/v1/payment_intents/{quote(payment_intent_id)}?expand[]=latest_charge",
+            method="GET",
+        )
+
+    with price_model_state.admin_lock:
+        listing["is_urgent"] = "urgent" in boost_keys
+        listing["is_spotlight"] = "spotlight" in boost_keys
+        listing["is_bumped"] = "bump" in boost_keys
+        persist_admin_store()
+
+    sync_marketplace_listing_to_supabase(listing)
+    payment_record = build_payment_record(
+        listing=listing,
+        boost_keys=boost_keys,
+        checkout_session=checkout_session,
+        payment_intent=payment_intent,
+    )
+    saved_record = upsert_payment_record(payment_record)
+
+    return {
+        "message": "Stripe payment verified successfully.",
+        "listing": listing,
+        "payment": saved_record,
+    }
 
 
 @app.post("/api/admin/login")
@@ -684,6 +1156,13 @@ def get_marketplace_listings(
     status: str = Query(default="all"),
     _token: str = Depends(require_admin),
 ) -> dict[str, Any]:
+    try:
+        listings = fetch_marketplace_listings_from_supabase(status)
+        if listings:
+            return {"listings": listings}
+    except Exception:
+        pass
+
     listings = price_model_state.admin_store["marketplace_listings"]
     if status != "all":
         listings = [item for item in listings if item.get("status") == status]
@@ -705,6 +1184,7 @@ def update_marketplace_listing_status(
         listing["status"] = payload.status
         persist_admin_store()
 
+    sync_marketplace_listing_to_supabase(listing)
     return {"message": "Marketplace listing updated successfully.", "listing": listing}
 
 
@@ -719,14 +1199,22 @@ def delete_marketplace_listing(listing_id: str, _token: str = Depends(require_ad
         price_model_state.admin_store["marketplace_listings"] = remaining
         persist_admin_store()
 
+    delete_marketplace_listing_from_supabase(listing_id)
     return {"message": "Marketplace listing deleted successfully."}
 
 
 @app.get("/api/admin/payments")
 def get_payments(_token: str = Depends(require_admin)) -> dict[str, Any]:
+    try:
+        payments = fetch_marketplace_payments_from_supabase()
+        if payments:
+            return {"payments": payments}
+    except Exception:
+        pass
+
     payments = sorted(
         price_model_state.admin_store["payments"],
-        key=lambda item: item.get("confirmed_at") or "",
+        key=lambda item: item.get("confirmed_at") or item.get("created_at") or "",
         reverse=True,
     )
     return {"payments": payments}

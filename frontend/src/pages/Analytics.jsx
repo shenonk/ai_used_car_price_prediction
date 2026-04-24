@@ -12,6 +12,7 @@ import {
   Filler
 } from "chart.js"
 import { loadPredictionHistory } from "../utils/predictionHistory"
+import { supabase } from "../utils/supabaseClient"
 import analyticsTrends from "../data/analytics_trends.json"
 import marketTrends from "../data/market_trends.json"
 
@@ -19,6 +20,83 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat("en-LK")
 const DEPRECIATION_ASSUMPTION_LABEL = "10% (0-3 yrs), 7% (4-7 yrs), 5% (8+ yrs)"
+
+function normalizeSupabasePrediction(row) {
+  return {
+    id: `db-${row.id}`,
+    brand: row.brand,
+    model: row.model,
+    year: row.year,
+    predictedPrice: Number(row.predicted_price_lkr) || 0,
+    predictedAt: new Date(row.created_at).getTime(),
+  }
+}
+
+function buildPredictionFingerprint(prediction) {
+  const predictedAt = Number(prediction.predictedAt || 0)
+  const roundedToMinute = predictedAt > 0 ? Math.floor(predictedAt / 60000) : 0
+  const roundedPrice = Math.round(Number(prediction.predictedPrice || 0))
+
+  return [
+    String(prediction.brand || "").trim().toUpperCase(),
+    String(prediction.model || "").trim().toUpperCase(),
+    String(prediction.year || "").trim(),
+    String(roundedPrice),
+    String(roundedToMinute),
+  ].join("|||")
+}
+
+function mergePredictionSources(primary, secondary) {
+  const merged = []
+  const seen = new Set()
+
+  ;[...(primary || []), ...(secondary || [])].forEach((prediction) => {
+    const fingerprint = buildPredictionFingerprint(prediction)
+    if (seen.has(fingerprint)) {
+      return
+    }
+    seen.add(fingerprint)
+    merged.push(prediction)
+  })
+
+  return merged.sort((a, b) => (b.predictedAt || 0) - (a.predictedAt || 0))
+}
+
+async function loadAnalyticsPredictions() {
+  const localHistory = loadPredictionHistory()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  const currentUserId = session?.user?.id
+
+  if (!session?.access_token || !currentUserId) {
+    return {
+      predictions: localHistory,
+      source: "local",
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("predictions")
+    .select("id, brand, model, year, predicted_price_lkr, created_at")
+    .eq("user_id", currentUserId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("Failed to load Supabase prediction history:", error)
+    return {
+      predictions: [],
+      source: "supabase",
+    }
+  }
+
+  const remoteHistory = Array.isArray(data) ? data.map(normalizeSupabasePrediction) : []
+  return {
+    predictions: remoteHistory,
+    source: "supabase",
+  }
+}
 
 function buildVehicleLabel(prediction) {
   return `${prediction.brand} ${prediction.model} ${prediction.year}`
@@ -307,6 +385,8 @@ function Analytics() {
   const [showAll, setShowAll] = useState(false)
   const [savedPredictions, setSavedPredictions] = useState([])
   const [selectedPredictionId, setSelectedPredictionId] = useState("")
+  const [historySource, setHistorySource] = useState("local")
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true)
   const themeStyles =
     typeof window !== "undefined"
       ? getComputedStyle(document.documentElement)
@@ -317,10 +397,38 @@ function Analytics() {
   const themeBorder = themeStyles?.getPropertyValue("--border-color")?.trim() || "#334155"
 
   useEffect(() => {
-    const history = loadPredictionHistory()
-    setSavedPredictions(history)
-    if (history.length > 0) {
-      setSelectedPredictionId(history[0].id)
+    let isActive = true
+
+    const refreshPredictions = async () => {
+      setIsHistoryLoading(true)
+      const { predictions, source } = await loadAnalyticsPredictions()
+
+      if (!isActive) {
+        return
+      }
+
+      setSavedPredictions(predictions)
+      setHistorySource(source)
+      setSelectedPredictionId((currentId) => {
+        if (predictions.some((prediction) => prediction.id === currentId)) {
+          return currentId
+        }
+        return predictions[0]?.id || ""
+      })
+      setIsHistoryLoading(false)
+    }
+
+    refreshPredictions()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => {
+      refreshPredictions()
+    })
+
+    return () => {
+      isActive = false
+      subscription.unsubscribe()
     }
   }, [])
 
@@ -498,10 +606,19 @@ function Analytics() {
       {/* Prediction History */}
       <div className="card p-6 animate-fade-in animate-delay-200">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-            Prediction History
-          </h2>
+          <div>
+            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+              Prediction History
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              {isHistoryLoading
+                ? "Loading saved predictions..."
+                : historySource === "supabase"
+                  ? "Showing your synced cloud history."
+                  : "Showing local browser history."}
+            </p>
+          </div>
           <div className="flex gap-3">
             <input
               type="text"

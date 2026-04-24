@@ -1,8 +1,10 @@
 import axios from 'axios';
 
-// Base API instance pointing to Flask backend
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+// Base API instance pointing to the backend API
 const api = axios.create({
-    baseURL: 'http://localhost:5000',
+    baseURL: API_BASE_URL,
     headers: {
         'Content-Type': 'application/json',
     },

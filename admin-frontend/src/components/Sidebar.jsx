@@ -80,32 +80,34 @@ function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
     ];
 
     const linkClasses = ({ isActive }) =>
-        `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-            ? 'bg-blue-500/15 text-blue-400 border-l-2 border-blue-500 shadow-sm shadow-blue-500/10'
-            : 'text-gray-400 hover:text-white hover:bg-white/5'
+        `flex items-center gap-3 px-4 py-2.5 rounded-xl text-[0.8125rem] font-medium transition-all duration-250 ${isActive
+            ? 'bg-blue-500/12 text-blue-400 border border-blue-500/20 shadow-sm shadow-blue-500/8'
+            : 'text-gray-400 hover:text-white hover:bg-white/[0.04] border border-transparent'
         }`;
 
     return (
         <>
             {/* Sidebar */}
             <aside
-                className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-gray-800 bg-gray-900/95 backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0
+                className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-gray-800/60 bg-gray-900/95 backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0
           ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
             >
                 {/* Logo */}
-                <div className="p-6 border-b border-gray-800">
+                <div className="px-6 py-5 border-b border-gray-800/50">
                     <div className="flex items-center gap-3">
-                        <img src={logo} alt="AutoValueLK" className="h-7 object-contain" />
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700/50 shadow-sm">
+                            <img src={logo} alt="AutoValueLK" className="h-6 object-contain" />
+                        </div>
                         <div>
-                            <h2 className="text-sm font-bold text-white tracking-tight">AutoValueLK</h2>
-                            <p className="text-xs text-gray-500">Sri Lankan Market</p>
+                            <h2 className="heading-display text-sm font-bold text-white tracking-tight">AutoValueLK</h2>
+                            <p className="text-[0.65rem] text-gray-500 uppercase tracking-[0.15em]">Admin Panel</p>
                         </div>
                     </div>
                 </div>
 
                 {/* Navigation */}
-                <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-                    <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider px-4 mb-3">Main Menu</p>
+                <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                    <p className="text-[0.65rem] text-gray-500/80 font-semibold uppercase tracking-[0.14em] px-4 mb-3">Main Menu</p>
                     {navItems.map((item) => (
                         <NavLink
                             key={item.to}
@@ -120,10 +122,10 @@ function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
                 </nav>
 
                 {/* Logout */}
-                <div className="p-4 border-t border-gray-800">
+                <div className="px-3 py-4 border-t border-gray-800/50">
                     <button
                         onClick={handleLogout}
-                        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-200"
+                        className="flex items-center gap-3 w-full px-4 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-250"
                     >
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

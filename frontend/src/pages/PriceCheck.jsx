@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import logo from "../assets/logo/autovaluelk-logo.png"
 import brandModelOptions from "../data/brand_model_options.json"
 import { savePredictionHistoryEntry } from "../utils/predictionHistory"
+import { supabase } from "../utils/supabaseClient"
 
 const GEAR_TYPE_OPTIONS = [
   { label: "Automatic", value: "automatic" },
@@ -25,6 +26,7 @@ const CONDITION_OPTIONS = [
 const MODEL_REFERENCE_LISTING_MONTH = 1
 const MODEL_REFERENCE_LISTING_YEAR = 2025
 const BRAND_OPTIONS = Object.keys(brandModelOptions).sort()
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
 
 function PriceCheck() {
   const navigate = useNavigate()
@@ -82,9 +84,20 @@ function PriceCheck() {
     setIsLoading(true)
 
     try {
-      const response = await fetch("http://localhost:8000/predict", {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      const response = await fetch(`${API_BASE_URL}/predict`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? {
+                Authorization: `Bearer ${session.access_token}`,
+              }
+            : {}),
+        },
         body: JSON.stringify({
           brand: form.brand.trim().toUpperCase(),
           model: form.model.trim().toUpperCase(),
@@ -134,7 +147,7 @@ function PriceCheck() {
     } catch (error) {
       setIsLoading(false)
       if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
-        alert("Server not connected. Please make sure the backend is running at http://localhost:8000")
+        alert(`Server not connected. Please make sure the backend is running at ${API_BASE_URL}`)
       } else {
         alert("Prediction failed: " + error.message)
       }

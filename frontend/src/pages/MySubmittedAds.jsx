@@ -5,7 +5,7 @@ import { CheckCircle2, Clock3, Store, XCircle } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 const localeMap = {
   en: "en-LK",
@@ -44,6 +44,25 @@ const formatCurrency = (value, locale) =>
     currency: "LKR",
     maximumFractionDigits: 0,
   }).format(Number(value || 0));
+
+const normalizeImageCollection = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === "string" && item.trim());
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item) => typeof item === "string" && item.trim());
+      }
+    } catch {
+      return [value];
+    }
+  }
+
+  return [];
+};
 
 function MySubmittedAds() {
   const { t, i18n } = useTranslation();
@@ -236,9 +255,9 @@ function StatCard({ label, value }) {
 }
 
 function getListingImagesForCard(listing) {
-  const images = Array.isArray(listing?.image_urls) ? listing.image_urls.filter(Boolean) : [];
+  const images = normalizeImageCollection(listing?.image_urls);
   if (images.length > 0) return images;
-  return listing?.image_url ? [listing.image_url] : [];
+  return normalizeImageCollection(listing?.image_url);
 }
 
 function formatSubmissionDate(value, locale) {

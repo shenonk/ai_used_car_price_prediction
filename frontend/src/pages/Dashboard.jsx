@@ -58,20 +58,20 @@ function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0f172a] p-8">
-      <div className="mb-8 animate-fade-in">
-        <h1 className="text-3xl font-bold text-white mb-2">Welcome to <span className="gradient-text">AutoValueLK</span></h1>
-        <p className="text-slate-400">AI-Powered Vehicle Price Prediction for Sri Lanka</p>
+      <div className="mb-10 animate-fade-in">
+        <h1 className="heading-display text-4xl font-bold text-white mb-3">Welcome to <span className="gradient-text">AutoValueLK</span></h1>
+        <p className="text-slate-400 text-base max-w-lg">AI-Powered Vehicle Price Prediction for Sri Lanka — real-time market intelligence at your fingertips.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
         {stats.map((stat, index) => (
-          <div key={index} className="stat-card animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-            <div className="flex items-start justify-between mb-4">
+          <div key={index} className="stat-card group animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+            <div className="flex items-start justify-between mb-5">
               <div className={`icon-box ${stat.iconBg}`}>{stat.icon}</div>
-              <span className={`text-sm font-medium ${stat.changeType === 'positive' ? 'text-emerald-400' : stat.changeType === 'negative' ? 'text-rose-400' : 'text-blue-400'}`}>{stat.change}</span>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${stat.changeType === 'positive' ? 'text-emerald-400 bg-emerald-400/10' : stat.changeType === 'negative' ? 'text-rose-400 bg-rose-400/10' : 'text-blue-400 bg-blue-400/10'}`}>{stat.change}</span>
             </div>
-            <p className="text-sm text-slate-400 mb-1">{stat.label}</p>
-            <h2 className="text-3xl font-bold text-white">{stat.value}</h2>
+            <p className="text-xs font-medium text-slate-500 uppercase tracking-[0.08em] mb-1.5">{stat.label}</p>
+            <h2 className="heading-display text-3xl font-bold text-white tracking-tight">{stat.value}</h2>
           </div>
         ))}
       </div>
@@ -79,17 +79,20 @@ function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card p-6 animate-fade-in animate-delay-300">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            <h2 className="heading-display text-lg font-bold text-white flex items-center gap-2.5">
               <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
               Market Updates
             </h2>
-            <span className="badge badge-info">Live</span>
+            <span className="badge badge-info relative">
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+              Live
+            </span>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {marketUpdates.map((update, index) => (
-              <div key={index} className="flex items-start gap-4 p-3 rounded-xl bg-slate-800/30 hover:bg-slate-800/50 transition-all duration-300 group cursor-pointer">
+              <div key={index} className="flex items-start gap-4 p-3.5 rounded-xl bg-slate-800/30 hover:bg-slate-800/50 border border-transparent hover:border-slate-700/50 transition-all duration-300 group cursor-pointer">
                 <span className="mt-0.5 group-hover:scale-110 transition-transform duration-300">{update.icon}</span>
-                <div className="flex-1"><p className="text-slate-300 text-sm">{update.text}</p></div>
+                <div className="flex-1"><p className="text-slate-300 text-sm leading-relaxed">{update.text}</p></div>
                 <span className={`badge ${update.tag === 'trending' ? 'badge-success' : update.tag === 'hot' ? 'badge-warning' : 'badge-info'}`}>{update.tag}</span>
               </div>
             ))}
@@ -98,16 +101,16 @@ function Dashboard() {
 
         <div className="card p-6 animate-fade-in animate-delay-400">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            <h2 className="heading-display text-lg font-bold text-white flex items-center gap-2.5">
               <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               Recent Activity
             </h2>
-            <button onClick={() => navigate('/analytics')} className="text-sm text-blue-400 hover:text-blue-300 transition-colors">View All →</button>
+            <button onClick={() => navigate('/analytics')} className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium">View All →</button>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {activities.map((activity, index) => (
-              <div key={index} className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-800/30 transition-all duration-300 group">
-                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 group-hover:scale-110 transition-transform duration-300">{activity.icon}</div>
+              <div key={index} className="flex items-center gap-4 p-3.5 rounded-xl hover:bg-slate-800/30 border border-transparent hover:border-slate-700/50 transition-all duration-300 group">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700/50 to-slate-800/80 flex items-center justify-center text-slate-400 group-hover:text-blue-400 group-hover:scale-105 transition-all duration-300 border border-slate-700/30">{activity.icon}</div>
                 <div className="flex-1">
                   <p className="text-slate-300 text-sm">{activity.text}</p>
                   <p className="text-slate-500 text-xs mt-0.5">{activity.time}</p>
@@ -118,13 +121,16 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-8 p-6 rounded-2xl bg-gradient-to-r from-blue-600/20 to-cyan-600/20 border border-blue-500/20 animate-fade-in animate-delay-500">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="relative mt-10 p-8 rounded-2xl overflow-hidden animate-fade-in animate-delay-500" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(6,182,212,0.15) 50%, rgba(139,92,246,0.1) 100%)' }}>
+        <div className="absolute inset-0 border border-blue-500/20 rounded-2xl"></div>
+        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4"></div>
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
-            <h3 className="text-lg font-semibold text-white mb-1">Ready to predict your car's value?</h3>
-            <p className="text-slate-400 text-sm">Get accurate market price predictions powered by AI</p>
+            <h3 className="heading-display text-xl font-bold text-white mb-2">Ready to predict your car's value?</h3>
+            <p className="text-slate-400 text-sm max-w-md">Get accurate market price predictions powered by our advanced AI model trained on real Sri Lankan vehicle data.</p>
           </div>
-          <button onClick={() => navigate('/price-check')} className="btn-gradient whitespace-nowrap flex items-center gap-2">
+          <button onClick={() => navigate('/price-check')} className="btn-gradient whitespace-nowrap flex items-center gap-2 shadow-lg shadow-blue-500/20">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
             Start Price Check
           </button>

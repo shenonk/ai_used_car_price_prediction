@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+
 function Notifications() {
   const navigate = useNavigate()
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
@@ -15,7 +17,8 @@ function Notifications() {
   const fetchNotifications = async () => {
     try {
       setLoading(true)
-      const res = await fetch('http://localhost:5000/api/notifications')
+      setError(null)
+      const res = await fetch(`${API_BASE_URL}/api/notifications`)
       if (!res.ok) throw new Error('Failed to fetch notifications')
       const data = await res.json()
       

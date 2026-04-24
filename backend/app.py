@@ -23,6 +23,26 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 
+def load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+
+        os.environ[key] = value.strip().strip('"').strip("'")
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_env_file(PROJECT_ROOT / ".env")
+load_env_file(PROJECT_ROOT / ".env.docker")
 MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
 REFERENCE_DATASET_PATH = Path(__file__).resolve().parents[1] / "ml" / "data" / "active" / "AutoValueLK_Finalized_Dataset_v2.csv"
 ADMIN_DATA_PATH = Path(__file__).resolve().parent / "data" / "admin_store.json"
@@ -321,11 +341,15 @@ def get_requester_token(authorization: str | None = Header(default=None)) -> str
 
 
 def get_supabase_base_url() -> str:
-    return os.getenv("SUPABASE_URL", "").rstrip("/")
+    return (os.getenv("SUPABASE_URL", "") or os.getenv("VITE_SUPABASE_URL", "")).rstrip("/")
 
 
 def get_supabase_api_key() -> str:
-    return os.getenv("SUPABASE_KEY", "") or os.getenv("VITE_SUPABASE_ANON_KEY", "")
+    return (
+        os.getenv("SUPABASE_KEY", "")
+        or os.getenv("VITE_SUPABASE_SERVICE_ROLE_KEY", "")
+        or os.getenv("VITE_SUPABASE_ANON_KEY", "")
+    )
 
 
 def decode_jwt_payload(token: str) -> dict[str, Any]:
@@ -425,7 +449,7 @@ def make_supabase_rest_request(
     headers: dict[str, str] | None = None,
 ) -> Any:
     supabase_url = get_supabase_base_url()
-    supabase_key = os.getenv("SUPABASE_KEY", "")
+    supabase_key = get_supabase_api_key()
     if not supabase_url or not supabase_key:
         raise RuntimeError("Supabase database sync is not configured.")
 
@@ -532,6 +556,43 @@ def fetch_marketplace_payments_from_supabase() -> list[dict[str, Any]]:
         method="GET",
     )
     return rows if isinstance(rows, list) else []
+
+
+def sync_prediction_to_supabase(
+    prediction_request: dict[str, Any],
+    predicted_price_lkr: float,
+    requester: dict[str, Any] | None = None,
+) -> None:
+    payload = {
+        "brand": str(prediction_request.get("brand") or "").strip(),
+        "model": str(prediction_request.get("model") or "").strip(),
+        "year": int(prediction_request.get("year") or 0),
+        "engine_cc": float(prediction_request.get("engine_cc") or 0),
+        "gear_type": str(prediction_request.get("gear_type") or "").strip(),
+        "fuel_type": str(prediction_request.get("fuel_type") or "").strip(),
+        "mileage_km": float(prediction_request.get("mileage_km") or 0),
+        "condition": str(prediction_request.get("condition") or "").strip(),
+        "town": str(prediction_request.get("town") or "").strip(),
+        "listing_month": int(prediction_request.get("listing_month") or 0),
+        "listing_year": int(prediction_request.get("listing_year") or 0),
+        "predicted_price_lkr": round(float(predicted_price_lkr), 2),
+        "user_id": str((requester or {}).get("user_id") or "") or None,
+        "account_email": str((requester or {}).get("email") or "") or None,
+        "username": str((requester or {}).get("username") or "") or None,
+    }
+
+    try:
+        make_supabase_rest_request(
+            "/rest/v1/predictions",
+            method="POST",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+        )
+    except Exception as error:
+        log_warning(f"Failed to sync prediction to Supabase: {error}")
 
 
 def hydrate_admin_store_from_supabase() -> None:
@@ -1373,7 +1434,10 @@ def get_targeted_reference_price(features: dict[str, Any]) -> float | None:
 
 
 @app.post("/predict")
-def predict_price(payload: VehiclePredictionRequest) -> dict[str, float]:
+def predict_price(
+    payload: VehiclePredictionRequest,
+    requester: dict[str, Any] = Depends(get_requester_identity),
+) -> dict[str, float]:
     if price_model_state.model is None:
         raise HTTPException(
             status_code=503,
@@ -1404,4 +1468,5 @@ def predict_price(payload: VehiclePredictionRequest) -> dict[str, float]:
         )
         predicted_price = targeted_reference_price
 
+    sync_prediction_to_supabase(raw_features, predicted_price, requester)
     return {"predicted_price_lkr": round(predicted_price, 2)}

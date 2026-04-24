@@ -47,6 +47,40 @@
   ],
   "marketplace_listings": [
     {
+      "id": "listing-70e35c22d0054239bfb5e14fb8e1c263",
+      "brand": "Daihatsu",
+      "model": "Mira",
+      "seller_name": "Onel",
+      "phone_number": "0777854632",
+      "vehicle_location": "Diyagama",
+      "vehicle_description": "New reconditioned \r\nimport from japan",
+      "year": 2024,
+      "mileage": 150,
+      "fuel_type": "Petrol",
+      "transmission": "Automatic",
+      "condition": "Reconditioned",
+      "price": 7500000.0,
+      "status": "approved",
+      "image_url": "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/a8bba8e5fac54ce2a15a420a3019c845.jpg",
+      "image_urls": [
+        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/a8bba8e5fac54ce2a15a420a3019c845.jpg",
+        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/ce4fc4b711b34a5fbfa3147c043a0eb6.jpg",
+        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/eee90b2974e64110bb02a5d110090487.jpg",
+        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/614e0df0f0914e55bfd01b78a9278835.jpg",
+        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/aad3204c147c4ee3a483ed160525644a.jpg"
+      ],
+      "uploaded_image_count": 5,
+      "is_urgent": false,
+      "is_spotlight": false,
+      "is_bumped": true,
+      "created_at": "2026-04-23T13:47:32+00:00",
+      "user_id": "2a2b3f7b-2b4c-4609-bae3-efa73313d065",
+      "account_email": "soorya@gmail.com",
+      "username": "soorya",
+      "logged_in_account": "soorya@gmail.com",
+      "updated_at": "2026-04-23T13:49:02.720369+00:00"
+    },
+    {
       "id": "listing-b90b7ed5771a4448bb6bbb520aa11a88",
       "brand": "Toyota",
       "model": "Travo",
@@ -909,42 +943,33 @@
       "is_bumped": false,
       "created_at": "2026-03-29T10:30:00Z",
       "user_id": "user_087"
-    },
-    {
-      "id": "listing-70e35c22d0054239bfb5e14fb8e1c263",
-      "brand": "Daihatsu",
-      "model": "Mira",
-      "seller_name": "Onel",
-      "phone_number": "0777854632",
-      "vehicle_location": "Diyagama",
-      "vehicle_description": "New reconditioned \r\nimport from japan",
-      "year": 2024,
-      "mileage": 150,
-      "fuel_type": "Petrol",
-      "transmission": "Automatic",
-      "condition": "Reconditioned",
-      "price": 7500000.0,
-      "status": "approved",
-      "image_url": "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/a8bba8e5fac54ce2a15a420a3019c845.jpg",
-      "image_urls": [
-        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/a8bba8e5fac54ce2a15a420a3019c845.jpg",
-        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/ce4fc4b711b34a5fbfa3147c043a0eb6.jpg",
-        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/eee90b2974e64110bb02a5d110090487.jpg",
-        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/614e0df0f0914e55bfd01b78a9278835.jpg",
-        "https://bwsxujswqbfifsjizxrb.supabase.co/storage/v1/object/public/car_images/listings/listing-70e35c22d0054239bfb5e14fb8e1c263/aad3204c147c4ee3a483ed160525644a.jpg"
-      ],
-      "uploaded_image_count": 5,
-      "is_urgent": false,
-      "is_spotlight": false,
-      "is_bumped": true,
-      "created_at": "2026-04-23T13:47:32Z",
-      "user_id": "2a2b3f7b-2b4c-4609-bae3-efa73313d065",
-      "account_email": "soorya@gmail.com",
-      "username": "soorya",
-      "logged_in_account": "soorya@gmail.com"
     }
   ],
   "payments": [
+    {
+      "id": "pi_3TPNbU2R4SSbxjJs0lgG5IOo",
+      "checkout_session_id": "cs_test_a16JvMRmGeVYiebxyMl4t256rvnYwwBFwPTsAEkFXZ2CWtyqN1w2AaSyzE",
+      "listing_id": "listing-70e35c22d0054239bfb5e14fb8e1c263",
+      "user_id": "2a2b3f7b-2b4c-4609-bae3-efa73313d065",
+      "payer_name": "Onel",
+      "login_name": "soorya",
+      "phone_number": "0777854632",
+      "account_email": "soorya@gmail.com",
+      "ad_title": "Daihatsu Mira 2024",
+      "boost_option": "Bump Up",
+      "boost_types": [
+        "bump"
+      ],
+      "amount": 300.0,
+      "currency": "LKR",
+      "payment_status": "confirmed",
+      "stripe_status": "succeeded",
+      "payment_method": "Visa ending 4242",
+      "confirmed_at": "2026-04-23T13:47:47Z",
+      "ad_reference": "listing-70e35c22d0054239bfb5e14fb8e1c263",
+      "notes": "Ad boost activated after Stripe confirmation.",
+      "created_at": "2026-04-23T13:47:47Z"
+    },
     {
       "id": "pi_3TPNSO2R4SSbxjJs0eimGLHR",
       "checkout_session_id": "cs_test_a1k8EuYdcqhqQueRKyOMvWI3igP8aSXbgjqns5BwJdEXLs5paelM4Za9oT",
@@ -1138,30 +1163,6 @@
       "ad_reference": "",
       "notes": "",
       "updated_at": "2026-04-23T08:31:18.748368+00:00"
-    },
-    {
-      "id": "pi_3TPNbU2R4SSbxjJs0lgG5IOo",
-      "checkout_session_id": "cs_test_a16JvMRmGeVYiebxyMl4t256rvnYwwBFwPTsAEkFXZ2CWtyqN1w2AaSyzE",
-      "listing_id": "listing-70e35c22d0054239bfb5e14fb8e1c263",
-      "user_id": "2a2b3f7b-2b4c-4609-bae3-efa73313d065",
-      "payer_name": "Onel",
-      "login_name": "soorya",
-      "phone_number": "0777854632",
-      "account_email": "soorya@gmail.com",
-      "ad_title": "Daihatsu Mira 2024",
-      "boost_option": "Bump Up",
-      "boost_types": [
-        "bump"
-      ],
-      "amount": 300.0,
-      "currency": "LKR",
-      "payment_status": "confirmed",
-      "stripe_status": "succeeded",
-      "payment_method": "Visa ending 4242",
-      "confirmed_at": "2026-04-23T13:47:47Z",
-      "ad_reference": "listing-70e35c22d0054239bfb5e14fb8e1c263",
-      "notes": "Ad boost activated after Stripe confirmation.",
-      "created_at": "2026-04-23T13:47:47Z"
     }
   ]
 }

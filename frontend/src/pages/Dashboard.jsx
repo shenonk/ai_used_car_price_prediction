@@ -1,141 +1,488 @@
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
+import {
+  ArrowRight,
+  BellRing,
+  Bookmark,
+  Calculator,
+  CarFront,
+  Clock3,
+  Coins,
+  LineChart,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+} from "lucide-react"
+import { getCurrentUser } from "../utils/auth"
+import { loadPredictionHistory } from "../utils/predictionHistory"
+import { supabase } from "../utils/supabaseClient"
+import { loadUserAlerts } from "../utils/userAlerts"
+
+function formatCurrency(value) {
+  return `LKR ${Math.round(Number(value || 0)).toLocaleString("en-LK")}`
+}
+
+function formatCompactCurrency(value) {
+  const amount = Number(value || 0)
+  if (amount >= 1_000_000) {
+    return `LKR ${(amount / 1_000_000).toFixed(1)}M`
+  }
+  if (amount >= 1_000) {
+    return `LKR ${(amount / 1_000).toFixed(0)}K`
+  }
+  return `LKR ${amount.toLocaleString("en-LK")}`
+}
+
+function formatRelativeDate(value) {
+  const timestamp = new Date(value).getTime()
+  if (!timestamp) {
+    return "No recent activity"
+  }
+
+  const diffMinutes = Math.round((Date.now() - timestamp) / 60000)
+  if (diffMinutes < 1) return "Just now"
+  if (diffMinutes < 60) return `${diffMinutes} min ago`
+
+  const diffHours = Math.round(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours} hr ago`
+
+  const diffDays = Math.round(diffHours / 24)
+  if (diffDays < 30) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`
+
+  return new Date(value).toLocaleDateString("en-LK")
+}
+
+function normalizeCloudPrediction(row) {
+  return {
+    id: `db-${row.id}`,
+    brand: row.brand,
+    model: row.model,
+    year: row.year,
+    predictedPrice: Number(row.predicted_price_lkr) || 0,
+    predictedAt: row.created_at,
+  }
+}
+
+function normalizeLocalPrediction(row) {
+  return {
+    id: row.id,
+    brand: row.brand,
+    model: row.model,
+    year: row.year,
+    predictedPrice: Number(row.predictedPrice) || 0,
+    predictedAt: new Date(row.predictedAt || Date.now()).toISOString(),
+  }
+}
 
 function Dashboard() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+  const [isLoading, setIsLoading] = useState(true)
+  const [dashboardData, setDashboardData] = useState({
+    user: null,
+    predictions: [],
+    alertsCount: 0,
+    bestRate: null,
+    source: "local",
+  })
 
-  const stats = [
-    {
-      label: "Total Predictions",
-      value: "1,245",
-      change: "+12% this week",
-      changeType: "positive",
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      iconBg: "icon-box-blue"
-    },
-    {
-      label: "Average Car Price",
-      value: "LKR 5.2M",
-      change: "Market stable",
-      changeType: "neutral",
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      iconBg: "icon-box-emerald"
-    },
-    {
-      label: "Loan Calculations",
-      value: "856",
-      change: "+5% today",
-      changeType: "positive",
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      ),
-      iconBg: "icon-box-amber"
+  useEffect(() => {
+    let isActive = true
+
+    const loadDashboard = async () => {
+      setIsLoading(true)
+
+      const user = await getCurrentUser()
+      const alerts = loadUserAlerts(user || { email: "guest@example.com", username: "Guest" })
+      let predictions = []
+      let source = "local"
+
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from("predictions")
+          .select("id, brand, model, year, predicted_price_lkr, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(12)
+
+        if (!error && Array.isArray(data)) {
+          predictions = data.map(normalizeCloudPrediction)
+          source = "supabase"
+        }
+      }
+
+      if (!user && predictions.length === 0) {
+        predictions = loadPredictionHistory().map(normalizeLocalPrediction).slice(0, 12)
+        source = "local"
+      }
+
+      const { data: financingData } = await supabase
+        .from("financing_options")
+        .select("fixed_rate")
+        .eq("status", "Active")
+        .order("fixed_rate", { ascending: true })
+        .limit(1)
+
+      if (!isActive) return
+
+      setDashboardData({
+        user,
+        predictions,
+        alertsCount: alerts.length,
+        bestRate: financingData?.[0]?.fixed_rate ? Number(financingData[0].fixed_rate) : null,
+        source,
+      })
+      setIsLoading(false)
     }
-  ];
 
-  const marketUpdates = [
-    { icon: <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>, text: "Vehicle prices in Colombo increased by 5% this month", tag: "trending" },
-    { icon: <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>, text: "Hybrid vehicles demand rising rapidly", tag: "hot" },
-    { icon: <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>, text: "Bank loan interest reduced by 0.5%", tag: "finance" },
-    { icon: <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>, text: "Toyota & Suzuki dominate resale market", tag: "insight" }
-  ];
+    loadDashboard()
+    return () => {
+      isActive = false
+    }
+  }, [])
 
-  const activities = [
-    { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 17h8M8 17v-4m8 4v-4m-8 0h8m-8 0l-2-4h12l-2 4M6 13l-2-4h16l-2 4" /></svg>, text: "New prediction generated — Toyota Aqua 2018", time: "2 min ago" },
-    { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>, text: "User downloaded price report", time: "15 min ago" },
-    { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>, text: "Loan calculation completed", time: "1 hour ago" },
-    { icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, text: "System accuracy updated to 87%", time: "3 hours ago" }
-  ];
+  const recentPredictions = useMemo(
+    () => dashboardData.predictions.slice(0, 4),
+    [dashboardData.predictions]
+  )
+
+  const summary = useMemo(() => {
+    const predictions = dashboardData.predictions
+    const totalPredictions = predictions.length
+    const averagePrice =
+      totalPredictions > 0
+        ? predictions.reduce((sum, item) => sum + Number(item.predictedPrice || 0), 0) / totalPredictions
+        : 0
+
+    const brandCounts = predictions.reduce((acc, item) => {
+      const key = String(item.brand || "").trim()
+      if (!key) return acc
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {})
+
+    const topBrand = Object.entries(brandCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || t("dashboard_page.default_brand")
+    const latestPrediction = predictions[0]
+
+    return {
+      totalPredictions,
+      averagePrice,
+      topBrand,
+      latestPredictionTime: latestPrediction?.predictedAt || "",
+      latestPredictionValue: latestPrediction?.predictedPrice || 0,
+    }
+  }, [dashboardData.predictions, t])
+
+  const sparklineData = useMemo(() => {
+    const values = dashboardData.predictions
+      .slice(0, 6)
+      .map((item) => Number(item.predictedPrice || 0))
+      .reverse()
+
+    const max = Math.max(...values, 1)
+    return values.map((value) => ({
+      value,
+      height: `${Math.max(22, (value / max) * 100)}%`,
+    }))
+  }, [dashboardData.predictions])
+
+  const quickActions = useMemo(() => ([
+    {
+      title: t("dashboard_page.quick_actions.new_prediction_title"),
+      note: t("dashboard_page.quick_actions.new_prediction_note"),
+      icon: <Sparkles className="h-5 w-5" />,
+      accent: "from-blue-500/25 to-cyan-400/10 border-blue-500/20 text-blue-300",
+      onClick: () => navigate("/price-check"),
+    },
+    {
+      title: t("dashboard_page.quick_actions.analytics_title"),
+      note: t("dashboard_page.quick_actions.analytics_note"),
+      icon: <LineChart className="h-5 w-5" />,
+      accent: "from-amber-500/25 to-orange-400/10 border-amber-500/20 text-amber-300",
+      onClick: () => navigate("/analytics"),
+    },
+    {
+      title: t("dashboard_page.quick_actions.marketplace_title"),
+      note: t("dashboard_page.quick_actions.marketplace_note"),
+      icon: <CarFront className="h-5 w-5" />,
+      accent: "from-emerald-500/25 to-teal-400/10 border-emerald-500/20 text-emerald-300",
+      onClick: () => navigate("/marketplace"),
+    },
+    {
+      title: t("dashboard_page.quick_actions.financing_title"),
+      note: t("dashboard_page.quick_actions.financing_note"),
+      icon: <Calculator className="h-5 w-5" />,
+      accent: "from-fuchsia-500/20 to-pink-400/10 border-fuchsia-500/20 text-fuchsia-300",
+      onClick: () => navigate("/financing"),
+    },
+  ]), [navigate, t])
+
+  const statCards = [
+    {
+      label: t("dashboard_page.stats.saved_predictions"),
+      value: `${summary.totalPredictions}`,
+      meta: dashboardData.source === "supabase" ? t("dashboard_page.stats.cloud_history") : t("dashboard_page.stats.local_history"),
+      icon: <Bookmark className="h-5 w-5" />,
+      iconBg: "bg-blue-500/15 text-blue-300",
+    },
+    {
+      label: t("dashboard_page.stats.average_estimate"),
+      value: summary.totalPredictions > 0 ? formatCompactCurrency(summary.averagePrice) : t("dashboard_page.no_data"),
+      meta: summary.totalPredictions > 0 ? t("dashboard_page.stats.recent_saves") : t("dashboard_page.stats.first_prediction"),
+      icon: <Coins className="h-5 w-5" />,
+      iconBg: "bg-emerald-500/15 text-emerald-300",
+    },
+    {
+      label: t("dashboard_page.stats.active_alerts"),
+      value: `${dashboardData.alertsCount}`,
+      meta: dashboardData.alertsCount > 0 ? t("dashboard_page.stats.alerts_ready") : t("dashboard_page.stats.no_alerts"),
+      icon: <BellRing className="h-5 w-5" />,
+      iconBg: "bg-amber-500/15 text-amber-300",
+    },
+    {
+      label: t("dashboard_page.stats.top_brand"),
+      value: summary.topBrand,
+      meta: summary.latestPredictionTime ? formatRelativeDate(summary.latestPredictionTime) : t("dashboard_page.stats.waiting_activity"),
+      icon: <TrendingUp className="h-5 w-5" />,
+      iconBg: "bg-cyan-500/15 text-cyan-300",
+    },
+  ]
+
+  const insightCards = [
+    {
+      label: t("dashboard_page.best_bank_rate"),
+      value: dashboardData.bestRate ? `${dashboardData.bestRate.toFixed(1)}%` : "8.5%",
+      tone: "text-emerald-300",
+      icon: <Coins className="h-4 w-4 text-emerald-400" />,
+    },
+    {
+      label: t("dashboard_page.most_tracked_brand"),
+      value: summary.topBrand,
+      tone: "text-cyan-300",
+      icon: <CarFront className="h-4 w-4 text-cyan-400" />,
+    },
+    {
+      label: t("dashboard_page.active_alerts_short"),
+      value: `${dashboardData.alertsCount}`,
+      tone: "text-amber-300",
+      icon: <BellRing className="h-4 w-4 text-amber-400" />,
+    },
+    {
+      label: t("dashboard_page.latest_estimate_short"),
+      value: summary.latestPredictionValue ? formatCompactCurrency(summary.latestPredictionValue) : t("dashboard_page.no_data"),
+      tone: "text-blue-300",
+      icon: <Sparkles className="h-4 w-4 text-blue-400" />,
+    },
+  ]
+
+  const username = dashboardData.user?.username || dashboardData.user?.email?.split("@")[0] || t("dashboard_page.default_driver")
 
   return (
-    <div className="min-h-screen bg-[#0f172a] p-8">
-      <div className="mb-10 animate-fade-in">
-        <h1 className="heading-display text-4xl font-bold text-white mb-3">Welcome to <span className="gradient-text">AutoValueLK</span></h1>
-        <p className="text-slate-400 text-base max-w-lg">AI-Powered Vehicle Price Prediction for Sri Lanka — real-time market intelligence at your fingertips.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-        {stats.map((stat, index) => (
-          <div key={index} className="stat-card group animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
-            <div className="flex items-start justify-between mb-5">
-              <div className={`icon-box ${stat.iconBg}`}>{stat.icon}</div>
-              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${stat.changeType === 'positive' ? 'text-emerald-400 bg-emerald-400/10' : stat.changeType === 'negative' ? 'text-rose-400 bg-rose-400/10' : 'text-blue-400 bg-blue-400/10'}`}>{stat.change}</span>
+    <div className="min-h-screen bg-[#0f172a] p-5 md:p-8">
+      <section className="relative overflow-hidden rounded-[32px] border border-slate-700/50 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.25),_transparent_34%),radial-gradient(circle_at_80%_20%,_rgba(16,185,129,0.18),_transparent_28%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.85))] px-6 py-7 md:px-8 md:py-8">
+        <div className="absolute inset-y-0 right-0 hidden w-[38%] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0))] md:block" />
+        <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-blue-500/10 blur-3xl" />
+        <div className="absolute -bottom-10 left-10 h-28 w-28 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="relative z-10 grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
+          <div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-slate-300">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              {t("dashboard_page.badge")}
             </div>
-            <p className="text-xs font-medium text-slate-500 uppercase tracking-[0.08em] mb-1.5">{stat.label}</p>
-            <h2 className="heading-display text-3xl font-bold text-white tracking-tight">{stat.value}</h2>
+            <h1 className="text-3xl font-bold tracking-tight text-white md:text-5xl">
+              {t("dashboard_page.greeting", { name: username }).replace(username, "")}
+              <span className="bg-gradient-to-r from-white to-cyan-300 bg-clip-text text-transparent">{username}</span>
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
+              {t("dashboard_page.subtitle")}
+            </p>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                onClick={() => navigate("/price-check")}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform duration-300 hover:-translate-y-0.5"
+              >
+                {t("dashboard_page.start_prediction")}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => navigate("/analytics")}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition-colors duration-300 hover:bg-white/10"
+              >
+                {t("dashboard_page.open_analytics")}
+                <LineChart className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("dashboard_page.latest_estimate")}</p>
+              <p className="mt-3 text-3xl font-bold text-amber-300">
+                {summary.latestPredictionValue ? formatCompactCurrency(summary.latestPredictionValue) : t("dashboard_page.no_data")}
+              </p>
+              <p className="mt-2 text-sm text-slate-400">
+                {summary.latestPredictionTime ? formatRelativeDate(summary.latestPredictionTime) : t("dashboard_page.create_prediction_hint")}
+              </p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-slate-950/30 p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("dashboard_page.price_rhythm")}</p>
+                <Clock3 className="h-4 w-4 text-slate-500" />
+              </div>
+              <div className="mt-5 flex h-24 items-end gap-2">
+                {sparklineData.length > 0 ? (
+                  sparklineData.map((item, index) => (
+                    <div
+                      key={`${item.value}-${index}`}
+                      className="flex-1 rounded-t-2xl bg-gradient-to-t from-blue-500 to-cyan-300/90"
+                      style={{ height: item.height }}
+                    />
+                  ))
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-700/70 text-sm text-slate-500">
+                    {t("dashboard_page.no_recent_data")}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {quickActions.map((item) => (
+          <button
+            key={item.title}
+            onClick={item.onClick}
+            className={`group rounded-[28px] border bg-gradient-to-br p-5 text-left transition-all duration-300 hover:-translate-y-1 ${item.accent}`}
+          >
+            <div className="flex items-start justify-between">
+              <span className="inline-flex rounded-2xl bg-white/10 p-3">{item.icon}</span>
+              <ArrowRight className="h-4 w-4 text-slate-400 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-white" />
+            </div>
+            <h2 className="mt-5 text-lg font-semibold text-white">{item.title}</h2>
+            <p className="mt-1 text-sm text-slate-400">{item.note}</p>
+          </button>
+        ))}
+      </section>
+
+      <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {statCards.map((item) => (
+          <div key={item.label} className="rounded-[28px] border border-slate-700/60 bg-slate-900/55 p-5">
+            <div className="flex items-center justify-between">
+              <span className={`inline-flex rounded-2xl p-3 ${item.iconBg}`}>{item.icon}</span>
+            </div>
+            <p className="mt-5 text-xs uppercase tracking-[0.22em] text-slate-500">{item.label}</p>
+            <p className="mt-2 text-2xl font-bold text-white">{item.value}</p>
+            <p className="mt-1 text-sm text-slate-400">{item.meta}</p>
           </div>
         ))}
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-6 animate-fade-in animate-delay-300">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="heading-display text-lg font-bold text-white flex items-center gap-2.5">
-              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
-              Market Updates
-            </h2>
-            <span className="badge badge-info relative">
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-              Live
-            </span>
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
+        <div className="rounded-[30px] border border-slate-700/60 bg-slate-900/55 p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-white">{t("dashboard_page.recent_predictions")}</h2>
+              <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.latest_saved_estimates")}</p>
+            </div>
+            <button
+              onClick={() => navigate("/analytics")}
+              className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-700/70 px-4 py-2 text-sm font-medium text-blue-300 transition-colors duration-300 hover:border-blue-400/40 hover:text-blue-200"
+            >
+              {t("dashboard_page.view_all")}
+              <ArrowRight className="h-4 w-4" />
+            </button>
           </div>
-          <div className="space-y-3">
-            {marketUpdates.map((update, index) => (
-              <div key={index} className="flex items-start gap-4 p-3.5 rounded-xl bg-slate-800/30 hover:bg-slate-800/50 border border-transparent hover:border-slate-700/50 transition-all duration-300 group cursor-pointer">
-                <span className="mt-0.5 group-hover:scale-110 transition-transform duration-300">{update.icon}</span>
-                <div className="flex-1"><p className="text-slate-300 text-sm leading-relaxed">{update.text}</p></div>
-                <span className={`badge ${update.tag === 'trending' ? 'badge-success' : update.tag === 'hot' ? 'badge-warning' : 'badge-info'}`}>{update.tag}</span>
+
+          <div className="mt-6 space-y-3">
+            {isLoading ? (
+              <div className="rounded-3xl border border-dashed border-slate-700/70 px-6 py-12 text-center text-slate-500">
+                {t("dashboard_page.loading")}
               </div>
-            ))}
+            ) : recentPredictions.length > 0 ? (
+              recentPredictions.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => navigate("/analytics")}
+                  className="flex w-full items-center gap-4 rounded-[24px] border border-slate-800/80 bg-slate-950/30 px-4 py-4 text-left transition-all duration-300 hover:border-slate-600/60 hover:bg-slate-800/40"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-300">
+                    <CarFront className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-base font-semibold text-white">
+                      {item.brand} {item.model}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {item.year} - {formatRelativeDate(item.predictedAt)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-cyan-300">{formatCurrency(item.predictedPrice)}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">{t("dashboard_page.saved")}</p>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="rounded-[28px] border border-dashed border-slate-700/70 bg-slate-950/20 px-6 py-14 text-center">
+                <p className="text-lg font-medium text-white">{t("dashboard_page.no_predictions_yet")}</p>
+                <p className="mt-2 text-sm text-slate-400">{t("dashboard_page.start_dashboard")}</p>
+                <button
+                  onClick={() => navigate("/price-check")}
+                  className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-colors duration-300 hover:bg-blue-400"
+                >
+                  {t("dashboard_page.create_first_prediction")}
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="card p-6 animate-fade-in animate-delay-400">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="heading-display text-lg font-bold text-white flex items-center gap-2.5">
-              <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-              Recent Activity
-            </h2>
-            <button onClick={() => navigate('/analytics')} className="text-sm text-blue-400 hover:text-blue-300 transition-colors font-medium">View All →</button>
-          </div>
-          <div className="space-y-3">
-            {activities.map((activity, index) => (
-              <div key={index} className="flex items-center gap-4 p-3.5 rounded-xl hover:bg-slate-800/30 border border-transparent hover:border-slate-700/50 transition-all duration-300 group">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700/50 to-slate-800/80 flex items-center justify-center text-slate-400 group-hover:text-blue-400 group-hover:scale-105 transition-all duration-300 border border-slate-700/30">{activity.icon}</div>
-                <div className="flex-1">
-                  <p className="text-slate-300 text-sm">{activity.text}</p>
-                  <p className="text-slate-500 text-xs mt-0.5">{activity.time}</p>
+        <div className="space-y-6">
+          <div className="rounded-[30px] border border-slate-700/60 bg-slate-900/55 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white">{t("dashboard_page.market_pulse")}</h2>
+                <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.fast_signals")}</p>
+              </div>
+              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
+                {t("dashboard_page.live")}
+              </span>
+            </div>
+
+            <div className="mt-6 grid gap-3">
+              {insightCards.map((item) => (
+                <div key={item.label} className="rounded-[22px] border border-slate-800/80 bg-slate-950/35 p-4">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500">
+                    {item.icon}
+                    {item.label}
+                  </div>
+                  <p className={`mt-3 text-lg font-semibold ${item.tone}`}>{item.value}</p>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="relative mt-10 p-8 rounded-2xl overflow-hidden animate-fade-in animate-delay-500" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(6,182,212,0.15) 50%, rgba(139,92,246,0.1) 100%)' }}>
-        <div className="absolute inset-0 border border-blue-500/20 rounded-2xl"></div>
-        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/4"></div>
-        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <h3 className="heading-display text-xl font-bold text-white mb-2">Ready to predict your car's value?</h3>
-            <p className="text-slate-400 text-sm max-w-md">Get accurate market price predictions powered by our advanced AI model trained on real Sri Lankan vehicle data.</p>
+          <div className="rounded-[30px] border border-slate-700/60 bg-[linear-gradient(160deg,rgba(14,165,233,0.08),rgba(15,23,42,0.88))] p-6">
+            <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{t("dashboard_page.ready_now")}</p>
+            <h2 className="mt-3 text-2xl font-bold text-white">{t("dashboard_page.move_to_action")}</h2>
+            <div className="mt-5 space-y-3 text-sm text-slate-300">
+              <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
+                <span>{t("dashboard_page.fresh_valuation")}</span>
+                <span className="text-cyan-300">{t("price_check")}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
+                <span>{t("dashboard_page.compare_plans")}</span>
+                <span className="text-emerald-300">{t("financing")}</span>
+              </div>
+            </div>
           </div>
-          <button onClick={() => navigate('/price-check')} className="btn-gradient whitespace-nowrap flex items-center gap-2 shadow-lg shadow-blue-500/20">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-            Start Price Check
-          </button>
         </div>
-      </div>
+      </section>
     </div>
   )
 }

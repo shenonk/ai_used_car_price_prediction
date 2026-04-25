@@ -562,7 +562,10 @@ def sync_prediction_to_supabase(
     prediction_request: dict[str, Any],
     predicted_price_lkr: float,
     requester: dict[str, Any] | None = None,
-) -> None:
+) -> bool:
+    if not (requester or {}).get("is_authenticated"):
+        return False
+
     payload = {
         "brand": str(prediction_request.get("brand") or "").strip(),
         "model": str(prediction_request.get("model") or "").strip(),
@@ -591,8 +594,10 @@ def sync_prediction_to_supabase(
                 "Prefer": "return=minimal",
             },
         )
+        return True
     except Exception as error:
         log_warning(f"Failed to sync prediction to Supabase: {error}")
+        return False
 
 
 def hydrate_admin_store_from_supabase() -> None:
@@ -1437,7 +1442,7 @@ def get_targeted_reference_price(features: dict[str, Any]) -> float | None:
 def predict_price(
     payload: VehiclePredictionRequest,
     requester: dict[str, Any] = Depends(get_requester_identity),
-) -> dict[str, float]:
+) -> dict[str, Any]:
     if price_model_state.model is None:
         raise HTTPException(
             status_code=503,
@@ -1468,5 +1473,16 @@ def predict_price(
         )
         predicted_price = targeted_reference_price
 
-    sync_prediction_to_supabase(raw_features, predicted_price, requester)
-    return {"predicted_price_lkr": round(predicted_price, 2)}
+    cloud_saved = sync_prediction_to_supabase(raw_features, predicted_price, requester)
+    save_status = "cloud" if cloud_saved else "local_only"
+    save_message = (
+        "Prediction saved to your account."
+        if cloud_saved
+        else "Prediction saved only on this device."
+    )
+
+    return {
+        "predicted_price_lkr": round(predicted_price, 2),
+        "save_status": save_status,
+        "save_message": save_message,
+    }

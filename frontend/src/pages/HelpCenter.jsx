@@ -1,4 +1,5 @@
 import React, { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Search,
   BookOpen,
@@ -15,6 +16,7 @@ import { supabase } from "../utils/supabaseClient";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 const HelpCenter = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const faqSectionRef = useRef(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -32,33 +34,33 @@ const HelpCenter = () => {
   const categories = [
     {
       id: "financing",
-      title: "Financing Basics",
+      title: t("help_center_page.categories.financing.title"),
       icon: <BookOpen className="w-8 h-8" />,
-      description: "Learn about loans, leasing, and credit requirements.",
+      description: t("help_center_page.categories.financing.description"),
       keywords: ["loan", "leasing", "finance", "credit", "interest"],
       route: "/financing",
     },
     {
       id: "payments",
-      title: "Payment Methods",
+      title: t("help_center_page.categories.payments.title"),
       icon: <CreditCard className="w-8 h-8" />,
-      description: "Manage your bank details and payment schedules.",
+      description: t("help_center_page.categories.payments.description"),
       keywords: ["payment", "bank", "schedule", "installment", "details"],
       route: "/settings",
     },
     {
       id: "security",
-      title: "Account Security",
+      title: t("help_center_page.categories.security.title"),
       icon: <ShieldCheck className="w-8 h-8" />,
-      description: "Keep your personal and financial data safe.",
+      description: t("help_center_page.categories.security.description"),
       keywords: ["password", "security", "account", "login", "safe"],
       route: "/settings",
     },
     {
       id: "tutorials",
-      title: "App Tutorials",
+      title: t("help_center_page.categories.tutorials.title"),
       icon: <PlayCircle className="w-8 h-8" />,
-      description: "Step-by-step guides on using AutoValueLK.",
+      description: t("help_center_page.categories.tutorials.description"),
       keywords: ["guide", "tutorial", "results", "price", "dashboard"],
       route: "/price-check",
     },
@@ -68,37 +70,32 @@ const HelpCenter = () => {
     {
       id: 1,
       category: "financing",
-      question: "How do I apply for vehicle financing?",
-      answer:
-        "You can apply through the Financing page. Compare lenders, review the estimated monthly cost, and continue with the provider that best matches your budget.",
+      question: t("help_center_page.faqs.0.question"),
+      answer: t("help_center_page.faqs.0.answer"),
     },
     {
       id: 2,
       category: "financing",
-      question: "What are the current interest rates?",
-      answer:
-        "Interest rates vary by lender and your profile. The Financing page shows the currently available provider rates stored in the system for comparison.",
+      question: t("help_center_page.faqs.1.question"),
+      answer: t("help_center_page.faqs.1.answer"),
     },
     {
       id: 3,
       category: "payments",
-      question: "How do I update my bank details?",
-      answer:
-        "Go to Settings to manage your saved preferences and account-related options. Payment and profile-related changes can be reviewed there.",
+      question: t("help_center_page.faqs.2.question"),
+      answer: t("help_center_page.faqs.2.answer"),
     },
     {
       id: 4,
       category: "security",
-      question: "Where can I change my password?",
-      answer:
-        "Open Settings and use the Security tab to update your password and keep your account protected.",
+      question: t("help_center_page.faqs.3.question"),
+      answer: t("help_center_page.faqs.3.answer"),
     },
     {
       id: 5,
       category: "tutorials",
-      question: "How do I start a vehicle price check?",
-      answer:
-        "Open Price Check, enter the vehicle details, and submit the form to generate a predicted vehicle value and related results.",
+      question: t("help_center_page.faqs.4.question"),
+      answer: t("help_center_page.faqs.4.answer"),
     },
   ];
 
@@ -167,7 +164,7 @@ const HelpCenter = () => {
         const result = await response.json();
 
         if (!response.ok) {
-          throw new Error(result.error || "Failed to send support ticket.");
+          throw new Error(result.error || t("help_center_page.errors.submit_failed"));
         }
       } catch {
         const { error } = await supabase.from("support_tickets").insert({
@@ -178,11 +175,11 @@ const HelpCenter = () => {
         });
 
         if (error) {
-          throw new Error(error.message || "Failed to send support ticket.");
+          throw new Error(error.message || t("help_center_page.errors.submit_failed"));
         }
       }
     } catch (error) {
-      setSubmitError(error.message || "We couldn't send your message right now. Please try again in a moment.");
+      setSubmitError(error.message || t("help_center_page.errors.submit_retry"));
       setIsSubmitting(false);
       return;
     }
@@ -192,7 +189,7 @@ const HelpCenter = () => {
       email: "",
       message: "",
     });
-    setSubmitSuccess("Thank you! Our support team will contact you shortly.");
+    setSubmitSuccess(t("help_center_page.success"));
     setIsSubmitting(false);
     window.setTimeout(() => {
       setSubmitSuccess("");
@@ -209,7 +206,7 @@ const HelpCenter = () => {
       <div className="max-w-6xl mx-auto space-y-16">
         <div className="text-center space-y-8 py-10">
           <h1 className="text-5xl font-bold tracking-tight">
-            How can we <span className="gradient-text">help you?</span>
+            {t("help_center_page.title_prefix")} <span className="gradient-text">{t("help_center_page.title_highlight")}</span>
           </h1>
 
           <div className="max-w-2xl mx-auto relative group">
@@ -218,7 +215,7 @@ const HelpCenter = () => {
             </div>
             <input
               type="text"
-              placeholder="Search for articles, guides, or keywords..."
+              placeholder={t("help_center_page.search_placeholder")}
               className="w-full bg-[#1e293b]/50 border border-slate-700/50 py-4 pl-14 pr-6 rounded-full outline-none transition-all duration-300 focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20 backdrop-blur-md theme-text-primary"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -228,14 +225,14 @@ const HelpCenter = () => {
           {selectedCategory !== "all" && (
             <div className="flex items-center justify-center gap-3 text-sm">
               <span className="theme-text-secondary">
-                Filtering by {categories.find((cat) => cat.id === selectedCategory)?.title}
+                {t("help_center_page.filtering_by")} {categories.find((cat) => cat.id === selectedCategory)?.title}
               </span>
               <button
                 type="button"
                 onClick={() => setSelectedCategory("all")}
                 className="text-[#3B82F6] hover:text-blue-300 transition-colors"
               >
-                Clear filter
+                {t("help_center_page.clear_filter")}
               </button>
             </div>
           )}
@@ -267,14 +264,14 @@ const HelpCenter = () => {
               <p className="theme-text-secondary text-sm leading-relaxed">{cat.description}</p>
               <div className="mt-5 flex items-center justify-between gap-3">
                 <span className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                  Filter FAQs
+                  {t("help_center_page.filter_faqs")}
                 </span>
                 <button
                   type="button"
                   onClick={(event) => handleCategoryOpen(event, cat.route)}
                   className="rounded-full border border-[#3B82F6]/30 bg-[#3B82F6]/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#7dd3fc] transition hover:border-[#3B82F6]/50 hover:bg-[#3B82F6]/15"
                 >
-                  Open Page
+                  {t("help_center_page.open_page")}
                 </button>
               </div>
             </div>
@@ -283,15 +280,15 @@ const HelpCenter = () => {
 
         <div ref={faqSectionRef} className="space-y-8 glass p-8 md:p-12 rounded-3xl">
           <div className="text-center md:text-left">
-            <h2 className="theme-text-primary text-3xl font-bold mb-2">Frequently Asked Questions</h2>
-            <p className="theme-text-secondary">Quick answers to common questions about our platform.</p>
+            <h2 className="theme-text-primary text-3xl font-bold mb-2">{t("help_center_page.faq_title")}</h2>
+            <p className="theme-text-secondary">{t("help_center_page.faq_subtitle")}</p>
           </div>
 
           <div className="grid gap-4">
             {filteredFaqs.length === 0 ? (
               <div className="theme-surface-soft rounded-2xl p-6 text-center">
-                <p className="theme-text-primary text-lg font-medium">No matching help articles found.</p>
-                <p className="theme-text-secondary mt-2">Try another keyword or clear the category filter.</p>
+                <p className="theme-text-primary text-lg font-medium">{t("help_center_page.no_matches_title")}</p>
+                <p className="theme-text-secondary mt-2">{t("help_center_page.no_matches_subtitle")}</p>
               </div>
             ) : (
               filteredFaqs.map((faq) => (
@@ -333,8 +330,8 @@ const HelpCenter = () => {
           className="flex flex-col items-center justify-center space-y-8 py-12 border-t border-slate-800/50 scroll-mt-24"
         >
           <div className="text-center">
-            <h2 className="theme-text-primary text-2xl font-bold mb-2">Contact Us</h2>
-            <p className="theme-text-secondary">Our support team is available 24/7 to assist you.</p>
+            <h2 className="theme-text-primary text-2xl font-bold mb-2">{t("help_center_page.contact_title")}</h2>
+            <p className="theme-text-secondary">{t("help_center_page.contact_subtitle")}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="w-full max-w-2xl space-y-4">
@@ -344,7 +341,7 @@ const HelpCenter = () => {
                 name="full_name"
                 value={formData.full_name}
                 onChange={handleInputChange}
-                placeholder="Full Name"
+                placeholder={t("help_center_page.full_name")}
                 required
                 className="w-full bg-[#1e293b]/50 border border-slate-700/50 py-4 px-5 rounded-xl outline-none transition-all duration-300 focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20 backdrop-blur-md"
               />
@@ -353,7 +350,7 @@ const HelpCenter = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleInputChange}
-                placeholder="Email Address"
+                placeholder={t("help_center_page.email")}
                 required
                 className="w-full bg-[#1e293b]/50 border border-slate-700/50 py-4 px-5 rounded-xl outline-none transition-all duration-300 focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20 backdrop-blur-md"
               />
@@ -363,7 +360,7 @@ const HelpCenter = () => {
               name="message"
               value={formData.message}
               onChange={handleInputChange}
-              placeholder="Tell us how we can help..."
+              placeholder={t("help_center_page.message")}
               required
               rows="6"
               className="w-full bg-[#1e293b]/50 border border-slate-700/50 py-4 px-5 rounded-2xl outline-none transition-all duration-300 focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20 backdrop-blur-md resize-none"
@@ -384,7 +381,7 @@ const HelpCenter = () => {
                 }}
               >
                 <Mail className="w-5 h-5" />
-                {isSubmitting ? "Sending..." : "Send Message"}
+                {isSubmitting ? t("help_center_page.sending") : t("help_center_page.send")}
               </button>
 
               {submitSuccess && <p className="text-emerald-400 text-sm text-center">{submitSuccess}</p>}

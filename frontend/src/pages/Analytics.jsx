@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Line } from "react-chartjs-2"
+import { Trash2 } from "lucide-react"
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -11,7 +12,8 @@ import {
   Legend,
   Filler
 } from "chart.js"
-import { loadPredictionHistory } from "../utils/predictionHistory"
+import SuccessToast from "../components/auth/SuccessToast"
+import { deletePredictionHistoryEntry, loadPredictionHistory } from "../utils/predictionHistory"
 import { supabase } from "../utils/supabaseClient"
 import analyticsTrends from "../data/analytics_trends.json"
 import marketTrends from "../data/market_trends.json"
@@ -24,6 +26,7 @@ const DEPRECIATION_ASSUMPTION_LABEL = "10% (0-3 yrs), 7% (4-7 yrs), 5% (8+ yrs)"
 function normalizeSupabasePrediction(row) {
   return {
     id: `db-${row.id}`,
+    sourceId: row.id,
     brand: row.brand,
     model: row.model,
     year: row.year,
@@ -387,6 +390,13 @@ function Analytics() {
   const [selectedPredictionId, setSelectedPredictionId] = useState("")
   const [historySource, setHistorySource] = useState("local")
   const [isHistoryLoading, setIsHistoryLoading] = useState(true)
+  const [deletingPredictionId, setDeletingPredictionId] = useState("")
+  const [toast, setToast] = useState({
+    isOpen: false,
+    type: "success",
+    message: "",
+    subMessage: "",
+  })
   const themeStyles =
     typeof window !== "undefined"
       ? getComputedStyle(document.documentElement)
@@ -395,6 +405,14 @@ function Analytics() {
   const themeTextSecondary = themeStyles?.getPropertyValue("--text-secondary")?.trim() || "#94a3b8"
   const themeSurface = themeStyles?.getPropertyValue("--bg-surface")?.trim() || "#1e293b"
   const themeBorder = themeStyles?.getPropertyValue("--border-color")?.trim() || "#334155"
+
+  const showToast = (type, message, subMessage = "") => {
+    setToast({ isOpen: true, type, message, subMessage })
+    window.clearTimeout(window.__analyticsToastTimeout)
+    window.__analyticsToastTimeout = window.setTimeout(() => {
+      setToast((prev) => ({ ...prev, isOpen: false }))
+    }, 3000)
+  }
 
   useEffect(() => {
     let isActive = true
@@ -519,8 +537,76 @@ function Analytics() {
 
   const displayedPredictions = showAll ? filteredPredictions : filteredPredictions.slice(0, 4)
 
+  const handleDeletePrediction = async (prediction) => {
+    const confirmed = window.confirm(
+      `Delete the saved prediction for ${prediction.brand} ${prediction.model} ${prediction.year}?`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setDeletingPredictionId(prediction.id)
+
+    try {
+      if (historySource === "supabase") {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession()
+        const currentUserId = session?.user?.id
+
+        if (!currentUserId || !prediction.sourceId) {
+          throw new Error("Missing prediction owner or record id.")
+        }
+
+        const { error } = await supabase
+          .from("predictions")
+          .delete()
+          .eq("id", prediction.sourceId)
+          .eq("user_id", currentUserId)
+
+        if (error) {
+          throw error
+        }
+      } else {
+        deletePredictionHistoryEntry(prediction.id)
+      }
+
+      setSavedPredictions((current) => current.filter((item) => item.id !== prediction.id))
+      setSelectedPredictionId((currentId) => (
+        currentId === prediction.id ? "" : currentId
+      ))
+      showToast("success", "Prediction deleted.", "The saved prediction was removed successfully.")
+    } catch (error) {
+      console.error("Failed to delete prediction:", error)
+      showToast("error", "Delete failed.", error?.message || "Unable to remove this prediction right now.")
+    } finally {
+      setDeletingPredictionId("")
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#0f172a] p-8">
+      <SuccessToast
+        isOpen={toast.isOpen && toast.type === "success"}
+        message={toast.message}
+        subMessage={toast.subMessage}
+      />
+      {toast.isOpen && toast.type === "error" && (
+        <div className="fixed top-6 right-6 z-50 animate-slide-in-right">
+          <div className="theme-surface rounded-r-xl border-l-4 border-rose-500 p-4 min-w-[300px] flex items-start gap-4">
+            <div className="bg-rose-500/10 rounded-full p-2">
+              <svg className="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h4 className="theme-text-primary font-semibold text-lg">{toast.message}</h4>
+              {toast.subMessage && <p className="theme-text-secondary text-sm mt-1">{toast.subMessage}</p>}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mb-8 animate-fade-in">
         <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
@@ -652,12 +738,13 @@ function Analytics() {
                 <th>Year</th>
                 <th>Predicted Price</th>
                 <th>Status</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {displayedPredictions.length > 0 ? (
-                displayedPredictions.map((item, index) => (
-                  <tr key={index}>
+                displayedPredictions.map((item) => (
+                  <tr key={item.id}>
                     <td className="text-slate-400">{item.date}</td>
                     <td className="text-white font-medium">{item.brand}</td>
                     <td className="text-slate-300">{item.model}</td>
@@ -669,11 +756,23 @@ function Analytics() {
                         Completed
                       </span>
                     </td>
+                    <td className="text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePrediction(item)}
+                        disabled={deletingPredictionId === item.id}
+                        className="inline-flex items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/5 p-2 text-rose-400 transition-all hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        aria-label={`Delete prediction for ${item.brand} ${item.model} ${item.year}`}
+                        title="Delete saved prediction"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="text-center text-slate-500 py-8">No predictions found matching your search.</td>
+                  <td colSpan="7" className="text-center text-slate-500 py-8">No predictions found matching your search.</td>
                 </tr>
               )}
             </tbody>

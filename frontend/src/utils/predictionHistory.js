@@ -49,4 +49,20 @@ export function savePredictionHistoryEntry(entry) {
   }
 }
 
+export function deletePredictionHistoryEntry(entryId) {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const existing = loadPredictionHistory();
+    const next = existing.filter((item) => item?.id !== entryId);
+    window.localStorage.setItem(PREDICTION_HISTORY_STORAGE_KEY, JSON.stringify(next));
+    return next;
+  } catch (error) {
+    console.error("Failed to delete prediction history entry:", error);
+    return loadPredictionHistory();
+  }
+}
+
 export { PREDICTION_HISTORY_STORAGE_KEY };

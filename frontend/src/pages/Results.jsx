@@ -18,6 +18,8 @@ function Results() {
   const predictedPrice = location.state?.predictedPrice || 4500000;
   const predictedAt = location.state?.predictedAt || Date.now();
   const predictionKey = location.state?.predictionKey || `${vehicle?.brand || "unknown"}-${vehicle?.model || "unknown"}-${predictedAt}`;
+  const saveStatus = location.state?.saveStatus || "local_only";
+  const saveMessage = location.state?.saveMessage || "Prediction saved only on this device.";
   const [alertSet, setAlertSet] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [loanPlans, setLoanPlans] = useState([]);
@@ -280,6 +282,26 @@ function Results() {
           </div>
         </div>
       )}
+
+      <div className={`mb-6 p-4 rounded-xl border flex items-start gap-3 animate-fade-in ${
+        saveStatus === "cloud"
+          ? "bg-emerald-500/10 border-emerald-500/30"
+          : "bg-amber-500/10 border-amber-500/30"
+      }`}>
+        <svg className={`w-5 h-5 flex-shrink-0 ${saveStatus === "cloud" ? "text-emerald-400" : "text-amber-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {saveStatus === "cloud" ? (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          ) : (
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+          )}
+        </svg>
+        <div>
+          <p className={`text-sm font-medium ${saveStatus === "cloud" ? "text-emerald-300" : "text-amber-300"}`}>
+            {saveStatus === "cloud" ? "Saved to your account" : "Saved locally only"}
+          </p>
+          <p className="text-slate-400 text-xs">{saveMessage}</p>
+        </div>
+      </div>
 
       {/* HEADER - Price Result */}
       <div className="relative overflow-hidden rounded-2xl p-8 mb-8 animate-fade-in" style={{

@@ -142,6 +142,8 @@ function PriceCheck() {
           predictedPrice: data.predicted_price_lkr,
           predictedAt,
           predictionKey,
+          saveStatus: data.save_status || "local_only",
+          saveMessage: data.save_message || "Prediction saved only on this device.",
         },
       })
     } catch (error) {

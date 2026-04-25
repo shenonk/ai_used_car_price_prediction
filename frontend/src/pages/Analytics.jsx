@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Line } from "react-chartjs-2"
 import { Trash2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -10,7 +11,7 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 } from "chart.js"
 import SuccessToast from "../components/auth/SuccessToast"
 import { deletePredictionHistoryEntry, loadPredictionHistory } from "../utils/predictionHistory"
@@ -21,7 +22,6 @@ import marketTrends from "../data/market_trends.json"
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, Filler)
 
 const CURRENCY_FORMATTER = new Intl.NumberFormat("en-LK")
-const DEPRECIATION_ASSUMPTION_LABEL = "10% (0-3 yrs), 7% (4-7 yrs), 5% (8+ yrs)"
 
 function normalizeSupabasePrediction(row) {
   return {
@@ -33,36 +33,6 @@ function normalizeSupabasePrediction(row) {
     predictedPrice: Number(row.predicted_price_lkr) || 0,
     predictedAt: new Date(row.created_at).getTime(),
   }
-}
-
-function buildPredictionFingerprint(prediction) {
-  const predictedAt = Number(prediction.predictedAt || 0)
-  const roundedToMinute = predictedAt > 0 ? Math.floor(predictedAt / 60000) : 0
-  const roundedPrice = Math.round(Number(prediction.predictedPrice || 0))
-
-  return [
-    String(prediction.brand || "").trim().toUpperCase(),
-    String(prediction.model || "").trim().toUpperCase(),
-    String(prediction.year || "").trim(),
-    String(roundedPrice),
-    String(roundedToMinute),
-  ].join("|||")
-}
-
-function mergePredictionSources(primary, secondary) {
-  const merged = []
-  const seen = new Set()
-
-  ;[...(primary || []), ...(secondary || [])].forEach((prediction) => {
-    const fingerprint = buildPredictionFingerprint(prediction)
-    if (seen.has(fingerprint)) {
-      return
-    }
-    seen.add(fingerprint)
-    merged.push(prediction)
-  })
-
-  return merged.sort((a, b) => (b.predictedAt || 0) - (a.predictedAt || 0))
 }
 
 async function loadAnalyticsPredictions() {
@@ -200,9 +170,7 @@ function applyBackwardDepreciation(fromValue, manufactureYear, fromYear, targetY
 function buildFullAnnualTrend(prediction, basePoints, sourceLabel, baseNote) {
   const currentYear = new Date().getFullYear()
   const manufactureYear = Math.min(Number(prediction.year) || currentYear, currentYear)
-  const pointMap = new Map(
-    basePoints.map((point) => [Number(point.listingYear), Number(point.medianPrice)])
-  )
+  const pointMap = new Map(basePoints.map((point) => [Number(point.listingYear), Number(point.medianPrice)]))
 
   if (!pointMap.has(currentYear)) {
     pointMap.set(currentYear, Number(prediction.predictedPrice))
@@ -260,6 +228,10 @@ function filterPlausibleMarketPoints(prediction, points) {
     const value = Number(point.marketValueLkr ?? point.medianPrice ?? 0)
     return value >= 1_000_000 && value <= 20_000_000
   })
+}
+
+function roundToTwo(value) {
+  return Math.round(value * 100) / 100
 }
 
 function buildVariantMarketTrendSeries(prediction) {
@@ -330,10 +302,6 @@ function buildVariantMarketTrendSeries(prediction) {
   }
 }
 
-function roundToTwo(value) {
-  return Math.round(value * 100) / 100
-}
-
 function getDatasetTrendSeries(prediction) {
   const marketTrend = filterPlausibleMarketPoints(
     prediction,
@@ -383,6 +351,7 @@ function getDatasetTrendSeries(prediction) {
 }
 
 function Analytics() {
+  const { t, i18n } = useTranslation()
   const [search, setSearch] = useState("")
   const [brandFilter, setBrandFilter] = useState("")
   const [showAll, setShowAll] = useState(false)
@@ -405,6 +374,7 @@ function Analytics() {
   const themeTextSecondary = themeStyles?.getPropertyValue("--text-secondary")?.trim() || "#94a3b8"
   const themeSurface = themeStyles?.getPropertyValue("--bg-surface")?.trim() || "#1e293b"
   const themeBorder = themeStyles?.getPropertyValue("--border-color")?.trim() || "#334155"
+  const depreciationAssumptionLabel = t("dashboard_page.depreciation_assumption_value")
 
   const showToast = (type, message, subMessage = "") => {
     setToast({ isOpen: true, type, message, subMessage })
@@ -474,19 +444,21 @@ function Analytics() {
 
   const data = {
     labels: chartSeries.labels,
-    datasets: [{
-      label: "Vehicle Value (LKR)",
-      data: chartSeries.values,
-      borderColor: "#f97316",
-      backgroundColor: "rgba(249, 115, 22, 0.1)",
-      tension: 0.4,
-      fill: true,
-      pointBackgroundColor: "#f97316",
-      pointBorderColor: "#fff",
-      pointBorderWidth: 2,
-      pointRadius: 5,
-      pointHoverRadius: 8,
-    }],
+    datasets: [
+      {
+        label: t("analytics_page.vehicle_value_label"),
+        data: chartSeries.values,
+        borderColor: "#f97316",
+        backgroundColor: "rgba(249, 115, 22, 0.1)",
+        tension: 0.4,
+        fill: true,
+        pointBackgroundColor: "#f97316",
+        pointBorderColor: "#fff",
+        pointBorderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 8,
+      },
+    ],
   }
 
   const options = {
@@ -504,7 +476,7 @@ function Analytics() {
         callbacks: {
           label: (context) => `LKR ${CURRENCY_FORMATTER.format(context.parsed.y)}`,
         },
-      }
+      },
     },
     scales: {
       x: { grid: { color: themeBorder }, ticks: { color: themeTextSecondary } },
@@ -514,21 +486,24 @@ function Analytics() {
           color: themeTextSecondary,
           callback: (value) => `LKR ${CURRENCY_FORMATTER.format(value)}`,
         },
-      }
-    }
+      },
+    },
   }
 
   const allPredictions = savedPredictions.map((item) => ({
     ...item,
-    date: new Date(item.predictedAt).toLocaleDateString("en-LK"),
+    date: new Date(item.predictedAt).toLocaleDateString(
+      i18n.language === "si" ? "si-LK" : i18n.language === "ta" ? "ta-LK" : "en-LK"
+    ),
     price: CURRENCY_FORMATTER.format(Math.round(item.predictedPrice)),
     status: "completed",
   }))
 
   const brandOptions = [...new Set(savedPredictions.map((item) => item.brand))].sort()
 
-  const filteredPredictions = allPredictions.filter(item => {
-    const matchesSearch = search === "" ||
+  const filteredPredictions = allPredictions.filter((item) => {
+    const matchesSearch =
+      search === "" ||
       item.brand.toLowerCase().includes(search.toLowerCase()) ||
       item.model.toLowerCase().includes(search.toLowerCase())
     const matchesBrand = brandFilter === "" || item.brand === brandFilter
@@ -539,7 +514,9 @@ function Analytics() {
 
   const handleDeletePrediction = async (prediction) => {
     const confirmed = window.confirm(
-      `Delete the saved prediction for ${prediction.brand} ${prediction.model} ${prediction.year}?`
+      t("analytics_page.delete_confirm", {
+        label: `${prediction.brand} ${prediction.model} ${prediction.year}`,
+      })
     )
 
     if (!confirmed) {
@@ -556,7 +533,7 @@ function Analytics() {
         const currentUserId = session?.user?.id
 
         if (!currentUserId || !prediction.sourceId) {
-          throw new Error("Missing prediction owner or record id.")
+          throw new Error(t("analytics_page.missing_record_error"))
         }
 
         const { error } = await supabase
@@ -573,13 +550,19 @@ function Analytics() {
       }
 
       setSavedPredictions((current) => current.filter((item) => item.id !== prediction.id))
-      setSelectedPredictionId((currentId) => (
-        currentId === prediction.id ? "" : currentId
-      ))
-      showToast("success", "Prediction deleted.", "The saved prediction was removed successfully.")
+      setSelectedPredictionId((currentId) => (currentId === prediction.id ? "" : currentId))
+      showToast(
+        "success",
+        t("analytics_page.delete_success_title"),
+        t("analytics_page.delete_success_subtitle")
+      )
     } catch (error) {
       console.error("Failed to delete prediction:", error)
-      showToast("error", "Delete failed.", error?.message || "Unable to remove this prediction right now.")
+      showToast(
+        "error",
+        t("analytics_page.delete_failed_title"),
+        error?.message || t("analytics_page.delete_failed_subtitle")
+      )
     } finally {
       setDeletingPredictionId("")
     }
@@ -615,17 +598,16 @@ function Analytics() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
             </svg>
           </span>
-          Analytics Dashboard
+          {t("analytics_page.title")}
         </h1>
-        <p className="text-slate-400">Track depreciation trends and prediction history</p>
+        <p className="text-slate-400">{t("analytics_page.subtitle")}</p>
       </div>
 
-      {/* Depreciation Chart */}
       <div className="card p-6 mb-8 animate-fade-in animate-delay-100">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-white flex items-center gap-2">
             <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
-            Market Value Trend
+            {t("analytics_page.market_value_trend")}
           </h2>
           <select
             className="input w-auto max-w-full text-sm py-2"
@@ -634,7 +616,7 @@ function Analytics() {
             disabled={savedPredictions.length === 0}
           >
             {savedPredictions.length === 0 ? (
-              <option value="">No saved predictions yet</option>
+              <option value="">{t("analytics_page.no_saved_predictions")}</option>
             ) : (
               savedPredictions.map((prediction) => (
                 <option key={prediction.id} value={prediction.id}>
@@ -649,28 +631,28 @@ function Analytics() {
             <div className="h-72"><Line data={data} options={options} /></div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
               <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Selected Vehicle</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("analytics_page.selected_vehicle")}</p>
                 <p className="mt-2 text-lg font-semibold text-white">{buildVehicleLabel(selectedPrediction)}</p>
               </div>
               <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Estimated Current Value</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("analytics_page.estimated_current_value")}</p>
                 <p className="mt-2 text-lg font-semibold text-amber-400">
                   LKR {CURRENCY_FORMATTER.format(displayCurrentValue)}
                 </p>
               </div>
               <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Approximate Annual Depreciation Assumption</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("analytics_page.depreciation_assumption")}</p>
                 <p className="mt-2 text-lg font-semibold text-white">
-                  {chartSeries.source === "projection" ? DEPRECIATION_ASSUMPTION_LABEL : "Dataset-backed market values"}
+                  {chartSeries.source === "projection" ? depreciationAssumptionLabel : t("analytics_page.dataset_backed_market_values")}
                 </p>
               </div>
             </div>
           </>
         ) : (
           <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-900/30 px-6 py-14 text-center">
-            <p className="text-lg font-medium text-white">No saved predictions yet</p>
+            <p className="text-lg font-medium text-white">{t("analytics_page.no_saved_predictions")}</p>
             <p className="mt-2 text-sm text-slate-400">
-              Run a vehicle price prediction first, and it will appear here automatically for analytics.
+              {t("analytics_page.run_prediction_hint")}
             </p>
           </div>
         )}
@@ -679,36 +661,35 @@ function Analytics() {
             <svg className="w-6 h-6 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
             <div>
               <p className="font-semibold text-white">
-                {chartSeries.source === "projection" ? "Approximate Value Projection" : "Dataset-Based Market Trend"}
+                {chartSeries.source === "projection" ? t("analytics_page.approximate_projection") : t("analytics_page.dataset_market_trend")}
               </p>
               <p className="text-sm text-slate-400">
-                {chartSeries.note || "This chart is shown for analytical guidance only."}
+                {chartSeries.note || t("analytics_page.chart_guidance")}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Prediction History */}
       <div className="card p-6 animate-fade-in animate-delay-200">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <h2 className="text-xl font-semibold text-white flex items-center gap-2">
               <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-              Prediction History
+              {t("analytics_page.prediction_history")}
             </h2>
             <p className="mt-2 text-sm text-slate-500">
               {isHistoryLoading
-                ? "Loading saved predictions..."
+                ? t("analytics_page.loading_saved_predictions")
                 : historySource === "supabase"
-                  ? "Showing your synced cloud history."
-                  : "Showing local browser history."}
+                  ? t("analytics_page.synced_cloud_history")
+                  : t("analytics_page.local_browser_history")}
             </p>
           </div>
           <div className="flex gap-3">
             <input
               type="text"
-              placeholder="Search brand or model..."
+              placeholder={t("analytics_page.search_placeholder")}
               className="input w-48 text-sm py-2"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -718,7 +699,7 @@ function Analytics() {
               value={brandFilter}
               onChange={(e) => setBrandFilter(e.target.value)}
             >
-              <option value="">All Brands</option>
+              <option value="">{t("analytics_page.all_brands")}</option>
               {brandOptions.map((brand) => (
                 <option key={brand} value={brand}>
                   {brand}
@@ -732,13 +713,13 @@ function Analytics() {
           <table className="table-modern">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Brand</th>
-                <th>Model</th>
-                <th>Year</th>
-                <th>Predicted Price</th>
-                <th>Status</th>
-                <th className="text-right">Actions</th>
+                <th>{t("analytics_page.date")}</th>
+                <th>{t("analytics_page.brand")}</th>
+                <th>{t("analytics_page.model")}</th>
+                <th>{t("analytics_page.year")}</th>
+                <th>{t("analytics_page.predicted_price")}</th>
+                <th>{t("analytics_page.status")}</th>
+                <th className="text-right">{t("analytics_page.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -753,7 +734,7 @@ function Analytics() {
                     <td>
                       <span className="badge badge-success">
                         <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                        Completed
+                        {t("analytics_page.completed")}
                       </span>
                     </td>
                     <td className="text-right">
@@ -762,8 +743,10 @@ function Analytics() {
                         onClick={() => handleDeletePrediction(item)}
                         disabled={deletingPredictionId === item.id}
                         className="inline-flex items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/5 p-2 text-rose-400 transition-all hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                        aria-label={`Delete prediction for ${item.brand} ${item.model} ${item.year}`}
-                        title="Delete saved prediction"
+                        aria-label={t("analytics_page.delete_aria_label", {
+                          label: `${item.brand} ${item.model} ${item.year}`,
+                        })}
+                        title={t("analytics_page.delete_title")}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -772,7 +755,7 @@ function Analytics() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="text-center text-slate-500 py-8">No predictions found matching your search.</td>
+                  <td colSpan="7" className="text-center text-slate-500 py-8">{t("analytics_page.no_matching_predictions")}</td>
                 </tr>
               )}
             </tbody>
@@ -780,12 +763,12 @@ function Analytics() {
         </div>
 
         <div className="mt-6 flex justify-between items-center text-sm text-slate-500">
-          <span>Showing {displayedPredictions.length} of {filteredPredictions.length} predictions</span>
+          <span>{t("analytics_page.showing_count", { shown: displayedPredictions.length, total: filteredPredictions.length })}</span>
           {!showAll && filteredPredictions.length > 4 && (
-            <button onClick={() => setShowAll(true)} className="text-blue-400 hover:text-blue-300 transition-colors">View All →</button>
+            <button onClick={() => setShowAll(true)} className="text-blue-400 hover:text-blue-300 transition-colors">{t("analytics_page.view_all")}</button>
           )}
           {showAll && (
-            <button onClick={() => setShowAll(false)} className="text-blue-400 hover:text-blue-300 transition-colors">Show Less ←</button>
+            <button onClick={() => setShowAll(false)} className="text-blue-400 hover:text-blue-300 transition-colors">{t("analytics_page.show_less")}</button>
           )}
         </div>
       </div>

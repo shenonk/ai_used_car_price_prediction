@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import {
   ArrowRight,
   BellRing,
@@ -40,22 +41,14 @@ function formatRelativeDate(value) {
   }
 
   const diffMinutes = Math.round((Date.now() - timestamp) / 60000)
-  if (diffMinutes < 1) {
-    return "Just now"
-  }
-  if (diffMinutes < 60) {
-    return `${diffMinutes} min ago`
-  }
+  if (diffMinutes < 1) return "Just now"
+  if (diffMinutes < 60) return `${diffMinutes} min ago`
 
   const diffHours = Math.round(diffMinutes / 60)
-  if (diffHours < 24) {
-    return `${diffHours} hr ago`
-  }
+  if (diffHours < 24) return `${diffHours} hr ago`
 
   const diffDays = Math.round(diffHours / 24)
-  if (diffDays < 30) {
-    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`
-  }
+  if (diffDays < 30) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`
 
   return new Date(value).toLocaleDateString("en-LK")
 }
@@ -82,52 +75,9 @@ function normalizeLocalPrediction(row) {
   }
 }
 
-function buildInsightCards(predictions, bestRate, alertsCount) {
-  const topPrediction = predictions[0]
-  const hottestBrand = (() => {
-    const counts = predictions.reduce((acc, item) => {
-      const key = String(item.brand || "").trim()
-      if (!key) {
-        return acc
-      }
-      acc[key] = (acc[key] || 0) + 1
-      return acc
-    }, {})
-
-    const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1])
-    return ranked[0]?.[0] || "Toyota"
-  })()
-
-  return [
-    {
-      label: "Best bank rate",
-      value: bestRate ? `${bestRate.toFixed(1)}%` : "8.5%",
-      tone: "text-emerald-300",
-      icon: <Coins className="h-4 w-4 text-emerald-400" />,
-    },
-    {
-      label: "Top predicted brand",
-      value: hottestBrand,
-      tone: "text-cyan-300",
-      icon: <CarFront className="h-4 w-4 text-cyan-400" />,
-    },
-    {
-      label: "Active alerts",
-      value: `${alertsCount}`,
-      tone: "text-amber-300",
-      icon: <BellRing className="h-4 w-4 text-amber-400" />,
-    },
-    {
-      label: "Latest estimate",
-      value: topPrediction ? formatCompactCurrency(topPrediction.predictedPrice) : "No data",
-      tone: "text-blue-300",
-      icon: <Sparkles className="h-4 w-4 text-blue-400" />,
-    },
-  ]
-}
-
 function Dashboard() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState({
     user: null,
@@ -174,9 +124,7 @@ function Dashboard() {
         .order("fixed_rate", { ascending: true })
         .limit(1)
 
-      if (!isActive) {
-        return
-      }
+      if (!isActive) return
 
       setDashboardData({
         user,
@@ -209,14 +157,12 @@ function Dashboard() {
 
     const brandCounts = predictions.reduce((acc, item) => {
       const key = String(item.brand || "").trim()
-      if (!key) {
-        return acc
-      }
+      if (!key) return acc
       acc[key] = (acc[key] || 0) + 1
       return acc
     }, {})
 
-    const topBrand = Object.entries(brandCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || "None"
+    const topBrand = Object.entries(brandCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || t("dashboard_page.default_brand")
     const latestPrediction = predictions[0]
 
     return {
@@ -226,7 +172,7 @@ function Dashboard() {
       latestPredictionTime: latestPrediction?.predictedAt || "",
       latestPredictionValue: latestPrediction?.predictedPrice || 0,
     }
-  }, [dashboardData.predictions])
+  }, [dashboardData.predictions, t])
 
   const sparklineData = useMemo(() => {
     const values = dashboardData.predictions
@@ -241,75 +187,96 @@ function Dashboard() {
     }))
   }, [dashboardData.predictions])
 
-  const quickActions = [
+  const quickActions = useMemo(() => ([
     {
-      title: "New Prediction",
-      note: "Check a vehicle price",
+      title: t("dashboard_page.quick_actions.new_prediction_title"),
+      note: t("dashboard_page.quick_actions.new_prediction_note"),
       icon: <Sparkles className="h-5 w-5" />,
       accent: "from-blue-500/25 to-cyan-400/10 border-blue-500/20 text-blue-300",
       onClick: () => navigate("/price-check"),
     },
     {
-      title: "Analytics",
-      note: "Open your history",
+      title: t("dashboard_page.quick_actions.analytics_title"),
+      note: t("dashboard_page.quick_actions.analytics_note"),
       icon: <LineChart className="h-5 w-5" />,
       accent: "from-amber-500/25 to-orange-400/10 border-amber-500/20 text-amber-300",
       onClick: () => navigate("/analytics"),
     },
     {
-      title: "Marketplace",
-      note: "Browse live listings",
+      title: t("dashboard_page.quick_actions.marketplace_title"),
+      note: t("dashboard_page.quick_actions.marketplace_note"),
       icon: <CarFront className="h-5 w-5" />,
       accent: "from-emerald-500/25 to-teal-400/10 border-emerald-500/20 text-emerald-300",
       onClick: () => navigate("/marketplace"),
     },
     {
-      title: "Financing",
-      note: "Compare repayment plans",
+      title: t("dashboard_page.quick_actions.financing_title"),
+      note: t("dashboard_page.quick_actions.financing_note"),
       icon: <Calculator className="h-5 w-5" />,
       accent: "from-fuchsia-500/20 to-pink-400/10 border-fuchsia-500/20 text-fuchsia-300",
       onClick: () => navigate("/financing"),
     },
-  ]
+  ]), [navigate, t])
 
   const statCards = [
     {
-      label: "Saved predictions",
+      label: t("dashboard_page.stats.saved_predictions"),
       value: `${summary.totalPredictions}`,
-      meta: dashboardData.source === "supabase" ? "Cloud history" : "Local history",
+      meta: dashboardData.source === "supabase" ? t("dashboard_page.stats.cloud_history") : t("dashboard_page.stats.local_history"),
       icon: <Bookmark className="h-5 w-5" />,
       iconBg: "bg-blue-500/15 text-blue-300",
     },
     {
-      label: "Average estimate",
-      value: summary.totalPredictions > 0 ? formatCompactCurrency(summary.averagePrice) : "No data",
-      meta: summary.totalPredictions > 0 ? "Across recent saves" : "Make your first prediction",
+      label: t("dashboard_page.stats.average_estimate"),
+      value: summary.totalPredictions > 0 ? formatCompactCurrency(summary.averagePrice) : t("dashboard_page.no_data"),
+      meta: summary.totalPredictions > 0 ? t("dashboard_page.stats.recent_saves") : t("dashboard_page.stats.first_prediction"),
       icon: <Coins className="h-5 w-5" />,
       iconBg: "bg-emerald-500/15 text-emerald-300",
     },
     {
-      label: "Active alerts",
+      label: t("dashboard_page.stats.active_alerts"),
       value: `${dashboardData.alertsCount}`,
-      meta: dashboardData.alertsCount > 0 ? "Ready for follow-up" : "No tracked alerts",
+      meta: dashboardData.alertsCount > 0 ? t("dashboard_page.stats.alerts_ready") : t("dashboard_page.stats.no_alerts"),
       icon: <BellRing className="h-5 w-5" />,
       iconBg: "bg-amber-500/15 text-amber-300",
     },
     {
-      label: "Most predicted brand",
+      label: t("dashboard_page.stats.top_brand"),
       value: summary.topBrand,
-      meta: summary.latestPredictionTime ? formatRelativeDate(summary.latestPredictionTime) : "Waiting for activity",
+      meta: summary.latestPredictionTime ? formatRelativeDate(summary.latestPredictionTime) : t("dashboard_page.stats.waiting_activity"),
       icon: <TrendingUp className="h-5 w-5" />,
       iconBg: "bg-cyan-500/15 text-cyan-300",
     },
   ]
 
-  const insightCards = buildInsightCards(
-    dashboardData.predictions,
-    dashboardData.bestRate,
-    dashboardData.alertsCount
-  )
+  const insightCards = [
+    {
+      label: t("dashboard_page.best_bank_rate"),
+      value: dashboardData.bestRate ? `${dashboardData.bestRate.toFixed(1)}%` : "8.5%",
+      tone: "text-emerald-300",
+      icon: <Coins className="h-4 w-4 text-emerald-400" />,
+    },
+    {
+      label: t("dashboard_page.most_tracked_brand"),
+      value: summary.topBrand,
+      tone: "text-cyan-300",
+      icon: <CarFront className="h-4 w-4 text-cyan-400" />,
+    },
+    {
+      label: t("dashboard_page.active_alerts_short"),
+      value: `${dashboardData.alertsCount}`,
+      tone: "text-amber-300",
+      icon: <BellRing className="h-4 w-4 text-amber-400" />,
+    },
+    {
+      label: t("dashboard_page.latest_estimate_short"),
+      value: summary.latestPredictionValue ? formatCompactCurrency(summary.latestPredictionValue) : t("dashboard_page.no_data"),
+      tone: "text-blue-300",
+      icon: <Sparkles className="h-4 w-4 text-blue-400" />,
+    },
+  ]
 
-  const username = dashboardData.user?.username || dashboardData.user?.email?.split("@")[0] || "Driver"
+  const username = dashboardData.user?.username || dashboardData.user?.email?.split("@")[0] || t("dashboard_page.default_driver")
 
   return (
     <div className="min-h-screen bg-[#0f172a] p-5 md:p-8">
@@ -321,13 +288,14 @@ function Dashboard() {
           <div>
             <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-slate-300">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              Dashboard
+              {t("dashboard_page.badge")}
             </div>
             <h1 className="text-3xl font-bold tracking-tight text-white md:text-5xl">
-              Good to see you, <span className="bg-gradient-to-r from-white to-cyan-300 bg-clip-text text-transparent">{username}</span>
+              {t("dashboard_page.greeting", { name: username }).replace(username, "")}
+              <span className="bg-gradient-to-r from-white to-cyan-300 bg-clip-text text-transparent">{username}</span>
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-              Your predictions, alerts, and market pulse in one place.
+              {t("dashboard_page.subtitle")}
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
@@ -335,14 +303,14 @@ function Dashboard() {
                 onClick={() => navigate("/price-check")}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform duration-300 hover:-translate-y-0.5"
               >
-                Start Prediction
+                {t("dashboard_page.start_prediction")}
                 <ArrowRight className="h-4 w-4" />
               </button>
               <button
                 onClick={() => navigate("/analytics")}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition-colors duration-300 hover:bg-white/10"
               >
-                Open Analytics
+                {t("dashboard_page.open_analytics")}
                 <LineChart className="h-4 w-4" />
               </button>
             </div>
@@ -350,17 +318,17 @@ function Dashboard() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Latest estimate</p>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("dashboard_page.latest_estimate")}</p>
               <p className="mt-3 text-3xl font-bold text-amber-300">
-                {summary.latestPredictionValue ? formatCompactCurrency(summary.latestPredictionValue) : "No data"}
+                {summary.latestPredictionValue ? formatCompactCurrency(summary.latestPredictionValue) : t("dashboard_page.no_data")}
               </p>
               <p className="mt-2 text-sm text-slate-400">
-                {summary.latestPredictionTime ? formatRelativeDate(summary.latestPredictionTime) : "Create a prediction to start tracking"}
+                {summary.latestPredictionTime ? formatRelativeDate(summary.latestPredictionTime) : t("dashboard_page.create_prediction_hint")}
               </p>
             </div>
             <div className="rounded-3xl border border-white/10 bg-slate-950/30 p-5">
               <div className="flex items-center justify-between">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Price rhythm</p>
+                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("dashboard_page.price_rhythm")}</p>
                 <Clock3 className="h-4 w-4 text-slate-500" />
               </div>
               <div className="mt-5 flex h-24 items-end gap-2">
@@ -374,7 +342,7 @@ function Dashboard() {
                   ))
                 ) : (
                   <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-700/70 text-sm text-slate-500">
-                    No recent data
+                    {t("dashboard_page.no_recent_data")}
                   </div>
                 )}
               </div>
@@ -417,14 +385,14 @@ function Dashboard() {
         <div className="rounded-[30px] border border-slate-700/60 bg-slate-900/55 p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-white">Recent Predictions</h2>
-              <p className="mt-1 text-sm text-slate-400">Your latest saved estimates.</p>
+              <h2 className="text-2xl font-bold text-white">{t("dashboard_page.recent_predictions")}</h2>
+              <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.latest_saved_estimates")}</p>
             </div>
             <button
               onClick={() => navigate("/analytics")}
               className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-700/70 px-4 py-2 text-sm font-medium text-blue-300 transition-colors duration-300 hover:border-blue-400/40 hover:text-blue-200"
             >
-              View all
+              {t("dashboard_page.view_all")}
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
@@ -432,7 +400,7 @@ function Dashboard() {
           <div className="mt-6 space-y-3">
             {isLoading ? (
               <div className="rounded-3xl border border-dashed border-slate-700/70 px-6 py-12 text-center text-slate-500">
-                Loading dashboard...
+                {t("dashboard_page.loading")}
               </div>
             ) : recentPredictions.length > 0 ? (
               recentPredictions.map((item) => (
@@ -454,19 +422,19 @@ function Dashboard() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-cyan-300">{formatCurrency(item.predictedPrice)}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">Saved</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">{t("dashboard_page.saved")}</p>
                   </div>
                 </button>
               ))
             ) : (
               <div className="rounded-[28px] border border-dashed border-slate-700/70 bg-slate-950/20 px-6 py-14 text-center">
-                <p className="text-lg font-medium text-white">No predictions yet</p>
-                <p className="mt-2 text-sm text-slate-400">Run a price check to start building your dashboard.</p>
+                <p className="text-lg font-medium text-white">{t("dashboard_page.no_predictions_yet")}</p>
+                <p className="mt-2 text-sm text-slate-400">{t("dashboard_page.start_dashboard")}</p>
                 <button
                   onClick={() => navigate("/price-check")}
                   className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-colors duration-300 hover:bg-blue-400"
                 >
-                  Create first prediction
+                  {t("dashboard_page.create_first_prediction")}
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
@@ -478,11 +446,11 @@ function Dashboard() {
           <div className="rounded-[30px] border border-slate-700/60 bg-slate-900/55 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-white">Market Pulse</h2>
-                <p className="mt-1 text-sm text-slate-400">Fast signals for the day.</p>
+                <h2 className="text-2xl font-bold text-white">{t("dashboard_page.market_pulse")}</h2>
+                <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.fast_signals")}</p>
               </div>
               <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
-                Live
+                {t("dashboard_page.live")}
               </span>
             </div>
 
@@ -500,16 +468,16 @@ function Dashboard() {
           </div>
 
           <div className="rounded-[30px] border border-slate-700/60 bg-[linear-gradient(160deg,rgba(14,165,233,0.08),rgba(15,23,42,0.88))] p-6">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Ready now</p>
-            <h2 className="mt-3 text-2xl font-bold text-white">Move from estimate to action.</h2>
+            <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{t("dashboard_page.ready_now")}</p>
+            <h2 className="mt-3 text-2xl font-bold text-white">{t("dashboard_page.move_to_action")}</h2>
             <div className="mt-5 space-y-3 text-sm text-slate-300">
               <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
-                <span>Run a fresh valuation</span>
-                <span className="text-cyan-300">Price Check</span>
+                <span>{t("dashboard_page.fresh_valuation")}</span>
+                <span className="text-cyan-300">{t("price_check")}</span>
               </div>
               <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
-                <span>Compare monthly plans</span>
-                <span className="text-emerald-300">Financing</span>
+                <span>{t("dashboard_page.compare_plans")}</span>
+                <span className="text-emerald-300">{t("financing")}</span>
               </div>
             </div>
           </div>

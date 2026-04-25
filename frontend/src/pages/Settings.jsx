@@ -101,22 +101,38 @@ function Settings() {
     e.preventDefault();
 
     if (!passwordForm.currentPassword.trim()) {
-      showToast("error", "Current password is required.", "Enter your current password before updating it.");
+      showToast(
+        "error",
+        t("settings_page.security.errors.current_required"),
+        t("settings_page.security.errors.current_required_hint")
+      );
       return;
     }
 
     if (passwordForm.newPassword.length < 6) {
-      showToast("error", "New password is too short.", "Use at least 6 characters for better security.");
+      showToast(
+        "error",
+        t("settings_page.security.errors.too_short"),
+        t("settings_page.security.errors.too_short_hint")
+      );
       return;
     }
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      showToast("error", "Passwords do not match.", "Make sure the new password and confirmation are identical.");
+      showToast(
+        "error",
+        t("settings_page.security.errors.no_match"),
+        t("settings_page.security.errors.no_match_hint")
+      );
       return;
     }
 
     if (passwordForm.currentPassword === passwordForm.newPassword) {
-      showToast("error", "Choose a different password.", "Your new password should not be the same as the current one.");
+      showToast(
+        "error",
+        t("settings_page.security.errors.same_password"),
+        t("settings_page.security.errors.same_password_hint")
+      );
       return;
     }
 
@@ -128,13 +144,13 @@ function Settings() {
         if (result.isSessionMissing || result.requiresRelogin) {
           showToast(
             "error",
-            "Session expired.",
-            result.error || "Please refresh the page or log in again for security before updating your password."
+            t("settings_page.security.errors.session_expired"),
+            result.error || t("settings_page.security.errors.session_expired_hint")
           );
           return;
         }
 
-        showToast("error", "Password update failed.", result.error);
+        showToast("error", t("settings_page.security.errors.update_failed"), result.error);
         return;
       }
 
@@ -159,19 +175,23 @@ function Settings() {
           replace: true,
           state: {
             authMessage: "Password updated, please log in again.",
-            authSubMessage: "For security, your session ended after the password change.",
+            authSubMessage: t("settings_page.security.relogin_hint"),
           },
         });
         return;
       }
 
-      showToast("success", "Password updated successfully!", "Your account security settings have been updated.");
+      showToast(
+        "success",
+        t("settings_page.security.success_title"),
+        t("settings_page.security.success_subtitle")
+      );
     } catch (error) {
       const message =
         typeof error?.message === "string" && error.message.toLowerCase().includes("auth session missing")
-          ? "Please refresh the page or log in again for security before updating your password."
-          : "Something went wrong while updating your password. Please try again after refreshing the page.";
-      showToast("error", "Password update failed.", message);
+          ? t("settings_page.security.errors.session_expired_hint")
+          : t("settings_page.security.errors.generic");
+      showToast("error", t("settings_page.security.errors.update_failed"), message);
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -219,7 +239,7 @@ function Settings() {
     { id: "profile", label: t("profile"), icon: <User size={20} /> },
     { id: "notifications", label: t("notification_preferences"), icon: <Bell size={20} /> },
     { id: "alerts", label: t("manage_alerts"), icon: <Zap size={20} /> },
-    { id: "security", label: "Security", icon: <Lock size={20} /> },
+    { id: "security", label: t("settings_page.security.tab"), icon: <Lock size={20} /> },
     { id: "general", label: t("language_preferences"), icon: <Globe size={20} /> },
   ];
 
@@ -258,7 +278,7 @@ function Settings() {
         {/* Page Header */}
         <div className="mb-10">
           <h1 className="theme-text-primary text-4xl font-bold mb-2">{t("settings")}</h1>
-          <p className="theme-text-secondary">Manage your account, preferences, and data security.</p>
+          <p className="theme-text-secondary">{t("settings_page.subtitle")}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -454,8 +474,8 @@ function Settings() {
               {activeTab === "security" && (
                 <div className="space-y-8 animate-slide-up">
                   <div>
-                    <h2 className="text-2xl font-bold text-white mb-2">Security</h2>
-                    <p className="text-slate-400">Update your password to keep your account protected.</p>
+                    <h2 className="text-2xl font-bold text-white mb-2">{t("settings_page.security.title")}</h2>
+                    <p className="text-slate-400">{t("settings_page.security.subtitle")}</p>
                   </div>
 
                   <div className="p-6 rounded-2xl bg-slate-800/20 border border-slate-700/30">
@@ -464,20 +484,20 @@ function Settings() {
                         <Shield size={22} />
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-white mb-1">Change Password</h3>
-                        <p className="text-sm text-slate-400">Use a strong password with a mix of letters, numbers, and symbols.</p>
+                        <h3 className="text-lg font-semibold text-white mb-1">{t("settings_page.security.change_title")}</h3>
+                        <p className="text-sm text-slate-400">{t("settings_page.security.change_hint")}</p>
                       </div>
                     </div>
 
                     <form onSubmit={handlePasswordUpdate} className="mt-8 space-y-5">
                       <div className="space-y-2">
-                        <label className="label">Current Password</label>
+                        <label className="label">{t("settings_page.security.current_password")}</label>
                         <div className="relative group">
                           <input
                             type={showPassword ? "text" : "password"}
                             value={passwordForm.currentPassword}
                             onChange={(e) => handlePasswordFieldChange("currentPassword", e.target.value)}
-                            placeholder="Enter your current password"
+                            placeholder={t("settings_page.security.current_placeholder")}
                             className="input pl-12 pr-12"
                             autoComplete="current-password"
                             required
@@ -490,13 +510,13 @@ function Settings() {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
-                          <label className="label">New Password</label>
+                          <label className="label">{t("settings_page.security.new_password")}</label>
                           <div className="relative group">
                             <input
                               type={showPassword ? "text" : "password"}
                               value={passwordForm.newPassword}
                               onChange={(e) => handlePasswordFieldChange("newPassword", e.target.value)}
-                              placeholder="Create a new password"
+                              placeholder={t("settings_page.security.new_placeholder")}
                               className="input pl-12 pr-12"
                               autoComplete="new-password"
                               required
@@ -508,13 +528,13 @@ function Settings() {
                         </div>
 
                         <div className="space-y-2">
-                          <label className="label">Confirm Password</label>
+                          <label className="label">{t("settings_page.security.confirm_password")}</label>
                           <div className="relative group">
                             <input
                               type={showPassword ? "text" : "password"}
                               value={passwordForm.confirmPassword}
                               onChange={(e) => handlePasswordFieldChange("confirmPassword", e.target.value)}
-                              placeholder="Confirm your new password"
+                              placeholder={t("settings_page.security.confirm_placeholder")}
                               className="input pl-12 pr-12"
                               autoComplete="new-password"
                               required
@@ -526,7 +546,7 @@ function Settings() {
                               type="button"
                               onClick={() => setShowPassword((prev) => !prev)}
                               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                              aria-label={showPassword ? "Hide passwords" : "Show passwords"}
+                              aria-label={showPassword ? t("settings_page.security.hide_passwords") : t("settings_page.security.show_passwords")}
                             >
                               {showPassword ? (
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -544,7 +564,7 @@ function Settings() {
                       </div>
 
                       <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                        <p className="text-sm text-blue-200">Your password must be at least 6 characters and match the confirmation field.</p>
+                        <p className="text-sm text-blue-200">{t("settings_page.security.password_rule")}</p>
                       </div>
 
                       <div className="pt-4 border-t border-slate-800/50">
@@ -559,12 +579,12 @@ function Settings() {
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                               </svg>
-                              Updating...
+                              {t("settings_page.security.updating")}
                             </>
                           ) : (
                             <>
                               <Save size={18} />
-                              Update Password
+                              {t("settings_page.security.update_button")}
                             </>
                           )}
                         </button>

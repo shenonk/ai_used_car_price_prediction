@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
 
 function Notifications() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [notifications, setNotifications] = useState([])
@@ -19,7 +21,7 @@ function Notifications() {
       setLoading(true)
       setError(null)
       const res = await fetch(`${API_BASE_URL}/api/notifications`)
-      if (!res.ok) throw new Error('Failed to fetch notifications')
+      if (!res.ok) throw new Error(t("notifications_page.errors.fetch_failed"))
       const data = await res.json()
       
       const readIds = JSON.parse(localStorage.getItem('carpriceai_read_notifications') || '[]')
@@ -37,7 +39,7 @@ function Notifications() {
 
       setNotifications(formattedNotifs)
     } catch (err) {
-      setError('Unable to load notifications at this time.')
+      setError(t("notifications_page.errors.load_failed"))
     } finally {
       setLoading(false)
     }
@@ -90,16 +92,16 @@ function Notifications() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
             </span>
-            Notifications
+            {t("notifications_page.title")}
           </h1>
-          <p className="text-slate-400">Stay updated with market trends and price alerts</p>
+          <p className="text-slate-400">{t("notifications_page.subtitle")}</p>
         </div>
         <button onClick={() => navigate('/settings')} className="btn-secondary flex items-center gap-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          Settings
+          {t("notifications_page.settings")}
         </button>
       </div>
 
@@ -112,7 +114,7 @@ function Notifications() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">{notifications.length}</p>
-              <p className="text-sm text-slate-400">Total</p>
+              <p className="text-sm text-slate-400">{t("notifications_page.total")}</p>
             </div>
           </div>
         </div>
@@ -123,7 +125,7 @@ function Notifications() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">{unreadCount}</p>
-              <p className="text-sm text-slate-400">Unread</p>
+              <p className="text-sm text-slate-400">{t("notifications_page.unread")}</p>
             </div>
           </div>
         </div>
@@ -134,7 +136,7 @@ function Notifications() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">{alertCount}</p>
-              <p className="text-sm text-slate-400">Price Alerts</p>
+              <p className="text-sm text-slate-400">{t("notifications_page.price_alerts")}</p>
             </div>
           </div>
         </div>
@@ -143,20 +145,20 @@ function Notifications() {
       {/* Notifications List */}
       <div className="card p-6 mb-8 animate-fade-in animate-delay-200">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-white">Recent Notifications</h2>
+          <h2 className="text-lg font-semibold text-white">{t("notifications_page.recent")}</h2>
           {notifications.some(n => n.unread) && (
             <button onClick={markAllRead} className="text-sm text-blue-400 hover:text-blue-300 transition-colors">
-              Mark all as read
+              {t("notifications_page.mark_all_read")}
             </button>
           )}
         </div>
         
         {loading ? (
-            <div className="text-center py-8 text-slate-400">Loading notifications...</div>
+            <div className="text-center py-8 text-slate-400">{t("notifications_page.loading")}</div>
         ) : error ? (
             <div className="text-center py-8 text-rose-400">{error}</div>
         ) : notifications.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">You have no notifications.</div>
+            <div className="text-center py-8 text-slate-400">{t("notifications_page.empty")}</div>
         ) : (
             <div className="space-y-3">
             {notifications.map((notification, index) => (
@@ -190,15 +192,15 @@ function Notifications() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             <div>
-              <h2 className="text-xl font-bold text-white mb-1">Stay Updated</h2>
-              <p className="text-white/80 text-sm max-w-md">Enable notifications to receive real-time updates on market trends, price changes, and loan offers.</p>
+              <h2 className="text-xl font-bold text-white mb-1">{t("notifications_page.banner_title")}</h2>
+              <p className="text-white/80 text-sm max-w-md">{t("notifications_page.banner_subtitle")}</p>
             </div>
           </div>
           <button
             onClick={handleEnableAll}
             className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg whitespace-nowrap ${notificationsEnabled ? 'bg-emerald-500 text-white' : 'bg-white text-blue-600 hover:bg-white/90'}`}
           >
-            {notificationsEnabled ? 'Notifications Enabled!' : 'Enable All Notifications'}
+            {notificationsEnabled ? t("notifications_page.enabled") : t("notifications_page.enable_all")}
           </button>
         </div>
       </div>

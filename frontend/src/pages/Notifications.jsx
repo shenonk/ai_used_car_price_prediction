@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
+import { getCurrentUser } from "../utils/auth"
+import {
+  inferNotificationType,
+  loadReadNotificationIds,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+} from "../utils/notifications"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
 
@@ -11,6 +18,7 @@ function Notifications() {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [notificationUser, setNotificationUser] = useState(null)
 
   useEffect(() => {
     fetchNotifications()
@@ -20,16 +28,16 @@ function Notifications() {
     try {
       setLoading(true)
       setError(null)
+      const user = await getCurrentUser()
+      setNotificationUser(user)
       const res = await fetch(`${API_BASE_URL}/api/notifications`)
       if (!res.ok) throw new Error(t("notifications_page.errors.fetch_failed"))
       const data = await res.json()
       
-      const readIds = JSON.parse(localStorage.getItem('carpriceai_read_notifications') || '[]')
+      const readIds = loadReadNotificationIds(user)
       const formattedNotifs = (data.notifications || []).map(n => ({
         id: n.id,
-        // we can guess icon/type based on some keywords or default it
-        type: n.title.toLowerCase().includes('alert') ? 'info' : 
-              n.title.toLowerCase().includes('rate') ? 'success' : 'default',
+        type: inferNotificationType(n.title),
         icon: getIconForType(n.title),
         title: n.title,
         message: n.message,
@@ -59,17 +67,12 @@ function Notifications() {
   const alertCount = notifications.filter(n => n.type === 'info').length;
 
   const markAllRead = () => {
-    const readIds = notifications.map(n => n.id)
-    localStorage.setItem('carpriceai_read_notifications', JSON.stringify(readIds))
+    markAllNotificationsAsRead(notificationUser, notifications.map((n) => n.id))
     setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
   };
 
   const markAsRead = (id) => {
-    const readIds = JSON.parse(localStorage.getItem('carpriceai_read_notifications') || '[]')
-    if (!readIds.includes(id)) {
-      readIds.push(id)
-      localStorage.setItem('carpriceai_read_notifications', JSON.stringify(readIds))
-    }
+    markNotificationAsRead(notificationUser, id)
     setNotifications(prev => prev.map((n) => n.id === id ? { ...n, unread: false } : n));
   };
 

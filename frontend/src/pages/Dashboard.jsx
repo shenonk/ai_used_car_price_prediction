@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
   ArrowRight,
+  Check,
   BellRing,
   Bookmark,
   Calculator,
@@ -11,14 +12,25 @@ import {
   Coins,
   Eye,
   LineChart,
+  MessageSquareText,
   ShieldCheck,
   Sparkles,
   TrendingUp,
+  X,
 } from "lucide-react"
 import { getCurrentUser } from "../utils/auth"
 import { loadPredictionHistory } from "../utils/predictionHistory"
 import { supabase } from "../utils/supabaseClient"
 import { loadUserAlerts } from "../utils/userAlerts"
+import {
+  dismissNotification,
+  inferNotificationType,
+  loadDismissedNotificationIds,
+  loadReadNotificationIds,
+  markNotificationAsRead,
+} from "../utils/notifications"
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
 
 function formatCurrency(value) {
   return `LKR ${Math.round(Number(value || 0)).toLocaleString("en-LK")}`
@@ -99,10 +111,23 @@ function normalizeLocalPrediction(row) {
   }
 }
 
+function buildNotificationTimeLabel(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ""
+  }
+
+  return date.toLocaleDateString("en-LK", {
+    month: "short",
+    day: "numeric",
+  })
+}
+
 function Dashboard() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(true)
+  const [dashboardNotifications, setDashboardNotifications] = useState([])
   const [dashboardData, setDashboardData] = useState({
     user: null,
     predictions: [],
@@ -168,6 +193,79 @@ function Dashboard() {
     loadDashboard()
     return () => {
       isActive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let isActive = true
+
+    const loadUnreadNotifications = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (!user) {
+          if (isActive) {
+            setDashboardNotifications([])
+          }
+          return
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/notifications`)
+        if (!response.ok) {
+          throw new Error("Failed to load notifications")
+        }
+
+        const data = await response.json()
+        const readIds = loadReadNotificationIds(user)
+        const dismissedIds = loadDismissedNotificationIds(user)
+        const unreadItems = (data.notifications || [])
+          .filter((item) => !readIds.includes(item.id) && !dismissedIds.includes(item.id))
+          .sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at))
+          .slice(0, 3)
+          .map((item) => ({
+            id: item.id,
+            title: item.title,
+            message: item.message,
+            type: inferNotificationType(item.title),
+            createdAt: item.created_at,
+            timeLabel: buildNotificationTimeLabel(item.created_at),
+          }))
+
+        if (!isActive) {
+          return
+        }
+
+        setDashboardNotifications(unreadItems)
+      } catch (error) {
+        if (isActive) {
+          setDashboardNotifications([])
+        }
+      }
+    }
+
+    loadUnreadNotifications()
+
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState === "visible") {
+        loadUnreadNotifications()
+      }
+    }
+
+    const handleWindowFocus = () => {
+      loadUnreadNotifications()
+    }
+
+    const intervalId = window.setInterval(() => {
+      loadUnreadNotifications()
+    }, 30000)
+
+    window.addEventListener("focus", handleWindowFocus)
+    document.addEventListener("visibilitychange", handleVisibilityRefresh)
+
+    return () => {
+      isActive = false
+      window.clearInterval(intervalId)
+      window.removeEventListener("focus", handleWindowFocus)
+      document.removeEventListener("visibilitychange", handleVisibilityRefresh)
     }
   }, [])
 
@@ -400,8 +498,25 @@ function Dashboard() {
 
   const username = dashboardData.user?.username || dashboardData.user?.email?.split("@")[0] || t("dashboard_page.default_driver")
 
+  const handleMarkNotificationRead = (id) => {
+    markNotificationAsRead(dashboardData.user, id)
+    setDashboardNotifications((current) => current.filter((item) => item.id !== id))
+  }
+
+  const handleDismissNotification = (event, id) => {
+    event.stopPropagation()
+    dismissNotification(dashboardData.user, id)
+    setDashboardNotifications((current) => current.filter((item) => item.id !== id))
+  }
+
+  const notificationToneClasses = {
+    info: "border-blue-400/20 bg-blue-500/10 text-blue-100",
+    success: "border-emerald-400/20 bg-emerald-500/10 text-emerald-100",
+    default: "border-white/10 bg-white/8 text-slate-100",
+  }
+
   return (
-    <div className="min-h-screen bg-[#0f172a] p-5 md:p-8">
+    <div className="min-h-screen bg-[#0f172a] p-5 md:p-8 relative">
       <section className="relative overflow-hidden rounded-[32px] border border-slate-700/50 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.25),_transparent_34%),radial-gradient(circle_at_80%_20%,_rgba(16,185,129,0.18),_transparent_28%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.85))] px-6 py-7 md:px-8 md:py-8">
         <div className="absolute inset-y-0 right-0 hidden w-[38%] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0))] md:block" />
         <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-blue-500/10 blur-3xl" />
@@ -605,6 +720,62 @@ function Dashboard() {
           </div>
         </div>
       </section>
+
+      {dashboardNotifications.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-40 w-[min(360px,calc(100vw-2rem))] space-y-3">
+          {dashboardNotifications.map((item) => (
+            <div
+              key={item.id}
+              className={`rounded-[24px] border p-4 shadow-[0_18px_40px_rgba(2,6,23,0.24)] backdrop-blur-xl ${notificationToneClasses[item.type] || notificationToneClasses.default}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 gap-3">
+                  <div className="mt-0.5 rounded-2xl bg-white/10 p-2.5">
+                    <MessageSquareText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold">{item.title}</p>
+                      {item.timeLabel && (
+                        <span className="text-[11px] uppercase tracking-[0.14em] text-slate-300/70">
+                          {item.timeLabel}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm leading-5 text-slate-200/82">{item.message}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => handleDismissNotification(event, item.id)}
+                  className="rounded-xl p-1.5 text-slate-300/70 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label={t("dashboard_page.notifications_dismiss_aria")}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/notifications")}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200 transition-colors hover:bg-white/10"
+                >
+                  {t("dashboard_page.notifications_view")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMarkNotificationRead(item.id)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-950 transition-colors hover:bg-slate-100"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {t("dashboard_page.notifications_mark_read")}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -207,10 +207,10 @@ const HelpCenter = () => {
         <div className="dashboard-page-hero space-y-6 py-6">
           <div className="space-y-3">
             <div className="dashboard-page-eyebrow">{t("help_center_page.title_highlight")}</div>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
               {t("help_center_page.title_prefix")} {t("help_center_page.title_highlight")}
             </h1>
-            <p className="max-w-2xl text-base md:text-lg text-slate-300">
+            <p className="max-w-2xl text-sm md:text-base text-slate-300">
               {t("help_center_page.search_placeholder")}
             </p>
           </div>

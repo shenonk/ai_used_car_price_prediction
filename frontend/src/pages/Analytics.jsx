@@ -598,8 +598,8 @@ function Analytics() {
           </svg>
           {t("analytics_page.title")}
         </div>
-        <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white">{t("analytics_page.title")}</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">{t("analytics_page.subtitle")}</p>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">{t("analytics_page.title")}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{t("analytics_page.subtitle")}</p>
       </div>
 
       <div className="dashboard-page-panel mb-8 animate-fade-in animate-delay-100">
@@ -741,7 +741,7 @@ function Analytics() {
                         type="button"
                         onClick={() => handleDeletePrediction(item)}
                         disabled={deletingPredictionId === item.id}
-                        className="inline-flex items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/5 p-2 text-rose-400 transition-all hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="btn-danger p-2 disabled:cursor-not-allowed disabled:opacity-60"
                         aria-label={t("analytics_page.delete_aria_label", {
                           label: `${item.brand} ${item.model} ${item.year}`,
                         })}
@@ -764,10 +764,10 @@ function Analytics() {
         <div className="mt-6 flex justify-between items-center text-sm text-slate-500">
           <span>{t("analytics_page.showing_count", { shown: displayedPredictions.length, total: filteredPredictions.length })}</span>
           {!showAll && filteredPredictions.length > 4 && (
-            <button onClick={() => setShowAll(true)} className="text-blue-400 hover:text-blue-300 transition-colors">{t("analytics_page.view_all")}</button>
+            <button onClick={() => setShowAll(true)} className="btn-text">{t("analytics_page.view_all")}</button>
           )}
           {showAll && (
-            <button onClick={() => setShowAll(false)} className="text-blue-400 hover:text-blue-300 transition-colors">{t("analytics_page.show_less")}</button>
+            <button onClick={() => setShowAll(false)} className="btn-text">{t("analytics_page.show_less")}</button>
           )}
         </div>
       </div>

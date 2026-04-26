@@ -182,8 +182,8 @@ function PriceCheck() {
           </svg>
           {t("price_check_page.title")}
         </div>
-        <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white">{t("price_check_page.title")}</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">{t("price_check_page.title")}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
           {t("price_check_page.subtitle")}
         </p>
       </div>

@@ -88,8 +88,8 @@ function Notifications() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <div className="dashboard-page-eyebrow mb-4">{t("notifications_page.title")}</div>
-            <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-2">{t("notifications_page.title")}</h1>
-            <p className="text-slate-300 max-w-2xl">{t("notifications_page.subtitle")}</p>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-2">{t("notifications_page.title")}</h1>
+            <p className="text-sm text-slate-300 max-w-2xl">{t("notifications_page.subtitle")}</p>
           </div>
           <button
             onClick={() => navigate('/settings')}
@@ -195,10 +195,10 @@ function Notifications() {
           </div>
           <button
             onClick={handleEnableAll}
-            className={`px-6 py-3 rounded-xl font-semibold transition-colors whitespace-nowrap ${
+            className={`whitespace-nowrap ${
               notificationsEnabled
-                ? 'bg-emerald-500 text-white'
-                : 'bg-slate-100 text-slate-900 hover:bg-white'
+                ? 'btn-success'
+                : 'btn-primary'
             }`}
           >
             {notificationsEnabled ? t("notifications_page.enabled") : t("notifications_page.enable_all")}

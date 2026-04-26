@@ -267,7 +267,7 @@ function Results() {
   return (
     <div className="app-page-shell">
       {!vehicle && (
-        <div className="dashboard-page-panel-soft mb-6 flex items-center gap-3 p-4 animate-fade-in">
+        <div className="app-inline-banner app-inline-banner-info mb-4 animate-fade-in">
           <svg className="w-5 h-5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
@@ -285,11 +285,7 @@ function Results() {
         </div>
       )}
 
-      <div className={`mb-6 p-4 rounded-3xl border flex items-start gap-3 animate-fade-in ${
-        saveStatus === "cloud"
-          ? "bg-emerald-500/10 border-emerald-500/30"
-          : "bg-amber-500/10 border-amber-500/30"
-      }`}>
+      <div className={`mb-4 animate-fade-in ${saveStatus === "cloud" ? "app-inline-banner app-inline-banner-success" : "app-inline-banner app-inline-banner-warning"}`}>
         <svg className={`w-5 h-5 flex-shrink-0 ${saveStatus === "cloud" ? "text-emerald-400" : "text-amber-400"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           {saveStatus === "cloud" ? (
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -313,11 +309,11 @@ function Results() {
             </svg>
             {t("results_page.title")}
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white">{t("results_page.title")}</h1>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">{t("results_page.title")}</h1>
           {vehicleSummary ? (
-            <p className="mt-3 text-slate-300 text-sm mb-6">{vehicleSummary}</p>
+            <p className="mt-2 text-slate-300 text-sm mb-4">{vehicleSummary}</p>
           ) : (
-            <p className="mt-3 text-slate-300 text-sm mb-6">{t("results_page.based_on_specs")}</p>
+            <p className="mt-2 text-slate-300 text-sm mb-4">{t("results_page.based_on_specs")}</p>
           )}
 
           <div className="inline-block rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
@@ -442,7 +438,7 @@ function Results() {
         <button
           onClick={handleSetAlert}
           disabled={alertSet}
-          className={`flex-1 py-4 flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-300 ${alertSet ? "bg-emerald-500/20 border border-emerald-500/50 text-emerald-400" : "bg-amber-500/20 border border-amber-500/50 text-amber-400 hover:bg-amber-500/30"}`}
+          className={`flex-1 py-4 flex items-center justify-center gap-2 ${alertSet ? "btn-success" : "btn-secondary"}`}
         >
           {alertSet ? (
             <>

@@ -276,8 +276,8 @@ function Settings() {
       <div className="max-w-5xl mx-auto">
         <div className="dashboard-page-hero mb-10">
           <div className="dashboard-page-eyebrow mb-4">{t("settings")}</div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-2">{t("settings")}</h1>
-          <p className="text-slate-300 max-w-2xl">{t("settings_page.subtitle")}</p>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-2">{t("settings")}</h1>
+          <p className="text-sm text-slate-300 max-w-2xl">{t("settings_page.subtitle")}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -619,7 +619,7 @@ function Settings() {
                                     onClick={() => i18n.changeLanguage(lang.id)}
                                     className={`p-4 rounded-xl border font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
                                         i18n.resolvedLanguage === lang.id 
-                                            ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20' 
+                                            ? 'btn-primary' 
                                             : 'theme-pill theme-text-secondary hover:border-slate-400'
                                     }`}
                                 >
@@ -685,7 +685,7 @@ function Settings() {
                             <p className="theme-text-secondary text-sm">Once you clear your local data, there is no going back. This includes preferences and alerts.</p>
                             <button 
                                 onClick={clearAllData}
-                                className="px-6 py-3 rounded-xl bg-transparent border border-rose-500/30 text-rose-400 hover:bg-rose-500 hover:text-white transition-all duration-300 font-semibold"
+                                className="btn-danger"
                             >
                                 {t("clear_data")}
                             </button>

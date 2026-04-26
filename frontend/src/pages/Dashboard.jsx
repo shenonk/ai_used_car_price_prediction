@@ -9,6 +9,7 @@ import {
   CarFront,
   Clock3,
   Coins,
+  Eye,
   LineChart,
   ShieldCheck,
   Sparkles,
@@ -53,6 +54,15 @@ function formatRelativeDate(value) {
   return new Date(value).toLocaleDateString("en-LK")
 }
 
+function toTimestamp(value) {
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+function buildVehicleKey(brand, model) {
+  return `${String(brand || "").trim().toUpperCase()}|||${String(model || "").trim().toUpperCase()}`
+}
+
 function normalizeCloudPrediction(row) {
   return {
     id: `db-${row.id}`,
@@ -61,6 +71,20 @@ function normalizeCloudPrediction(row) {
     year: row.year,
     predictedPrice: Number(row.predicted_price_lkr) || 0,
     predictedAt: row.created_at,
+  }
+}
+
+function normalizeMarketplaceListing(row) {
+  return {
+    id: String(row.id || ""),
+    brand: row.brand,
+    model: row.model,
+    price: Number(row.price || 0),
+    createdAt: row.created_at,
+    status: row.status,
+    isSpotlight: Boolean(row.is_spotlight),
+    isUrgent: Boolean(row.is_urgent),
+    isBumped: Boolean(row.is_bumped),
   }
 }
 
@@ -82,8 +106,8 @@ function Dashboard() {
   const [dashboardData, setDashboardData] = useState({
     user: null,
     predictions: [],
+    listings: [],
     alertsCount: 0,
-    bestRate: null,
     source: "local",
   })
 
@@ -96,6 +120,7 @@ function Dashboard() {
       const user = await getCurrentUser()
       const alerts = loadUserAlerts(user || { email: "guest@example.com", username: "Guest" })
       let predictions = []
+      let listings = []
       let source = "local"
 
       if (user?.id) {
@@ -117,20 +142,24 @@ function Dashboard() {
         source = "local"
       }
 
-      const { data: financingData } = await supabase
-        .from("financing_options")
-        .select("fixed_rate")
-        .eq("status", "Active")
-        .order("fixed_rate", { ascending: true })
-        .limit(1)
+      const { data: marketplaceData } = await supabase
+        .from("marketplace_listings")
+        .select("id, brand, model, price, created_at, status, is_spotlight, is_urgent, is_bumped")
+        .eq("status", "approved")
+        .order("created_at", { ascending: false })
+        .limit(24)
+
+      if (Array.isArray(marketplaceData)) {
+        listings = marketplaceData.map(normalizeMarketplaceListing)
+      }
 
       if (!isActive) return
 
       setDashboardData({
         user,
         predictions,
+        listings,
         alertsCount: alerts.length,
-        bestRate: financingData?.[0]?.fixed_rate ? Number(financingData[0].fixed_rate) : null,
         source,
       })
       setIsLoading(false)
@@ -186,6 +215,79 @@ function Dashboard() {
       height: `${Math.max(22, (value / max) * 100)}%`,
     }))
   }, [dashboardData.predictions])
+
+  const trendingSummary = useMemo(() => {
+    const now = Date.now()
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+    const todayTimestamp = startOfToday.getTime()
+    const lastWeekTimestamp = now - (7 * 24 * 60 * 60 * 1000)
+    const lastMonthTimestamp = now - (30 * 24 * 60 * 60 * 1000)
+
+    const topEntryFromMap = (counts) => {
+      const [key, count] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] || []
+      if (!key) return null
+      const [brand, model] = key.split("|||")
+      return { brand, model, count }
+    }
+
+    const combinedCounts = {}
+    dashboardData.predictions.forEach((item) => {
+      if (toTimestamp(item.predictedAt) < lastMonthTimestamp) return
+      const key = buildVehicleKey(item.brand, item.model)
+      if (!key.trim()) return
+      combinedCounts[key] = (combinedCounts[key] || 0) + 1
+    })
+    dashboardData.listings.forEach((item) => {
+      if (toTimestamp(item.createdAt) < lastMonthTimestamp) return
+      const key = buildVehicleKey(item.brand, item.model)
+      if (!key.trim()) return
+      combinedCounts[key] = (combinedCounts[key] || 0) + 1
+    })
+
+    const todayPredictionCounts = {}
+    dashboardData.predictions.forEach((item) => {
+      if (toTimestamp(item.predictedAt) < todayTimestamp) return
+      const key = buildVehicleKey(item.brand, item.model)
+      if (!key.trim()) return
+      todayPredictionCounts[key] = (todayPredictionCounts[key] || 0) + 1
+    })
+
+    const weeklyBrandCounts = {}
+    dashboardData.listings.forEach((item) => {
+      if (toTimestamp(item.createdAt) < lastWeekTimestamp) return
+      const brand = String(item.brand || "").trim()
+      if (!brand) return
+      weeklyBrandCounts[brand] = (weeklyBrandCounts[brand] || 0) + 1
+    })
+    if (Object.keys(weeklyBrandCounts).length === 0) {
+      dashboardData.predictions.forEach((item) => {
+        if (toTimestamp(item.predictedAt) < lastWeekTimestamp) return
+        const brand = String(item.brand || "").trim()
+        if (!brand) return
+        weeklyBrandCounts[brand] = (weeklyBrandCounts[brand] || 0) + 1
+      })
+    }
+
+    const featuredListing = [...dashboardData.listings]
+      .sort((a, b) => {
+        const scoreA = (a.isSpotlight ? 3 : 0) + (a.isUrgent ? 2 : 0) + (a.isBumped ? 1 : 0)
+        const scoreB = (b.isSpotlight ? 3 : 0) + (b.isUrgent ? 2 : 0) + (b.isBumped ? 1 : 0)
+        if (scoreB !== scoreA) return scoreB - scoreA
+        return toTimestamp(b.createdAt) - toTimestamp(a.createdAt)
+      })[0] || null
+
+    const trendingVehicle = topEntryFromMap(combinedCounts)
+    const mostPredictedToday = topEntryFromMap(todayPredictionCounts)
+    const [activeBrand, activeBrandCount] = Object.entries(weeklyBrandCounts).sort((a, b) => b[1] - a[1])[0] || []
+
+    return {
+      trendingVehicle,
+      mostPredictedToday,
+      featuredListing,
+      activeBrand: activeBrand ? { brand: activeBrand, count: activeBrandCount } : null,
+    }
+  }, [dashboardData.listings, dashboardData.predictions])
 
   const quickActions = useMemo(() => ([
     {
@@ -249,30 +351,50 @@ function Dashboard() {
     },
   ]
 
-  const insightCards = [
+  const trendingCards = [
     {
-      label: t("dashboard_page.best_bank_rate"),
-      value: dashboardData.bestRate ? `${dashboardData.bestRate.toFixed(1)}%` : "8.5%",
-      tone: "text-emerald-300",
-      icon: <Coins className="h-4 w-4 text-emerald-400" />,
-    },
-    {
-      label: t("dashboard_page.most_tracked_brand"),
-      value: summary.topBrand,
+      label: t("dashboard_page.trending_now"),
+      value: trendingSummary.trendingVehicle
+        ? `${trendingSummary.trendingVehicle.brand} ${trendingSummary.trendingVehicle.model}`
+        : t("dashboard_page.no_trend_data"),
+      meta: trendingSummary.trendingVehicle
+        ? t("dashboard_page.trending_now_meta", { count: trendingSummary.trendingVehicle.count })
+        : t("dashboard_page.trending_empty"),
       tone: "text-cyan-300",
-      icon: <CarFront className="h-4 w-4 text-cyan-400" />,
+      icon: <TrendingUp className="h-4 w-4 text-cyan-400" />,
     },
     {
-      label: t("dashboard_page.active_alerts_short"),
-      value: `${dashboardData.alertsCount}`,
+      label: t("dashboard_page.most_predicted_today"),
+      value: trendingSummary.mostPredictedToday
+        ? `${trendingSummary.mostPredictedToday.brand} ${trendingSummary.mostPredictedToday.model}`
+        : t("dashboard_page.no_trend_data"),
+      meta: trendingSummary.mostPredictedToday
+        ? t("dashboard_page.most_predicted_today_meta", { count: trendingSummary.mostPredictedToday.count })
+        : t("dashboard_page.predictions_waiting"),
+      tone: "text-emerald-300",
+      icon: <Sparkles className="h-4 w-4 text-emerald-400" />,
+    },
+    {
+      label: t("dashboard_page.most_viewed_listing"),
+      value: trendingSummary.featuredListing
+        ? `${trendingSummary.featuredListing.brand} ${trendingSummary.featuredListing.model}`
+        : t("dashboard_page.no_trend_data"),
+      meta: trendingSummary.featuredListing
+        ? t("dashboard_page.most_viewed_listing_meta")
+        : t("dashboard_page.listing_tracking_waiting"),
       tone: "text-amber-300",
-      icon: <BellRing className="h-4 w-4 text-amber-400" />,
+      icon: <Eye className="h-4 w-4 text-amber-400" />,
     },
     {
-      label: t("dashboard_page.latest_estimate_short"),
-      value: summary.latestPredictionValue ? formatCompactCurrency(summary.latestPredictionValue) : t("dashboard_page.no_data"),
+      label: t("dashboard_page.most_active_brand_week"),
+      value: trendingSummary.activeBrand
+        ? trendingSummary.activeBrand.brand
+        : t("dashboard_page.no_trend_data"),
+      meta: trendingSummary.activeBrand
+        ? t("dashboard_page.most_active_brand_week_meta", { count: trendingSummary.activeBrand.count })
+        : t("dashboard_page.brand_waiting"),
       tone: "text-blue-300",
-      icon: <Sparkles className="h-4 w-4 text-blue-400" />,
+      icon: <CarFront className="h-4 w-4 text-blue-400" />,
     },
   ]
 
@@ -446,16 +568,16 @@ function Dashboard() {
           <div className="rounded-[30px] border border-slate-700/60 bg-slate-900/55 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-white">{t("dashboard_page.market_pulse")}</h2>
-                <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.fast_signals")}</p>
+                <h2 className="text-2xl font-bold text-white">{t("dashboard_page.trending_section_title")}</h2>
+                <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.trending_section_subtitle")}</p>
               </div>
               <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
-                {t("dashboard_page.live")}
+                {t("dashboard_page.trending_live")}
               </span>
             </div>
 
             <div className="mt-6 grid gap-3">
-              {insightCards.map((item) => (
+              {trendingCards.map((item) => (
                 <div key={item.label} className="rounded-[22px] border border-slate-800/80 bg-slate-950/35 p-4">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500">
                     {item.icon}

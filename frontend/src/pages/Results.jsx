@@ -265,9 +265,9 @@ function Results() {
     : null
 
   return (
-    <div className="min-h-screen bg-[#0f172a] p-8">
+    <div className="app-page-shell">
       {!vehicle && (
-        <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 animate-fade-in">
+        <div className="dashboard-page-panel-soft mb-6 flex items-center gap-3 p-4 animate-fade-in">
           <svg className="w-5 h-5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
@@ -285,7 +285,7 @@ function Results() {
         </div>
       )}
 
-      <div className={`mb-6 p-4 rounded-xl border flex items-start gap-3 animate-fade-in ${
+      <div className={`mb-6 p-4 rounded-3xl border flex items-start gap-3 animate-fade-in ${
         saveStatus === "cloud"
           ? "bg-emerald-500/10 border-emerald-500/30"
           : "bg-amber-500/10 border-amber-500/30"
@@ -305,28 +305,24 @@ function Results() {
         </div>
       </div>
 
-      <div
-        className="relative overflow-hidden rounded-2xl p-8 mb-8 animate-fade-in"
-        style={{ background: "linear-gradient(135deg, #3b82f6 0%, #06b6d4 50%, #10b981 100%)" }}
-      >
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2"></div>
+      <div className="dashboard-page-hero mb-8 animate-fade-in">
         <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-2">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="dashboard-page-eyebrow mb-4">
+            <svg className="h-3.5 w-3.5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <h1 className="text-2xl font-bold text-white">{t("results_page.title")}</h1>
+            {t("results_page.title")}
           </div>
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white">{t("results_page.title")}</h1>
           {vehicleSummary ? (
-            <p className="text-white/80 text-sm mb-6">{vehicleSummary}</p>
+            <p className="mt-3 text-slate-300 text-sm mb-6">{vehicleSummary}</p>
           ) : (
-            <p className="text-white/80 text-sm mb-6">{t("results_page.based_on_specs")}</p>
+            <p className="mt-3 text-slate-300 text-sm mb-6">{t("results_page.based_on_specs")}</p>
           )}
 
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-6 inline-block">
-            <p className="text-white/80 text-sm mb-1">{t("results_page.estimated_market_value")}</p>
-            <h2 className="text-5xl font-bold text-white">LKR {formattedPrice}</h2>
+          <div className="inline-block rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
+            <p className="text-slate-300 text-sm mb-1">{t("results_page.estimated_market_value")}</p>
+            <h2 className="text-4xl md:text-5xl font-bold text-white">LKR {formattedPrice}</h2>
             <div className="flex items-center gap-2 mt-3">
               <span className="badge bg-white/20 text-white border-white/30">{t("results_page.accuracy_badge")}</span>
               <span className="badge bg-white/20 text-white border-white/30">{t("results_page.updated_today")}</span>
@@ -336,7 +332,7 @@ function Results() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="card p-6 animate-fade-in animate-delay-100">
+        <div className="dashboard-page-panel animate-fade-in animate-delay-100">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
@@ -376,7 +372,7 @@ function Results() {
           </div>
         </div>
 
-        <div className="card p-6 animate-fade-in animate-delay-200">
+        <div className="dashboard-page-panel animate-fade-in animate-delay-200">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
@@ -396,7 +392,7 @@ function Results() {
         </div>
       </div>
 
-      <div className="card p-6 animate-fade-in animate-delay-300">
+      <div className="dashboard-page-panel animate-fade-in animate-delay-300">
         <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
           <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />

@@ -202,14 +202,20 @@ const HelpCenter = () => {
     formData.message.trim();
 
   return (
-    <div className="theme-app-bg min-h-screen p-8 animate-fade-in">
-      <div className="max-w-6xl mx-auto space-y-16">
-        <div className="text-center space-y-8 py-10">
-          <h1 className="text-5xl font-bold tracking-tight">
-            {t("help_center_page.title_prefix")} <span className="gradient-text">{t("help_center_page.title_highlight")}</span>
-          </h1>
+    <div className="app-page-shell animate-fade-in">
+      <div className="max-w-6xl mx-auto space-y-14">
+        <div className="dashboard-page-hero space-y-6 py-6">
+          <div className="space-y-3">
+            <div className="dashboard-page-eyebrow">{t("help_center_page.title_highlight")}</div>
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
+              {t("help_center_page.title_prefix")} {t("help_center_page.title_highlight")}
+            </h1>
+            <p className="max-w-2xl text-base md:text-lg text-slate-300">
+              {t("help_center_page.search_placeholder")}
+            </p>
+          </div>
 
-          <div className="max-w-2xl mx-auto relative group">
+          <div className="max-w-2xl relative group">
             <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-[#3B82F6] transition-colors">
               <Search className="w-5 h-5" />
             </div>
@@ -223,7 +229,7 @@ const HelpCenter = () => {
           </div>
 
           {selectedCategory !== "all" && (
-            <div className="flex items-center justify-center gap-3 text-sm">
+            <div className="flex items-center gap-3 text-sm">
               <span className="theme-text-secondary">
                 {t("help_center_page.filtering_by")} {categories.find((cat) => cat.id === selectedCategory)?.title}
               </span>
@@ -251,13 +257,13 @@ const HelpCenter = () => {
                   handleCategoryClick(cat);
                 }
               }}
-              className={`group p-8 rounded-2xl border backdrop-blur-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] text-left ${
+              className={`group p-8 rounded-2xl border backdrop-blur-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_34px_rgba(15,23,42,0.12)] text-left ${
                 selectedCategory === cat.id
                   ? "border-[#3B82F6]/60 bg-[#1e293b]/70"
                   : "border-slate-700/50 bg-[#1e293b]/40 hover:border-[#3B82F6]/50"
               } cursor-pointer`}
             >
-              <div className="w-16 h-16 rounded-xl bg-blue-500/10 flex items-center justify-center text-[#3B82F6] mb-6 group-hover:scale-110 transition-transform">
+              <div className="w-14 h-14 rounded-xl bg-blue-500/10 flex items-center justify-center text-[#3B82F6] mb-6 group-hover:scale-[1.03] transition-transform">
                 {cat.icon}
               </div>
               <h3 className="theme-text-primary text-xl font-semibold mb-3">{cat.title}</h3>

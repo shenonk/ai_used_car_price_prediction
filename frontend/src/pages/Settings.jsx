@@ -252,7 +252,7 @@ function Settings() {
   }
 
   return (
-    <div className="theme-app-bg min-h-screen p-4 md:p-8 animate-fade-in">
+    <div className="app-page-shell animate-fade-in">
       <SuccessToast
         isOpen={toast.isOpen && toast.type === "success"}
         message={toast.message}
@@ -274,11 +274,10 @@ function Settings() {
         </div>
       )}
       <div className="max-w-5xl mx-auto">
-        
-        {/* Page Header */}
-        <div className="mb-10">
-          <h1 className="theme-text-primary text-4xl font-bold mb-2">{t("settings")}</h1>
-          <p className="theme-text-secondary">{t("settings_page.subtitle")}</p>
+        <div className="dashboard-page-hero mb-10">
+          <div className="dashboard-page-eyebrow mb-4">{t("settings")}</div>
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-2">{t("settings")}</h1>
+          <p className="text-slate-300 max-w-2xl">{t("settings_page.subtitle")}</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
@@ -314,7 +313,7 @@ function Settings() {
 
           {/* Content Area */}
           <div className="lg:col-span-3">
-            <div className="card-glass p-8 min-h-[500px]">
+            <div className="dashboard-page-panel min-h-[500px]">
               
               {/* Profile Tab */}
               {activeTab === "profile" && (

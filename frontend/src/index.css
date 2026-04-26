@@ -859,6 +859,133 @@ html[data-theme="light"] .nav-link.active .nav-icon {
   border: 1px solid var(--border-color);
 }
 
+.app-page-shell {
+  min-height: 100vh;
+  background: #0f172a;
+  padding: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .app-page-shell {
+    padding: 2rem;
+  }
+}
+
+.dashboard-page-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 32px;
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 32%),
+    radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.12), transparent 26%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.86));
+  padding: 1.75rem;
+}
+
+@media (min-width: 768px) {
+  .dashboard-page-hero {
+    padding: 2rem;
+  }
+}
+
+.dashboard-page-hero::before {
+  content: "";
+  position: absolute;
+  inset: auto auto -60px -40px;
+  width: 160px;
+  height: 160px;
+  border-radius: 9999px;
+  background: rgba(14, 165, 233, 0.08);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.dashboard-page-panel {
+  border-radius: 30px;
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  background: rgba(15, 23, 42, 0.55);
+  padding: 1.5rem;
+}
+
+.dashboard-page-panel-soft {
+  border-radius: 24px;
+  border: 1px solid rgba(51, 65, 85, 0.7);
+  background: rgba(2, 6, 23, 0.28);
+}
+
+.dashboard-page-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(51, 65, 85, 0.85);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.75rem 1rem;
+  color: #e2e8f0;
+  transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s ease;
+}
+
+.dashboard-page-toolbar-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(71, 85, 105, 0.9);
+  transform: translateY(-1px);
+}
+
+.dashboard-page-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #cbd5e1;
+}
+
+html[data-theme="light"] .app-page-shell {
+  background: var(--bg-primary);
+}
+
+html[data-theme="light"] .dashboard-page-hero {
+  border-color: rgba(148, 163, 184, 0.26);
+  background:
+    radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 32%),
+    radial-gradient(circle at 80% 20%, rgba(16, 185, 129, 0.08), transparent 26%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.94));
+}
+
+html[data-theme="light"] .dashboard-page-panel {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+html[data-theme="light"] .dashboard-page-panel-soft {
+  border-color: rgba(148, 163, 184, 0.22);
+  background: rgba(248, 250, 252, 0.96);
+}
+
+html[data-theme="light"] .dashboard-page-toolbar-button {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.82);
+  color: #0f172a;
+}
+
+html[data-theme="light"] .dashboard-page-toolbar-button:hover {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
+html[data-theme="light"] .dashboard-page-eyebrow {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.82);
+  color: #334155;
+}
+
 html[data-theme="light"] .marketplace-page .marketplace-hero {
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.92)) !important;
   border-color: rgba(148, 163, 184, 0.28) !important;

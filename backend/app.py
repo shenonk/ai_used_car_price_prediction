@@ -53,6 +53,34 @@ OLDER_REFERENCE_LISTING_MONTH = 1
 OLDER_REFERENCE_LISTING_YEAR = 2025
 RECENT_REFERENCE_LISTING_MONTH = 4
 RECENT_REFERENCE_LISTING_YEAR = 2026
+MARKETPLACE_LISTING_SYNC_FIELDS = {
+    "id",
+    "brand",
+    "model",
+    "seller_name",
+    "phone_number",
+    "vehicle_location",
+    "vehicle_description",
+    "year",
+    "mileage",
+    "fuel_type",
+    "transmission",
+    "condition",
+    "price",
+    "status",
+    "image_url",
+    "image_urls",
+    "uploaded_image_count",
+    "is_urgent",
+    "is_spotlight",
+    "is_bumped",
+    "created_at",
+    "updated_at",
+    "user_id",
+    "account_email",
+    "username",
+    "logged_in_account",
+}
 
 
 class PriceModelState:
@@ -141,6 +169,55 @@ def normalize_reference_text(value: object) -> str:
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_record_timestamp(value: object) -> datetime | None:
+    if not value:
+        return None
+
+    normalized = str(value).strip()
+    if not normalized:
+        return None
+
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+
+    try:
+        timestamp = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+    return timestamp.astimezone(timezone.utc)
+
+
+def get_record_timestamp(item: dict[str, Any]) -> datetime:
+    for field_name in ("updated_at", "confirmed_at", "created_at"):
+        timestamp = parse_record_timestamp(item.get(field_name))
+        if timestamp is not None:
+            return timestamp
+
+    return datetime.min.replace(tzinfo=timezone.utc)
+
+
+def get_marketplace_status_rank(item: dict[str, Any]) -> int:
+    return {
+        "pending": 0,
+        "rejected": 1,
+        "approved": 1,
+        "sold": 1,
+    }.get(str(item.get("status") or "").strip().lower(), 0)
+
+
+def should_prefer_record(candidate: dict[str, Any], existing: dict[str, Any]) -> bool:
+    candidate_timestamp = get_record_timestamp(candidate)
+    existing_timestamp = get_record_timestamp(existing)
+    if candidate_timestamp != existing_timestamp:
+        return candidate_timestamp > existing_timestamp
+
+    return get_marketplace_status_rank(candidate) >= get_marketplace_status_rank(existing)
 
 
 BOOST_PRICING = {
@@ -490,23 +567,28 @@ def merge_records_by_id(*collections: list[dict[str, Any]]) -> list[dict[str, An
             if not item_id:
                 continue
             if item_id in merged:
-                merged[item_id].update(item)
+                existing = merged[item_id]
+                if should_prefer_record(item, existing):
+                    merged[item_id] = {**existing, **item}
+                else:
+                    merged[item_id] = {**item, **existing}
             else:
                 merged[item_id] = dict(item)
 
     return sorted(
         merged.values(),
-        key=lambda item: item.get("confirmed_at") or item.get("created_at") or "",
+        key=get_record_timestamp,
         reverse=True,
     )
 
 
 def sync_marketplace_listing_to_supabase(listing: dict[str, Any]) -> None:
+    payload = {key: value for key, value in listing.items() if key in MARKETPLACE_LISTING_SYNC_FIELDS}
     try:
         make_supabase_rest_request(
             "/rest/v1/marketplace_listings?on_conflict=id",
             method="POST",
-            data=json.dumps(listing).encode("utf-8"),
+            data=json.dumps(payload).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
                 "Prefer": "resolution=merge-duplicates",
@@ -1114,6 +1196,7 @@ async def create_marketplace_listing(
     valid_images = [file for file in (images or []) if getattr(file, "filename", "")]
     listing_id = f"listing-{uuid4().hex}"
     image_urls = upload_marketplace_images(listing_id, valid_images) if valid_images else []
+    created_at = utc_now_iso()
 
     with price_model_state.admin_lock:
         listings = price_model_state.admin_store["marketplace_listings"]
@@ -1138,7 +1221,8 @@ async def create_marketplace_listing(
             "is_urgent": parse_boolean_flag(is_urgent),
             "is_spotlight": parse_boolean_flag(is_spotlight),
             "is_bumped": parse_boolean_flag(is_bumped),
-            "created_at": utc_now_iso(),
+            "created_at": created_at,
+            "updated_at": created_at,
             "user_id": requester["user_id"],
             "account_email": requester["email"],
             "username": requester["username"],
@@ -1254,6 +1338,7 @@ def verify_payment(
         listing["is_urgent"] = "urgent" in boost_keys
         listing["is_spotlight"] = "spotlight" in boost_keys
         listing["is_bumped"] = "bump" in boost_keys
+        listing["updated_at"] = utc_now_iso()
         persist_admin_store()
 
     sync_marketplace_listing_to_supabase(listing)
@@ -1466,6 +1551,7 @@ def update_marketplace_listing_status(
         if listing is None:
             raise admin_error("Marketplace listing not found.", status_code=404)
         listing["status"] = payload.status
+        listing["updated_at"] = utc_now_iso()
         persist_admin_store()
 
     sync_marketplace_listing_to_supabase(listing)

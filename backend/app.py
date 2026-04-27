@@ -3,19 +3,21 @@ from __future__ import annotations
 import base64
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from io import BytesIO
 import json
 import os
 from pathlib import Path
 import secrets
 from threading import Lock
 from typing import Any
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, unquote, urlencode
 from urllib.request import Request as UrlRequest, urlopen
 from uuid import uuid4
 
 import joblib
 import numpy as np
 import pandas as pd
+from PIL import Image, ImageDraw, ImageFont
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -826,6 +828,122 @@ def upload_marketplace_images(listing_id: str, images: list[UploadFile]) -> list
     return public_urls
 
 
+def infer_image_content_type(image_format: str) -> str:
+    normalized = str(image_format or "").upper()
+    if normalized in {"JPEG", "JPG"}:
+        return "image/jpeg"
+    if normalized == "PNG":
+        return "image/png"
+    if normalized == "WEBP":
+        return "image/webp"
+    return "application/octet-stream"
+
+
+def extract_marketplace_storage_path(public_url: str) -> str:
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    prefix = f"{supabase_url}/storage/v1/object/public/car_images/"
+    if not public_url.startswith(prefix):
+        raise RuntimeError("Marketplace image URL does not match the configured Supabase storage bucket.")
+    path_part = public_url[len(prefix):].split("?", 1)[0]
+    return unquote(path_part)
+
+
+def load_watermark_font(font_size: int) -> ImageFont.ImageFont:
+    for font_name in ("arial.ttf", "DejaVuSans-Bold.ttf"):
+        try:
+            return ImageFont.truetype(font_name, font_size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def watermark_image_bytes(content: bytes, watermark_text: str = "AutoValueLK") -> tuple[bytes, str]:
+    with Image.open(BytesIO(content)) as source_image:
+        output_format = source_image.format or "JPEG"
+        base_image = source_image.convert("RGBA")
+        width, height = base_image.size
+
+        overlay = Image.new("RGBA", base_image.size, (255, 255, 255, 0))
+        draw = ImageDraw.Draw(overlay)
+        font_size = max(40, min(width, height) // 6)
+        font = load_watermark_font(font_size)
+        text_box = draw.textbbox((0, 0), watermark_text, font=font, stroke_width=2)
+        text_width = text_box[2] - text_box[0]
+        text_height = text_box[3] - text_box[1]
+        text_x = (width - text_width) / 2 - text_box[0]
+        text_y = (height - text_height) / 2 - text_box[1]
+
+        draw.text(
+            (text_x, text_y),
+            watermark_text,
+            font=font,
+            fill=(255, 255, 255, 92),
+            stroke_width=2,
+            stroke_fill=(15, 23, 42, 64),
+        )
+
+        composited = Image.alpha_composite(base_image, overlay)
+
+        buffer = BytesIO()
+        if output_format.upper() in {"JPEG", "JPG"}:
+            composited.convert("RGB").save(buffer, format="JPEG", quality=92)
+            image_format = "JPEG"
+        else:
+            composited.save(buffer, format=output_format)
+            image_format = output_format
+
+    return buffer.getvalue(), infer_image_content_type(image_format)
+
+
+def upload_marketplace_storage_bytes(object_path: str, content: bytes, content_type: str, *, upsert: bool) -> str:
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("Supabase storage is not configured for marketplace image uploads.")
+
+    upload_url = f"{supabase_url}/storage/v1/object/car_images/{quote(object_path, safe='/')}"
+    request = UrlRequest(
+        upload_url,
+        data=content,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": content_type,
+            "x-upsert": "true" if upsert else "false",
+        },
+    )
+    with urlopen(request):
+        pass
+
+    return f"{supabase_url}/storage/v1/object/public/car_images/{object_path}"
+
+
+def apply_marketplace_watermark(listing: dict[str, Any]) -> dict[str, Any]:
+    image_urls = listing.get("image_urls") or []
+    if not image_urls and listing.get("image_url"):
+        image_urls = [listing["image_url"]]
+
+    if not image_urls:
+        return listing
+
+    updated_urls: list[str] = []
+    watermark_version = utc_now_iso()
+    for public_url in image_urls:
+        object_path = extract_marketplace_storage_path(public_url)
+        with urlopen(public_url) as response:
+            original_content = response.read()
+        watermarked_content, content_type = watermark_image_bytes(original_content)
+        updated_url = upload_marketplace_storage_bytes(object_path, watermarked_content, content_type, upsert=True)
+        updated_urls.append(f"{updated_url}?v={quote(watermark_version, safe='')}")
+
+    listing["image_urls"] = updated_urls
+    listing["image_url"] = updated_urls[0] if updated_urls else ""
+    listing["images_watermarked"] = True
+    listing["watermarked_at"] = watermark_version
+    return listing
+
+
 def resolve_reference_listing_period(payload: VehiclePredictionRequest) -> tuple[int, int]:
     if payload.condition == "BRAND NEW" or payload.year >= 2023:
         return RECENT_REFERENCE_LISTING_MONTH, RECENT_REFERENCE_LISTING_YEAR
@@ -969,7 +1087,7 @@ def get_public_marketplace_listings() -> dict[str, Any]:
         log_warning(f"Unable to load public marketplace listings from Supabase: {error}")
         supabase_listings = []
 
-    listings = merge_records_by_id(local_listings, supabase_listings)
+    listings = merge_records_by_id(supabase_listings, local_listings)
     return {"listings": listings}
 
 
@@ -1050,7 +1168,7 @@ def get_my_marketplace_listings(requester: dict[str, Any] = Depends(get_requeste
     else:
         supabase_listings = []
 
-    listings = merge_records_by_id(local_listings, supabase_listings)
+    listings = merge_records_by_id(supabase_listings, local_listings)
     return {"listings": listings}
 
 
@@ -1312,7 +1430,7 @@ def get_marketplace_listings(
         log_warning(f"Unable to load admin marketplace listings from Supabase: {error}")
         supabase_listings = []
 
-    listings = merge_records_by_id(local_listings, supabase_listings)
+    listings = merge_records_by_id(supabase_listings, local_listings)
     return {"listings": listings}
 
 
@@ -1322,12 +1440,31 @@ def update_marketplace_listing_status(
     payload: MarketplaceStatusPayload,
     _token: str = Depends(require_admin),
 ) -> dict[str, Any]:
+    should_apply_watermark = False
+
     with price_model_state.admin_lock:
         listings = price_model_state.admin_store["marketplace_listings"]
         listing = next((item for item in listings if str(item.get("id")) == listing_id), None)
         if listing is None:
             raise admin_error("Marketplace listing not found.", status_code=404)
 
+        if payload.status == "approved" and listing.get("image_urls") and not listing.get("images_watermarked"):
+            should_apply_watermark = True
+
+    if should_apply_watermark:
+        try:
+            apply_marketplace_watermark(listing)
+        except Exception as error:
+            raise admin_error(
+                f"Unable to watermark marketplace images before approval: {error}",
+                status_code=500,
+            )
+
+    with price_model_state.admin_lock:
+        listings = price_model_state.admin_store["marketplace_listings"]
+        listing = next((item for item in listings if str(item.get("id")) == listing_id), None)
+        if listing is None:
+            raise admin_error("Marketplace listing not found.", status_code=404)
         listing["status"] = payload.status
         persist_admin_store()
 

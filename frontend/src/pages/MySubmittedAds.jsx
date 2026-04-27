@@ -72,6 +72,8 @@ function MySubmittedAds() {
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
+    let isActive = true;
+
     const fetchMyListings = async () => {
       try {
         setIsLoading(true);
@@ -82,7 +84,9 @@ function MySubmittedAds() {
         } = await supabase.auth.getSession();
 
         if (!session?.access_token) {
-          setMyListings([]);
+          if (isActive) {
+            setMyListings([]);
+          }
           return;
         }
 
@@ -97,16 +101,44 @@ function MySubmittedAds() {
           throw new Error(result.error || t("marketplace.errors.load_my_ads_failed"));
         }
 
-        setMyListings(result.listings || []);
+        if (isActive) {
+          setMyListings(result.listings || []);
+        }
       } catch (error) {
-        setMyListings([]);
-        setLoadError(error.message || t("marketplace.errors.load_my_ads_failed"));
+        if (isActive) {
+          setMyListings([]);
+          setLoadError(error.message || t("marketplace.errors.load_my_ads_failed"));
+        }
       } finally {
-        setIsLoading(false);
+        if (isActive) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchMyListings();
+
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState === "visible") {
+        fetchMyListings();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      fetchMyListings();
+    };
+
+    const intervalId = window.setInterval(fetchMyListings, 20000);
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityRefresh);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityRefresh);
+    };
   }, [t]);
 
   const summary = useMemo(

@@ -46,6 +46,7 @@ load_env_file(PROJECT_ROOT / ".env.docker")
 MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
 REFERENCE_DATASET_PATH = Path(__file__).resolve().parents[1] / "ml" / "data" / "active" / "AutoValueLK_Finalized_Dataset_v2.csv"
 ADMIN_DATA_PATH = Path(__file__).resolve().parent / "data" / "admin_store.json"
+ADMIN_STORE_PERSIST_ENABLED = os.getenv("ADMIN_STORE_PERSIST", "true").strip().lower() not in {"0", "false", "no"}
 OLDER_REFERENCE_LISTING_MONTH = 1
 OLDER_REFERENCE_LISTING_YEAR = 2025
 RECENT_REFERENCE_LISTING_MONTH = 4
@@ -282,12 +283,18 @@ def ensure_admin_store_shape(store: dict[str, Any]) -> dict[str, Any]:
 
 
 def persist_admin_store() -> None:
+    if not ADMIN_STORE_PERSIST_ENABLED:
+        return
     ADMIN_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     with ADMIN_DATA_PATH.open("w", encoding="utf-8") as file:
         json.dump(price_model_state.admin_store, file, indent=2)
 
 
 def load_admin_store() -> None:
+    if not ADMIN_STORE_PERSIST_ENABLED:
+        price_model_state.admin_store = ensure_admin_store_shape(get_default_admin_store())
+        return
+
     if ADMIN_DATA_PATH.exists():
         with ADMIN_DATA_PATH.open("r", encoding="utf-8") as file:
             loaded_store = json.load(file)

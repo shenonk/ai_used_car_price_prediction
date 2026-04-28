@@ -10,6 +10,7 @@ from pathlib import Path
 import secrets
 from threading import Lock
 from typing import Any
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, unquote, urlencode
 from urllib.request import Request as UrlRequest, urlopen
 from uuid import uuid4
@@ -81,6 +82,35 @@ MARKETPLACE_LISTING_SYNC_FIELDS = {
     "username",
     "logged_in_account",
 }
+CHATBOT_FALLBACK_MESSAGE = (
+    "I can help with AutoValueLK price checks, marketplace ads, boost ups, financing, account help, "
+    "and contacting admin. OpenAI chat is not configured yet, so add OPENAI_API_KEY on the backend "
+    "to enable open-ended answers."
+)
+CHATBOT_SYSTEM_PROMPT = """
+You are AutoValue Assistant, the helpful in-app support chatbot for AutoValueLK, a Sri Lankan used-car price prediction and marketplace app.
+
+Answer user questions clearly and briefly. Prefer practical app guidance over generic explanations.
+
+Core app facts:
+- Price Check estimates vehicle value from brand, model, year, engine/fuel/gearbox, mileage, condition, town, and market timing.
+- Marketplace users can publish vehicle ads. New ads are pending until an admin approves them.
+- Public marketplace listings only show approved ads.
+- Users can track submitted ads under Marketplace > My submitted ads.
+- Marketplace boost ups are optional paid ad promotions:
+  - Urgent: marks the ad as urgent so buyers notice it faster.
+  - Spotlight: visually highlights/features the listing.
+  - Bump Up: lifts or refreshes the ad's visibility in the marketplace.
+- Boosts do not bypass admin approval; an ad still needs admin review before public publishing.
+- Financing helps users compare vehicle loan/lease options and estimate monthly payments.
+- For account/password issues, guide users to Login, Forgot Password, or Settings.
+- For problems needing a human admin, tell users to click Talk to Human in the chatbot or use Help Center.
+
+Rules:
+- If you are unsure about live prices, legal/financial terms, payments, or account-specific status, say the admin team can confirm it.
+- Do not claim a marketplace ad is approved/rejected unless the user can see that status in the app.
+- Keep answers under 120 words unless the user asks for details.
+""".strip()
 
 
 class PriceModelState:
@@ -138,6 +168,17 @@ class SupportTicketCreatePayload(BaseModel):
     user_email: str = Field(..., min_length=3)
     message: str = Field(..., min_length=1)
     status: str = Field(default="open", pattern="^(open|read|closed)$")
+
+
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., min_length=1, max_length=2000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    history: list[ChatMessage] = Field(default_factory=list, max_length=12)
+    pathname: str = Field(default="/", max_length=200)
 
 
 class MarketplaceStatusPayload(BaseModel):
@@ -557,6 +598,133 @@ def make_supabase_rest_request(
         return None
 
     return json.loads(raw)
+
+
+def get_openai_api_key() -> str:
+    return os.getenv("OPENAI_API_KEY", "").strip()
+
+
+def get_openai_model() -> str:
+    return os.getenv("OPENAI_MODEL", "gpt-5-mini").strip() or "gpt-5-mini"
+
+
+def build_local_chatbot_reply(message: str, pathname: str = "/") -> str:
+    normalized = message.strip().lower()
+    if not normalized:
+        return CHATBOT_FALLBACK_MESSAGE
+
+    if any(term in normalized for term in ("boost", "boost up", "urgent", "spotlight", "bump")):
+        return (
+            "Boost ups are optional marketplace promotions. Urgent marks the ad as urgent, "
+            "Spotlight highlights it more visually, and Bump Up refreshes/lifts its visibility. "
+            "Boosts help buyers notice the ad, but they do not skip admin approval."
+        )
+
+    if any(term in normalized for term in ("sell", "publish", "post ad", "submit ad")):
+        return (
+            "To sell a car, go to Marketplace, choose Publish Ad, add the car details and photos, "
+            "then submit it. The ad stays pending until admin approves it."
+        )
+
+    if any(term in normalized for term in ("pending", "approved", "review", "rejected", "my ads")):
+        return (
+            "New marketplace ads start as pending review. Admin can approve, reject, or mark them sold. "
+            "You can track your own ad status under Marketplace > My submitted ads."
+        )
+
+    if any(term in normalized for term in ("price", "prediction", "valuation", "accuracy", "value")):
+        return (
+            "Use Price Check to estimate a vehicle value. Enter the exact brand, model, year, fuel type, "
+            "gearbox, condition, town, and mileage for the best result."
+        )
+
+    if any(term in normalized for term in ("finance", "loan", "leasing", "installment")):
+        return "Open Financing to compare loan or lease options and estimate monthly payments."
+
+    if any(term in normalized for term in ("admin", "human", "support", "contact", "help")):
+        return "Click Talk to Human in the chatbot to send a message directly to the admin Contact Messages inbox."
+
+    if pathname == "/marketplace":
+        return "I can help with marketplace ads, boost ups, approvals, searching listings, and contacting sellers."
+
+    return CHATBOT_FALLBACK_MESSAGE
+
+
+def extract_openai_response_text(payload: dict[str, Any]) -> str:
+    output_text = str(payload.get("output_text") or "").strip()
+    if output_text:
+        return output_text
+
+    chunks: list[str] = []
+    for output_item in payload.get("output") or []:
+        if not isinstance(output_item, dict):
+            continue
+        for content_item in output_item.get("content") or []:
+            if not isinstance(content_item, dict):
+                continue
+            text = content_item.get("text")
+            if isinstance(text, str) and text.strip():
+                chunks.append(text.strip())
+
+    return "\n".join(chunks).strip()
+
+
+def build_chatbot_input(payload: ChatRequest) -> list[dict[str, str]]:
+    recent_history = payload.history[-8:]
+    messages = [
+        {
+            "role": item.role,
+            "content": item.content.strip(),
+        }
+        for item in recent_history
+        if item.content.strip()
+    ]
+    messages.append(
+        {
+            "role": "user",
+            "content": f"Current app page: {payload.pathname}\nUser question: {payload.message.strip()}",
+        }
+    )
+    return messages
+
+
+def request_openai_chatbot_reply(payload: ChatRequest) -> str:
+    api_key = get_openai_api_key()
+    if not api_key:
+        return build_local_chatbot_reply(payload.message, payload.pathname)
+
+    request_payload = {
+        "model": get_openai_model(),
+        "instructions": CHATBOT_SYSTEM_PROMPT,
+        "input": build_chatbot_input(payload),
+        "max_output_tokens": 350,
+    }
+    request = UrlRequest(
+        "https://api.openai.com/v1/responses",
+        method="POST",
+        data=json.dumps(request_payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            response_payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        raw_error = error.read().decode("utf-8", errors="replace")
+        log_warning(f"OpenAI chatbot request failed: {error.code} {raw_error[:300]}")
+        return build_local_chatbot_reply(payload.message, payload.pathname)
+    except (URLError, TimeoutError) as error:
+        log_warning(f"OpenAI chatbot request failed: {error}")
+        return build_local_chatbot_reply(payload.message, payload.pathname)
+
+    reply = extract_openai_response_text(response_payload)
+    if not reply:
+        return build_local_chatbot_reply(payload.message, payload.pathname)
+
+    return reply
 
 
 def merge_records_by_id(*collections: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1158,6 +1326,14 @@ def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]
         persist_admin_store()
 
     return {"message": "Support ticket created successfully.", "ticket": ticket}
+
+
+@app.post("/api/chat")
+def create_chatbot_reply(payload: ChatRequest) -> dict[str, str]:
+    return {
+        "message": request_openai_chatbot_reply(payload),
+        "model": get_openai_model() if get_openai_api_key() else "local-fallback",
+    }
 
 
 @app.get("/api/marketplace/listings")

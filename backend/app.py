@@ -84,8 +84,8 @@ MARKETPLACE_LISTING_SYNC_FIELDS = {
 }
 CHATBOT_FALLBACK_MESSAGE = (
     "I can help with AutoValueLK price checks, marketplace ads, boost ups, financing, account help, "
-    "and contacting admin. OpenAI chat is not configured yet, so add OPENAI_API_KEY on the backend "
-    "to enable open-ended answers."
+    "and contacting admin. Ask me about selling a car, boost ups, ad approval, price prediction, "
+    "financing, or how to reach admin."
 )
 CHATBOT_SYSTEM_PROMPT = """
 You are AutoValue Assistant, the helpful in-app support chatbot for AutoValueLK, a Sri Lankan used-car price prediction and marketplace app.
@@ -612,6 +612,12 @@ def build_local_chatbot_reply(message: str, pathname: str = "/") -> str:
     normalized = message.strip().lower()
     if not normalized:
         return CHATBOT_FALLBACK_MESSAGE
+
+    if normalized in {"hi", "hello", "hey", "yo", "yo hi", "hi there", "hello there"}:
+        return (
+            "Hi! I can help with AutoValueLK price checks, marketplace ads, boost ups, financing, "
+            "account help, and contacting admin. What would you like to do?"
+        )
 
     if any(term in normalized for term in ("boost", "boost up", "urgent", "spotlight", "bump")):
         return (

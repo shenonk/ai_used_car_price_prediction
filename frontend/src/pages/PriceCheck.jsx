@@ -29,6 +29,7 @@ const MODEL_REFERENCE_LISTING_MONTH = 1
 const MODEL_REFERENCE_LISTING_YEAR = 2025
 const BRAND_OPTIONS = Object.keys(brandModelOptions).sort()
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+const MAX_BRAND_SUGGESTIONS = 80
 const MAX_MODEL_SUGGESTIONS = 80
 
 function normalizeModelSearch(value) {
@@ -52,6 +53,7 @@ function PriceCheck() {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [dialog, setDialog] = useState(null)
+  const [isBrandPickerOpen, setIsBrandPickerOpen] = useState(false)
   const [isModelPickerOpen, setIsModelPickerOpen] = useState(false)
   const gearTypeOptions = useMemo(() => ([
     { label: t("price_check_page.options.automatic"), value: "automatic" },
@@ -68,6 +70,21 @@ function PriceCheck() {
     { label: t("price_check_page.options.brand_new"), value: "BRAND NEW" },
     { label: t("price_check_page.options.reconditioned"), value: "RECONDITIONED" },
   ]), [t])
+  const brandSuggestions = useMemo(() => {
+    const query = form.brand.trim()
+    const normalizedQuery = normalizeModelSearch(query)
+
+    if (!normalizedQuery) {
+      return BRAND_OPTIONS.slice(0, MAX_BRAND_SUGGESTIONS)
+    }
+
+    return BRAND_OPTIONS
+      .filter((brand) => {
+        const normalizedBrand = normalizeModelSearch(brand)
+        return brand.toLowerCase().includes(query.toLowerCase()) || normalizedBrand.includes(normalizedQuery)
+      })
+      .slice(0, MAX_BRAND_SUGGESTIONS)
+  }, [form.brand])
   const availableModels = useMemo(
     () => (form.brand ? (brandModelOptions[form.brand] || []) : []),
     [form.brand]
@@ -246,20 +263,48 @@ function PriceCheck() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
               {/* Brand */}
-              <div className="animate-fade-in animate-delay-100">
+              <div className="relative z-50 animate-fade-in animate-delay-100">
                 <label className="label">{t("price_check_page.brand")}</label>
-                <select
-                  className={`input ${errors.brand ? 'border-rose-500/50' : ''}`}
-                  value={form.brand}
-                  onChange={(e) => handleChange('brand', e.target.value)}
-                >
-                  <option value="">{t("price_check_page.select_brand")}</option>
-                  {BRAND_OPTIONS.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    className={`input ${errors.brand ? 'border-rose-500/50' : ''}`}
+                    placeholder={t("price_check_page.select_brand")}
+                    value={form.brand}
+                    onChange={(e) => {
+                      handleChange('brand', e.target.value)
+                      setIsBrandPickerOpen(true)
+                    }}
+                    onFocus={() => setIsBrandPickerOpen(true)}
+                    onBlur={() => setTimeout(() => setIsBrandPickerOpen(false), 120)}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-expanded={isBrandPickerOpen && brandSuggestions.length > 0}
+                    aria-controls="price-check-brand-options"
+                  />
+                  {isBrandPickerOpen && brandSuggestions.length > 0 && (
+                    <div
+                      id="price-check-brand-options"
+                      className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-2 shadow-2xl shadow-black/60"
+                      role="listbox"
+                    >
+                      {brandSuggestions.map((brand) => (
+                        <button
+                          key={brand}
+                          type="button"
+                          className="block w-full rounded-xl px-4 py-2.5 text-left text-sm font-semibold text-slate-100 transition hover:bg-blue-500/15 hover:text-white focus:bg-blue-500/20 focus:outline-none"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            handleChange('brand', brand)
+                            setIsBrandPickerOpen(false)
+                          }}
+                          role="option"
+                        >
+                          {brand}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {errors.brand && <p className="text-rose-400 text-xs mt-1">{errors.brand}</p>}
               </div>
 

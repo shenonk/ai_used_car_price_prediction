@@ -174,29 +174,26 @@ function PriceCheck() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] p-8">
-
-      {/* Header */}
-      <div className="mb-8 animate-fade-in">
-        <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-          <span className="icon-box icon-box-blue">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </span>
+    <div className="app-page-shell">
+      <div className="dashboard-page-hero mb-8 animate-fade-in">
+        <div className="dashboard-page-eyebrow mb-4">
+          <svg className="h-3.5 w-3.5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
           {t("price_check_page.title")}
-        </h1>
-        <p className="text-slate-400">
+        </div>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">{t("price_check_page.title")}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
           {t("price_check_page.subtitle")}
         </p>
       </div>
 
       {/* Main Form Card */}
       <div className="max-w-4xl animate-fade-in animate-delay-100">
-        <div className="card-glass p-8">
+        <div className="dashboard-page-panel">
 
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-14 h-14 rounded-xl bg-white/5 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-xl overflow-hidden">
+            <div className="w-14 h-14 rounded-2xl bg-white/5 backdrop-blur-md flex items-center justify-center border border-white/10 overflow-hidden">
               <img src={logo} alt="AutoValueLK Logo" className="w-10 h-10 object-contain" />
             </div>
             <div>

@@ -3,19 +3,22 @@ from __future__ import annotations
 import base64
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from io import BytesIO
 import json
 import os
 from pathlib import Path
 import secrets
 from threading import Lock
 from typing import Any
-from urllib.parse import quote, urlencode
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, unquote, urlencode
 from urllib.request import Request as UrlRequest, urlopen
 from uuid import uuid4
 
 import joblib
 import numpy as np
 import pandas as pd
+from PIL import Image, ImageDraw, ImageFont
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,13 +46,79 @@ def load_env_file(path: Path) -> None:
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_env_file(PROJECT_ROOT / ".env")
 load_env_file(PROJECT_ROOT / ".env.docker")
+load_env_file(Path(__file__).resolve().parent / ".env")
 MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
 REFERENCE_DATASET_PATH = Path(__file__).resolve().parents[1] / "ml" / "data" / "active" / "AutoValueLK_Finalized_Dataset_v2.csv"
 ADMIN_DATA_PATH = Path(__file__).resolve().parent / "data" / "admin_store.json"
+ADMIN_STORE_PERSIST_ENABLED = os.getenv("ADMIN_STORE_PERSIST", "true").strip().lower() not in {"0", "false", "no"}
 OLDER_REFERENCE_LISTING_MONTH = 1
 OLDER_REFERENCE_LISTING_YEAR = 2025
 RECENT_REFERENCE_LISTING_MONTH = 4
 RECENT_REFERENCE_LISTING_YEAR = 2026
+MARKETPLACE_LISTING_SYNC_FIELDS = {
+    "id",
+    "brand",
+    "model",
+    "seller_name",
+    "phone_number",
+    "vehicle_location",
+    "vehicle_description",
+    "year",
+    "mileage",
+    "fuel_type",
+    "transmission",
+    "condition",
+    "price",
+    "status",
+    "image_url",
+    "image_urls",
+    "uploaded_image_count",
+    "is_urgent",
+    "is_spotlight",
+    "is_bumped",
+    "created_at",
+    "updated_at",
+    "user_id",
+    "account_email",
+    "username",
+    "logged_in_account",
+}
+CHATBOT_FALLBACK_MESSAGE = (
+    "I can help with AutoValueLK price checks, marketplace ads, boost ups, financing, account help, "
+    "and contacting admin. Ask me about selling a car, boost ups, ad approval, price prediction, "
+    "financing, or how to reach admin."
+)
+CHATBOT_SYSTEM_PROMPT = """
+You are AutoValue Assistant, the helpful in-app support chatbot for AutoValueLK, a Sri Lankan used-car price prediction and marketplace app.
+
+Answer user questions clearly and briefly. Prefer practical app guidance over generic explanations.
+
+Core app facts:
+- Price Check estimates vehicle value from brand, model, year, engine/fuel/gearbox, mileage, condition, town, and market timing.
+- Results shows the latest Price Check output after a prediction. The predicted price is an AI estimate, not a guaranteed final selling price.
+- Marketplace users can publish vehicle ads. New ads are pending until an admin approves them.
+- Public marketplace listings only show approved ads.
+- Users can track submitted ads under Marketplace > My submitted ads.
+- Admin can approve, reject, or mark marketplace ads as sold.
+- Buyers use the seller details shown on approved marketplace listings to contact the seller.
+- Marketplace boost ups are optional paid ad promotions:
+  - Urgent costs LKR 500 and marks the ad as urgent so buyers notice it faster.
+  - Spotlight costs LKR 750 and visually highlights/features the listing.
+  - Bump Up costs LKR 300 and lifts or refreshes the ad's visibility in the marketplace.
+- Boosts do not bypass admin approval; an ad still needs admin review before public publishing.
+- Financing helps users compare vehicle loan, leasing, and vehicle draft options, estimate monthly payments, adjust down payment and tenure, compare institution rates, and download a financing report.
+- Analytics shows saved Price Check predictions, vehicle value trend charts, estimated current value, dataset-backed market trends or depreciation projections, and prediction history with search, brand filter, and delete controls.
+- Notifications show active app updates and announcements. Admins can create system notifications from the admin dashboard.
+- Boost payments are processed through Stripe card checkout. After a paid checkout is verified, the selected boost flags are applied to the user's own listing and the payment is recorded for admin review.
+- For account/password issues, guide users to Login, Forgot Password, or Settings.
+- For problems needing a human admin, tell users to click Talk to Human in the chatbot or use Help Center.
+
+Rules:
+- If you are unsure about live prices, legal/financial terms, payments, or account-specific status, say the admin team can confirm it.
+- Do not claim a marketplace ad is approved/rejected unless the user can see that status in the app.
+- The chatbot cannot approve ads, guarantee prices, provide legal/financial advice, or confirm exact account/payment status.
+- Keep answers under 120 words unless the user asks for details.
+""".strip()
 
 
 class PriceModelState:
@@ -109,6 +178,17 @@ class SupportTicketCreatePayload(BaseModel):
     status: str = Field(default="open", pattern="^(open|read|closed)$")
 
 
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant)$")
+    content: str = Field(..., min_length=1, max_length=2000)
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    history: list[ChatMessage] = Field(default_factory=list, max_length=12)
+    pathname: str = Field(default="/", max_length=200)
+
+
 class MarketplaceStatusPayload(BaseModel):
     status: str = Field(..., pattern="^(pending|approved|rejected|sold)$")
 
@@ -138,6 +218,55 @@ def normalize_reference_text(value: object) -> str:
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_record_timestamp(value: object) -> datetime | None:
+    if not value:
+        return None
+
+    normalized = str(value).strip()
+    if not normalized:
+        return None
+
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+
+    try:
+        timestamp = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+
+    if timestamp.tzinfo is None:
+        timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+    return timestamp.astimezone(timezone.utc)
+
+
+def get_record_timestamp(item: dict[str, Any]) -> datetime:
+    for field_name in ("updated_at", "confirmed_at", "created_at"):
+        timestamp = parse_record_timestamp(item.get(field_name))
+        if timestamp is not None:
+            return timestamp
+
+    return datetime.min.replace(tzinfo=timezone.utc)
+
+
+def get_marketplace_status_rank(item: dict[str, Any]) -> int:
+    return {
+        "pending": 0,
+        "rejected": 1,
+        "approved": 1,
+        "sold": 1,
+    }.get(str(item.get("status") or "").strip().lower(), 0)
+
+
+def should_prefer_record(candidate: dict[str, Any], existing: dict[str, Any]) -> bool:
+    candidate_timestamp = get_record_timestamp(candidate)
+    existing_timestamp = get_record_timestamp(existing)
+    if candidate_timestamp != existing_timestamp:
+        return candidate_timestamp > existing_timestamp
+
+    return get_marketplace_status_rank(candidate) >= get_marketplace_status_rank(existing)
 
 
 BOOST_PRICING = {
@@ -282,12 +411,18 @@ def ensure_admin_store_shape(store: dict[str, Any]) -> dict[str, Any]:
 
 
 def persist_admin_store() -> None:
+    if not ADMIN_STORE_PERSIST_ENABLED:
+        return
     ADMIN_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
     with ADMIN_DATA_PATH.open("w", encoding="utf-8") as file:
         json.dump(price_model_state.admin_store, file, indent=2)
 
 
 def load_admin_store() -> None:
+    if not ADMIN_STORE_PERSIST_ENABLED:
+        price_model_state.admin_store = ensure_admin_store_shape(get_default_admin_store())
+        return
+
     if ADMIN_DATA_PATH.exists():
         with ADMIN_DATA_PATH.open("r", encoding="utf-8") as file:
             loaded_store = json.load(file)
@@ -473,6 +608,291 @@ def make_supabase_rest_request(
     return json.loads(raw)
 
 
+def get_gemini_api_key() -> str:
+    api_key = (os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")).strip()
+    if not api_key or api_key == "your_gemini_api_key_here":
+        return ""
+    return api_key
+
+
+def get_gemini_model() -> str:
+    return os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite").strip() or "gemini-2.5-flash-lite"
+
+
+def build_local_chatbot_reply(message: str, pathname: str = "/") -> str:
+    normalized = message.strip().lower()
+    if not normalized:
+        return CHATBOT_FALLBACK_MESSAGE
+
+    if normalized in {"hi", "hello", "hey", "yo", "yo hi", "hi there", "hello there"}:
+        return (
+            "Hi! I can help with AutoValueLK price checks, marketplace ads, boost ups, financing, "
+            "account help, and contacting admin. What would you like to do?"
+        )
+
+    if "final selling price" in normalized or ("selling price" in normalized and "prediction" in normalized):
+        return (
+            "No. The predicted price is an AI estimate to guide your decision, not a guaranteed final selling price. "
+            "The real sale price can change based on buyer demand, vehicle condition, documents, negotiation, and market timing."
+        )
+
+    if "predicted price" in normalized and any(term in normalized for term in ("mean", "means", "meaning")):
+        return (
+            "The predicted price is the app's estimated current market value in LKR based on the vehicle details you entered. "
+            "Use it as guidance, not a guaranteed selling price."
+        )
+
+    if "check" in normalized and "value" in normalized:
+        return (
+            "Yes. Open Price Check and enter the vehicle's brand, model, year, fuel type, gearbox, condition, town, and mileage. "
+            "For a Toyota Aqua 2018, choose Toyota as the brand, Aqua as the model, and 2018 as the year."
+        )
+
+    if any(term in normalized for term in ("latest prediction", "latest result", "prediction result", "results page", "see my result")):
+        return (
+            "Your latest prediction result appears on the Results page after you run Price Check. "
+            "Saved predictions can also be reviewed later in Analytics."
+        )
+
+    if any(term in normalized for term in ("save my prediction", "save prediction", "saved prediction", "saved predictions")):
+        return (
+            "Yes. Predictions are saved so you can review them in Analytics. If you are signed in, they can be loaded from your account; "
+            "otherwise the app can use local browser history."
+        )
+
+    if any(term in normalized for term in ("analytics", "trend", "history", "market value chart", "trend chart", "estimated current value", "depreciation projection", "delete old prediction")):
+        if "saved" in normalized or "see my" in normalized:
+            return "Open Analytics to see your saved Price Check predictions and prediction history."
+        if "trend" in normalized or "chart" in normalized:
+            return (
+                "The market value trend chart shows how the selected saved vehicle's estimated value changes over time, "
+                "using matching market data when available or a depreciation projection when data is sparse."
+            )
+        if "estimated current value" in normalized:
+            return "Estimated current value is the app's current LKR value estimate for the selected saved vehicle in Analytics."
+        if "delete" in normalized:
+            return "Yes. In Analytics, use the delete button beside a prediction history row to remove an old prediction record."
+        if "depreciation" in normalized:
+            return (
+                "Analytics uses a depreciation projection when there is not enough matching market trend data for that vehicle. "
+                "It fills the missing years with an estimated value curve."
+            )
+        return (
+            "Analytics shows saved Price Check predictions, market value trend charts, estimated current value, "
+            "and prediction history. You can search, filter by brand, select a saved vehicle, and delete old prediction records."
+        )
+
+    if "submitted ads" in normalized or "my submitted ads" in normalized or "my ads" in normalized:
+        return "Go to Marketplace > My submitted ads to see the ads you have posted and their current status."
+
+    if "sign in" in normalized and ("publish" in normalized or "ad" in normalized):
+        return "You should sign in before publishing an ad so the listing is linked to your account and you can track it under Marketplace > My submitted ads."
+
+    if any(term in normalized for term in ("forgot my password", "forgot password", "reset password")):
+        return "Use Forgot Password on the Login page. Enter your email address and the app will send a secure password reset link."
+
+    if "settings" in normalized:
+        return "Open Settings to update profile preferences, notification preferences, security/password details, and language settings."
+
+    if "login" in normalized and ("save" in normalized or "prediction" in normalized):
+        return "You can save predictions locally, but signing in lets the app load your saved prediction history from your account across sessions."
+
+    if "app update" in normalized or "app updates" in normalized or "where can i see updates" in normalized:
+        return "You can see app updates and active announcements in Notifications."
+
+    if "notification" in normalized or "system announcement" in normalized or "announcements" in normalized:
+        if "admin" in normalized or "announcement" in normalized:
+            return "Yes. Admins can create active system notifications and announcements that users see in Notifications."
+        return "Notifications show active app updates, system messages, market notices, and other announcements from AutoValueLK."
+
+    if "sent a message" in normalized and "admin" in normalized:
+        return "Your message goes to the admin Contact Messages inbox. Admin can use your provided email or account details to follow up."
+
+    if "where does" in normalized and "support message" in normalized:
+        return "Your support message is saved in the admin Contact Messages inbox so the admin team can review it."
+
+    if "how will" in normalized and ("reply" in normalized or "contact me" in normalized):
+        return "Admin can follow up using the email address or account details you provided with your support message."
+
+    if "approve my ad" in normalized or "approve ad" in normalized:
+        return "I cannot approve ads. Only an admin can approve, reject, or mark marketplace listings as sold."
+
+    if "exact payment status" in normalized or ("payment status" in normalized and "exact" in normalized):
+        return "I cannot confirm your exact payment status in chat. Check the payment result in Marketplace, or contact admin if it looks wrong."
+
+    if "guarantee" in normalized and ("price" in normalized or "car" in normalized):
+        return "No. Price Check gives an AI estimate, not a guaranteed sale price. The final price depends on condition, documents, buyer demand, and negotiation."
+
+    if "legal" in normalized or "financial advice" in normalized:
+        return "I can explain app features, but I cannot provide legal or financial advice. Please confirm important loan, legal, or payment decisions with a qualified professional or admin."
+
+    if "ai is unsure" in normalized or "if the ai is unsure" in normalized or "unsure" in normalized:
+        return "If the AI is unsure, treat the answer as guidance only and contact admin for confirmation, especially for live prices, payment status, legal, or financial questions."
+
+    if "card" in normalized or "payment" in normalized or "pay for a boost" in normalized or "payment is cancelled" in normalized or "payment cancelled" in normalized or "boost activate" in normalized or "confirms my payment" in normalized:
+        if "safe" in normalized or "card" in normalized:
+            return "Boost payments use Stripe card checkout, so card details are handled by Stripe rather than stored directly by AutoValueLK."
+        if "cancel" in normalized:
+            return "If a boost payment is cancelled, the checkout returns to Marketplace and the boost is not confirmed or applied."
+        if "after" in normalized or "pay for a boost" in normalized:
+            return "After a successful boost payment, the backend verifies the Stripe checkout session, records the payment, and applies the selected boost to your listing."
+        if "immediately" in normalized or "activate" in normalized:
+            return "A boost is applied after Stripe confirms the payment. It still does not bypass admin approval for public listing visibility."
+        if "who" in normalized or "confirm" in normalized:
+            return "Stripe confirms the card payment, then AutoValueLK verifies that checkout session and records the payment for admin."
+        return "Boost payments are handled through Stripe checkout and are verified by the backend before boosts are applied."
+
+    if "admin reject" in normalized or "reject my ad" in normalized or "rejected" in normalized:
+        return "Yes. Admin can reject an ad if it needs changes, has missing details, or does not meet marketplace rules."
+
+    if "not visible" in normalized or "not showing" in normalized or "not appear" in normalized:
+        return "Your ad may not be visible publicly because only approved marketplace ads are shown. Check Marketplace > My submitted ads for its status."
+
+    if "buyers contact" in normalized or "buyer contact" in normalized or "contact the seller" in normalized:
+        return "Buyers can contact the seller using the seller details shown on an approved marketplace listing."
+
+    if "more than one boost" in normalized or "multiple boost" in normalized or "buy more than one" in normalized:
+        return (
+            "Yes. You can select more than one boost for your marketplace ad. The total is added together: "
+            "Urgent is LKR 500, Spotlight is LKR 750, and Bump Up is LKR 300."
+        )
+
+    if "urgent" in normalized and "how much" in normalized:
+        return "Urgent costs LKR 500. It marks your ad as urgent so buyers notice it faster."
+
+    if "spotlight" in normalized:
+        return "Spotlight costs LKR 750. It visually highlights or features your listing in the marketplace."
+
+    if "bump" in normalized:
+        return "Bump Up costs LKR 300. It refreshes or lifts your ad's visibility in the marketplace."
+
+    if "skip admin approval" in normalized or "bypass admin approval" in normalized:
+        return "No. Boost ups do not skip admin approval. Your ad still needs admin review before it appears publicly."
+
+    if any(term in normalized for term in ("boost", "boost up", "urgent")):
+        return (
+            "Boost ups are optional marketplace promotions. Urgent costs LKR 500, "
+            "Spotlight costs LKR 750, and Bump Up costs LKR 300. They help buyers notice the ad, "
+            "but they do not skip admin approval."
+        )
+
+    if any(term in normalized for term in ("sell", "publish", "post ad", "submit ad")):
+        return (
+            "To sell a car, go to Marketplace, choose Publish Ad, add the car details and photos, "
+            "then submit it. The ad stays pending until admin approves it."
+        )
+
+    if any(term in normalized for term in ("pending", "approved", "review")):
+        return (
+            "New marketplace ads start as pending review. Admin can approve, reject, or mark them sold. "
+            "You can track your own ad status under Marketplace > My submitted ads."
+        )
+
+    if any(term in normalized for term in ("price check", "valuation", "accuracy", "vehicle value", "car value")):
+        return (
+            "Use Price Check to estimate a vehicle value. Enter the exact brand, model, year, fuel type, "
+            "gearbox, condition, town, and mileage for the best result."
+        )
+
+    if any(term in normalized for term in ("finance", "financing", "loan", "leasing", "installment", "monthly payment", "down payment", "loan rate")):
+        if "monthly payment" in normalized or "calculated" in normalized:
+            return "The monthly payment is estimated from the vehicle price, down payment, loan amount, selected institution interest rate, and tenure."
+        if "minimum down payment" in normalized or "min down" in normalized:
+            return "Minimum down payment comes from the selected institution's financing rules. If no institution data is available, the app uses 20% as the default."
+        if "loan rate" in normalized or "rate change" in normalized:
+            return "Yes. Loan rates can change when admins update rates or when institution data changes, so Financing should be treated as an estimate."
+        return "Open Financing to compare vehicle loan, leasing, and draft options, adjust down payment and tenure, and estimate monthly payments."
+
+    if any(term in normalized for term in ("admin", "human", "support", "contact", "help")):
+        return "Click Talk to Human in the chatbot to send a message directly to the admin Contact Messages inbox."
+
+    if pathname == "/marketplace":
+        return "I can help with marketplace ads, boost ups, approvals, searching listings, and contacting sellers."
+
+    if pathname == "/analytics":
+        return "I can help explain saved predictions, market value trends, estimated current value, and prediction history."
+
+    return CHATBOT_FALLBACK_MESSAGE
+
+
+def extract_gemini_response_text(payload: dict[str, Any]) -> str:
+    chunks: list[str] = []
+    for candidate in payload.get("candidates") or []:
+        if not isinstance(candidate, dict):
+            continue
+        content = candidate.get("content") or {}
+        for part in content.get("parts") or []:
+            if not isinstance(part, dict):
+                continue
+            text = part.get("text")
+            if isinstance(text, str) and text.strip():
+                chunks.append(text.strip())
+
+    return "\n".join(chunks).strip()
+
+
+def build_chatbot_contents(payload: ChatRequest) -> list[dict[str, Any]]:
+    recent_history = payload.history[-8:]
+    contents = [
+        {
+            "role": "model" if item.role == "assistant" else "user",
+            "parts": [{"text": item.content.strip()}],
+        }
+        for item in recent_history
+        if item.content.strip()
+    ]
+    contents.append(
+        {
+            "role": "user",
+            "parts": [{"text": f"Current app page: {payload.pathname}\nUser question: {payload.message.strip()}"}],
+        }
+    )
+    return contents
+
+
+def request_gemini_chatbot_reply(payload: ChatRequest) -> str:
+    api_key = get_gemini_api_key()
+    if not api_key:
+        return build_local_chatbot_reply(payload.message, payload.pathname)
+
+    request_payload = {
+        "systemInstruction": {
+            "parts": [{"text": CHATBOT_SYSTEM_PROMPT}],
+        },
+        "contents": build_chatbot_contents(payload),
+        "generationConfig": {
+            "maxOutputTokens": 350,
+            "temperature": 0.4,
+        },
+    }
+    model = quote(get_gemini_model(), safe="")
+    request = UrlRequest(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={quote(api_key, safe='')}",
+        method="POST",
+        data=json.dumps(request_payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            response_payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        raw_error = error.read().decode("utf-8", errors="replace")
+        log_warning(f"Gemini chatbot request failed: {error.code} {raw_error[:300]}")
+        return build_local_chatbot_reply(payload.message, payload.pathname)
+    except (URLError, TimeoutError) as error:
+        log_warning(f"Gemini chatbot request failed: {error}")
+        return build_local_chatbot_reply(payload.message, payload.pathname)
+
+    reply = extract_gemini_response_text(response_payload)
+    if not reply:
+        return build_local_chatbot_reply(payload.message, payload.pathname)
+
+    return reply
+
+
 def merge_records_by_id(*collections: list[dict[str, Any]]) -> list[dict[str, Any]]:
     merged: dict[str, dict[str, Any]] = {}
     for collection in collections:
@@ -481,23 +901,28 @@ def merge_records_by_id(*collections: list[dict[str, Any]]) -> list[dict[str, An
             if not item_id:
                 continue
             if item_id in merged:
-                merged[item_id].update(item)
+                existing = merged[item_id]
+                if should_prefer_record(item, existing):
+                    merged[item_id] = {**existing, **item}
+                else:
+                    merged[item_id] = {**item, **existing}
             else:
                 merged[item_id] = dict(item)
 
     return sorted(
         merged.values(),
-        key=lambda item: item.get("confirmed_at") or item.get("created_at") or "",
+        key=get_record_timestamp,
         reverse=True,
     )
 
 
 def sync_marketplace_listing_to_supabase(listing: dict[str, Any]) -> None:
+    payload = {key: value for key, value in listing.items() if key in MARKETPLACE_LISTING_SYNC_FIELDS}
     try:
         make_supabase_rest_request(
             "/rest/v1/marketplace_listings?on_conflict=id",
             method="POST",
-            data=json.dumps(listing).encode("utf-8"),
+            data=json.dumps(payload).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
                 "Prefer": "resolution=merge-duplicates",
@@ -819,6 +1244,122 @@ def upload_marketplace_images(listing_id: str, images: list[UploadFile]) -> list
     return public_urls
 
 
+def infer_image_content_type(image_format: str) -> str:
+    normalized = str(image_format or "").upper()
+    if normalized in {"JPEG", "JPG"}:
+        return "image/jpeg"
+    if normalized == "PNG":
+        return "image/png"
+    if normalized == "WEBP":
+        return "image/webp"
+    return "application/octet-stream"
+
+
+def extract_marketplace_storage_path(public_url: str) -> str:
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    prefix = f"{supabase_url}/storage/v1/object/public/car_images/"
+    if not public_url.startswith(prefix):
+        raise RuntimeError("Marketplace image URL does not match the configured Supabase storage bucket.")
+    path_part = public_url[len(prefix):].split("?", 1)[0]
+    return unquote(path_part)
+
+
+def load_watermark_font(font_size: int) -> ImageFont.ImageFont:
+    for font_name in ("arial.ttf", "DejaVuSans-Bold.ttf"):
+        try:
+            return ImageFont.truetype(font_name, font_size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
+
+
+def watermark_image_bytes(content: bytes, watermark_text: str = "AutoValueLK") -> tuple[bytes, str]:
+    with Image.open(BytesIO(content)) as source_image:
+        output_format = source_image.format or "JPEG"
+        base_image = source_image.convert("RGBA")
+        width, height = base_image.size
+
+        overlay = Image.new("RGBA", base_image.size, (255, 255, 255, 0))
+        draw = ImageDraw.Draw(overlay)
+        font_size = max(40, min(width, height) // 6)
+        font = load_watermark_font(font_size)
+        text_box = draw.textbbox((0, 0), watermark_text, font=font, stroke_width=2)
+        text_width = text_box[2] - text_box[0]
+        text_height = text_box[3] - text_box[1]
+        text_x = (width - text_width) / 2 - text_box[0]
+        text_y = (height - text_height) / 2 - text_box[1]
+
+        draw.text(
+            (text_x, text_y),
+            watermark_text,
+            font=font,
+            fill=(255, 255, 255, 92),
+            stroke_width=2,
+            stroke_fill=(15, 23, 42, 64),
+        )
+
+        composited = Image.alpha_composite(base_image, overlay)
+
+        buffer = BytesIO()
+        if output_format.upper() in {"JPEG", "JPG"}:
+            composited.convert("RGB").save(buffer, format="JPEG", quality=92)
+            image_format = "JPEG"
+        else:
+            composited.save(buffer, format=output_format)
+            image_format = output_format
+
+    return buffer.getvalue(), infer_image_content_type(image_format)
+
+
+def upload_marketplace_storage_bytes(object_path: str, content: bytes, content_type: str, *, upsert: bool) -> str:
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    supabase_key = os.getenv("SUPABASE_KEY", "")
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("Supabase storage is not configured for marketplace image uploads.")
+
+    upload_url = f"{supabase_url}/storage/v1/object/car_images/{quote(object_path, safe='/')}"
+    request = UrlRequest(
+        upload_url,
+        data=content,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": content_type,
+            "x-upsert": "true" if upsert else "false",
+        },
+    )
+    with urlopen(request):
+        pass
+
+    return f"{supabase_url}/storage/v1/object/public/car_images/{object_path}"
+
+
+def apply_marketplace_watermark(listing: dict[str, Any]) -> dict[str, Any]:
+    image_urls = listing.get("image_urls") or []
+    if not image_urls and listing.get("image_url"):
+        image_urls = [listing["image_url"]]
+
+    if not image_urls:
+        return listing
+
+    updated_urls: list[str] = []
+    watermark_version = utc_now_iso()
+    for public_url in image_urls:
+        object_path = extract_marketplace_storage_path(public_url)
+        with urlopen(public_url) as response:
+            original_content = response.read()
+        watermarked_content, content_type = watermark_image_bytes(original_content)
+        updated_url = upload_marketplace_storage_bytes(object_path, watermarked_content, content_type, upsert=True)
+        updated_urls.append(f"{updated_url}?v={quote(watermark_version, safe='')}")
+
+    listing["image_urls"] = updated_urls
+    listing["image_url"] = updated_urls[0] if updated_urls else ""
+    listing["images_watermarked"] = True
+    listing["watermarked_at"] = watermark_version
+    return listing
+
+
 def resolve_reference_listing_period(payload: VehiclePredictionRequest) -> tuple[int, int]:
     if payload.condition == "BRAND NEW" or payload.year >= 2023:
         return RECENT_REFERENCE_LISTING_MONTH, RECENT_REFERENCE_LISTING_YEAR
@@ -953,6 +1494,14 @@ def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]
     return {"message": "Support ticket created successfully.", "ticket": ticket}
 
 
+@app.post("/api/chat")
+def create_chatbot_reply(payload: ChatRequest) -> dict[str, str]:
+    return {
+        "message": request_gemini_chatbot_reply(payload),
+        "model": get_gemini_model() if get_gemini_api_key() else "local-fallback",
+    }
+
+
 @app.get("/api/marketplace/listings")
 def get_public_marketplace_listings() -> dict[str, Any]:
     local_listings = price_model_state.admin_store["marketplace_listings"]
@@ -962,7 +1511,7 @@ def get_public_marketplace_listings() -> dict[str, Any]:
         log_warning(f"Unable to load public marketplace listings from Supabase: {error}")
         supabase_listings = []
 
-    listings = merge_records_by_id(local_listings, supabase_listings)
+    listings = merge_records_by_id(supabase_listings, local_listings)
     return {"listings": listings}
 
 
@@ -989,6 +1538,7 @@ async def create_marketplace_listing(
     valid_images = [file for file in (images or []) if getattr(file, "filename", "")]
     listing_id = f"listing-{uuid4().hex}"
     image_urls = upload_marketplace_images(listing_id, valid_images) if valid_images else []
+    created_at = utc_now_iso()
 
     with price_model_state.admin_lock:
         listings = price_model_state.admin_store["marketplace_listings"]
@@ -1013,7 +1563,8 @@ async def create_marketplace_listing(
             "is_urgent": parse_boolean_flag(is_urgent),
             "is_spotlight": parse_boolean_flag(is_spotlight),
             "is_bumped": parse_boolean_flag(is_bumped),
-            "created_at": utc_now_iso(),
+            "created_at": created_at,
+            "updated_at": created_at,
             "user_id": requester["user_id"],
             "account_email": requester["email"],
             "username": requester["username"],
@@ -1043,7 +1594,7 @@ def get_my_marketplace_listings(requester: dict[str, Any] = Depends(get_requeste
     else:
         supabase_listings = []
 
-    listings = merge_records_by_id(local_listings, supabase_listings)
+    listings = merge_records_by_id(supabase_listings, local_listings)
     return {"listings": listings}
 
 
@@ -1129,6 +1680,7 @@ def verify_payment(
         listing["is_urgent"] = "urgent" in boost_keys
         listing["is_spotlight"] = "spotlight" in boost_keys
         listing["is_bumped"] = "bump" in boost_keys
+        listing["updated_at"] = utc_now_iso()
         persist_admin_store()
 
     sync_marketplace_listing_to_supabase(listing)
@@ -1305,7 +1857,7 @@ def get_marketplace_listings(
         log_warning(f"Unable to load admin marketplace listings from Supabase: {error}")
         supabase_listings = []
 
-    listings = merge_records_by_id(local_listings, supabase_listings)
+    listings = merge_records_by_id(supabase_listings, local_listings)
     return {"listings": listings}
 
 
@@ -1315,13 +1867,33 @@ def update_marketplace_listing_status(
     payload: MarketplaceStatusPayload,
     _token: str = Depends(require_admin),
 ) -> dict[str, Any]:
+    should_apply_watermark = False
+
     with price_model_state.admin_lock:
         listings = price_model_state.admin_store["marketplace_listings"]
         listing = next((item for item in listings if str(item.get("id")) == listing_id), None)
         if listing is None:
             raise admin_error("Marketplace listing not found.", status_code=404)
 
+        if payload.status == "approved" and listing.get("image_urls") and not listing.get("images_watermarked"):
+            should_apply_watermark = True
+
+    if should_apply_watermark:
+        try:
+            apply_marketplace_watermark(listing)
+        except Exception as error:
+            raise admin_error(
+                f"Unable to watermark marketplace images before approval: {error}",
+                status_code=500,
+            )
+
+    with price_model_state.admin_lock:
+        listings = price_model_state.admin_store["marketplace_listings"]
+        listing = next((item for item in listings if str(item.get("id")) == listing_id), None)
+        if listing is None:
+            raise admin_error("Marketplace listing not found.", status_code=404)
         listing["status"] = payload.status
+        listing["updated_at"] = utc_now_iso()
         persist_admin_store()
 
     sync_marketplace_listing_to_supabase(listing)

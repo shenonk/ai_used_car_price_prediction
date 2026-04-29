@@ -569,7 +569,7 @@ function Analytics() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] p-8">
+    <div className="app-page-shell">
       <SuccessToast
         isOpen={toast.isOpen && toast.type === "success"}
         message={toast.message}
@@ -591,19 +591,18 @@ function Analytics() {
         </div>
       )}
 
-      <div className="mb-8 animate-fade-in">
-        <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-          <span className="icon-box icon-box-amber">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-            </svg>
-          </span>
+      <div className="dashboard-page-hero mb-8 animate-fade-in">
+        <div className="dashboard-page-eyebrow mb-4">
+          <svg className="h-3.5 w-3.5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
           {t("analytics_page.title")}
-        </h1>
-        <p className="text-slate-400">{t("analytics_page.subtitle")}</p>
+        </div>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">{t("analytics_page.title")}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{t("analytics_page.subtitle")}</p>
       </div>
 
-      <div className="card p-6 mb-8 animate-fade-in animate-delay-100">
+      <div className="dashboard-page-panel mb-8 animate-fade-in animate-delay-100">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-white flex items-center gap-2">
             <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
@@ -671,7 +670,7 @@ function Analytics() {
         </div>
       </div>
 
-      <div className="card p-6 animate-fade-in animate-delay-200">
+      <div className="dashboard-page-panel animate-fade-in animate-delay-200">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <div>
             <h2 className="text-xl font-semibold text-white flex items-center gap-2">
@@ -742,7 +741,7 @@ function Analytics() {
                         type="button"
                         onClick={() => handleDeletePrediction(item)}
                         disabled={deletingPredictionId === item.id}
-                        className="inline-flex items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/5 p-2 text-rose-400 transition-all hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="btn-danger p-2 disabled:cursor-not-allowed disabled:opacity-60"
                         aria-label={t("analytics_page.delete_aria_label", {
                           label: `${item.brand} ${item.model} ${item.year}`,
                         })}
@@ -765,10 +764,10 @@ function Analytics() {
         <div className="mt-6 flex justify-between items-center text-sm text-slate-500">
           <span>{t("analytics_page.showing_count", { shown: displayedPredictions.length, total: filteredPredictions.length })}</span>
           {!showAll && filteredPredictions.length > 4 && (
-            <button onClick={() => setShowAll(true)} className="text-blue-400 hover:text-blue-300 transition-colors">{t("analytics_page.view_all")}</button>
+            <button onClick={() => setShowAll(true)} className="btn-text">{t("analytics_page.view_all")}</button>
           )}
           {showAll && (
-            <button onClick={() => setShowAll(false)} className="text-blue-400 hover:text-blue-300 transition-colors">{t("analytics_page.show_less")}</button>
+            <button onClick={() => setShowAll(false)} className="btn-text">{t("analytics_page.show_less")}</button>
           )}
         </div>
       </div>

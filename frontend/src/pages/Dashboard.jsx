@@ -3,21 +3,34 @@ import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
   ArrowRight,
+  Check,
   BellRing,
   Bookmark,
   Calculator,
   CarFront,
   Clock3,
   Coins,
+  Eye,
   LineChart,
+  MessageSquareText,
   ShieldCheck,
   Sparkles,
   TrendingUp,
+  X,
 } from "lucide-react"
 import { getCurrentUser } from "../utils/auth"
 import { loadPredictionHistory } from "../utils/predictionHistory"
 import { supabase } from "../utils/supabaseClient"
 import { loadUserAlerts } from "../utils/userAlerts"
+import {
+  dismissNotification,
+  inferNotificationType,
+  loadDismissedNotificationIds,
+  loadReadNotificationIds,
+  markNotificationAsRead,
+} from "../utils/notifications"
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
 
 function formatCurrency(value) {
   return `LKR ${Math.round(Number(value || 0)).toLocaleString("en-LK")}`
@@ -53,6 +66,15 @@ function formatRelativeDate(value) {
   return new Date(value).toLocaleDateString("en-LK")
 }
 
+function toTimestamp(value) {
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+function buildVehicleKey(brand, model) {
+  return `${String(brand || "").trim().toUpperCase()}|||${String(model || "").trim().toUpperCase()}`
+}
+
 function normalizeCloudPrediction(row) {
   return {
     id: `db-${row.id}`,
@@ -61,6 +83,20 @@ function normalizeCloudPrediction(row) {
     year: row.year,
     predictedPrice: Number(row.predicted_price_lkr) || 0,
     predictedAt: row.created_at,
+  }
+}
+
+function normalizeMarketplaceListing(row) {
+  return {
+    id: String(row.id || ""),
+    brand: row.brand,
+    model: row.model,
+    price: Number(row.price || 0),
+    createdAt: row.created_at,
+    status: row.status,
+    isSpotlight: Boolean(row.is_spotlight),
+    isUrgent: Boolean(row.is_urgent),
+    isBumped: Boolean(row.is_bumped),
   }
 }
 
@@ -75,15 +111,28 @@ function normalizeLocalPrediction(row) {
   }
 }
 
+function buildNotificationTimeLabel(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return ""
+  }
+
+  return date.toLocaleDateString("en-LK", {
+    month: "short",
+    day: "numeric",
+  })
+}
+
 function Dashboard() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(true)
+  const [dashboardNotifications, setDashboardNotifications] = useState([])
   const [dashboardData, setDashboardData] = useState({
     user: null,
     predictions: [],
+    listings: [],
     alertsCount: 0,
-    bestRate: null,
     source: "local",
   })
 
@@ -96,6 +145,7 @@ function Dashboard() {
       const user = await getCurrentUser()
       const alerts = loadUserAlerts(user || { email: "guest@example.com", username: "Guest" })
       let predictions = []
+      let listings = []
       let source = "local"
 
       if (user?.id) {
@@ -117,20 +167,24 @@ function Dashboard() {
         source = "local"
       }
 
-      const { data: financingData } = await supabase
-        .from("financing_options")
-        .select("fixed_rate")
-        .eq("status", "Active")
-        .order("fixed_rate", { ascending: true })
-        .limit(1)
+      const { data: marketplaceData } = await supabase
+        .from("marketplace_listings")
+        .select("id, brand, model, price, created_at, status, is_spotlight, is_urgent, is_bumped")
+        .eq("status", "approved")
+        .order("created_at", { ascending: false })
+        .limit(24)
+
+      if (Array.isArray(marketplaceData)) {
+        listings = marketplaceData.map(normalizeMarketplaceListing)
+      }
 
       if (!isActive) return
 
       setDashboardData({
         user,
         predictions,
+        listings,
         alertsCount: alerts.length,
-        bestRate: financingData?.[0]?.fixed_rate ? Number(financingData[0].fixed_rate) : null,
         source,
       })
       setIsLoading(false)
@@ -139,6 +193,79 @@ function Dashboard() {
     loadDashboard()
     return () => {
       isActive = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let isActive = true
+
+    const loadUnreadNotifications = async () => {
+      try {
+        const user = await getCurrentUser()
+        if (!user) {
+          if (isActive) {
+            setDashboardNotifications([])
+          }
+          return
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/notifications`)
+        if (!response.ok) {
+          throw new Error("Failed to load notifications")
+        }
+
+        const data = await response.json()
+        const readIds = loadReadNotificationIds(user)
+        const dismissedIds = loadDismissedNotificationIds(user)
+        const unreadItems = (data.notifications || [])
+          .filter((item) => !readIds.includes(item.id) && !dismissedIds.includes(item.id))
+          .sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at))
+          .slice(0, 3)
+          .map((item) => ({
+            id: item.id,
+            title: item.title,
+            message: item.message,
+            type: inferNotificationType(item.title),
+            createdAt: item.created_at,
+            timeLabel: buildNotificationTimeLabel(item.created_at),
+          }))
+
+        if (!isActive) {
+          return
+        }
+
+        setDashboardNotifications(unreadItems)
+      } catch (error) {
+        if (isActive) {
+          setDashboardNotifications([])
+        }
+      }
+    }
+
+    loadUnreadNotifications()
+
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState === "visible") {
+        loadUnreadNotifications()
+      }
+    }
+
+    const handleWindowFocus = () => {
+      loadUnreadNotifications()
+    }
+
+    const intervalId = window.setInterval(() => {
+      loadUnreadNotifications()
+    }, 30000)
+
+    window.addEventListener("focus", handleWindowFocus)
+    document.addEventListener("visibilitychange", handleVisibilityRefresh)
+
+    return () => {
+      isActive = false
+      window.clearInterval(intervalId)
+      window.removeEventListener("focus", handleWindowFocus)
+      document.removeEventListener("visibilitychange", handleVisibilityRefresh)
     }
   }, [])
 
@@ -186,6 +313,79 @@ function Dashboard() {
       height: `${Math.max(22, (value / max) * 100)}%`,
     }))
   }, [dashboardData.predictions])
+
+  const trendingSummary = useMemo(() => {
+    const now = Date.now()
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+    const todayTimestamp = startOfToday.getTime()
+    const lastWeekTimestamp = now - (7 * 24 * 60 * 60 * 1000)
+    const lastMonthTimestamp = now - (30 * 24 * 60 * 60 * 1000)
+
+    const topEntryFromMap = (counts) => {
+      const [key, count] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] || []
+      if (!key) return null
+      const [brand, model] = key.split("|||")
+      return { brand, model, count }
+    }
+
+    const combinedCounts = {}
+    dashboardData.predictions.forEach((item) => {
+      if (toTimestamp(item.predictedAt) < lastMonthTimestamp) return
+      const key = buildVehicleKey(item.brand, item.model)
+      if (!key.trim()) return
+      combinedCounts[key] = (combinedCounts[key] || 0) + 1
+    })
+    dashboardData.listings.forEach((item) => {
+      if (toTimestamp(item.createdAt) < lastMonthTimestamp) return
+      const key = buildVehicleKey(item.brand, item.model)
+      if (!key.trim()) return
+      combinedCounts[key] = (combinedCounts[key] || 0) + 1
+    })
+
+    const todayPredictionCounts = {}
+    dashboardData.predictions.forEach((item) => {
+      if (toTimestamp(item.predictedAt) < todayTimestamp) return
+      const key = buildVehicleKey(item.brand, item.model)
+      if (!key.trim()) return
+      todayPredictionCounts[key] = (todayPredictionCounts[key] || 0) + 1
+    })
+
+    const weeklyBrandCounts = {}
+    dashboardData.listings.forEach((item) => {
+      if (toTimestamp(item.createdAt) < lastWeekTimestamp) return
+      const brand = String(item.brand || "").trim()
+      if (!brand) return
+      weeklyBrandCounts[brand] = (weeklyBrandCounts[brand] || 0) + 1
+    })
+    if (Object.keys(weeklyBrandCounts).length === 0) {
+      dashboardData.predictions.forEach((item) => {
+        if (toTimestamp(item.predictedAt) < lastWeekTimestamp) return
+        const brand = String(item.brand || "").trim()
+        if (!brand) return
+        weeklyBrandCounts[brand] = (weeklyBrandCounts[brand] || 0) + 1
+      })
+    }
+
+    const featuredListing = [...dashboardData.listings]
+      .sort((a, b) => {
+        const scoreA = (a.isSpotlight ? 3 : 0) + (a.isUrgent ? 2 : 0) + (a.isBumped ? 1 : 0)
+        const scoreB = (b.isSpotlight ? 3 : 0) + (b.isUrgent ? 2 : 0) + (b.isBumped ? 1 : 0)
+        if (scoreB !== scoreA) return scoreB - scoreA
+        return toTimestamp(b.createdAt) - toTimestamp(a.createdAt)
+      })[0] || null
+
+    const trendingVehicle = topEntryFromMap(combinedCounts)
+    const mostPredictedToday = topEntryFromMap(todayPredictionCounts)
+    const [activeBrand, activeBrandCount] = Object.entries(weeklyBrandCounts).sort((a, b) => b[1] - a[1])[0] || []
+
+    return {
+      trendingVehicle,
+      mostPredictedToday,
+      featuredListing,
+      activeBrand: activeBrand ? { brand: activeBrand, count: activeBrandCount } : null,
+    }
+  }, [dashboardData.listings, dashboardData.predictions])
 
   const quickActions = useMemo(() => ([
     {
@@ -249,37 +449,74 @@ function Dashboard() {
     },
   ]
 
-  const insightCards = [
+  const trendingCards = [
     {
-      label: t("dashboard_page.best_bank_rate"),
-      value: dashboardData.bestRate ? `${dashboardData.bestRate.toFixed(1)}%` : "8.5%",
-      tone: "text-emerald-300",
-      icon: <Coins className="h-4 w-4 text-emerald-400" />,
-    },
-    {
-      label: t("dashboard_page.most_tracked_brand"),
-      value: summary.topBrand,
+      label: t("dashboard_page.trending_now"),
+      value: trendingSummary.trendingVehicle
+        ? `${trendingSummary.trendingVehicle.brand} ${trendingSummary.trendingVehicle.model}`
+        : t("dashboard_page.no_trend_data"),
+      meta: trendingSummary.trendingVehicle
+        ? t("dashboard_page.trending_now_meta", { count: trendingSummary.trendingVehicle.count })
+        : t("dashboard_page.trending_empty"),
       tone: "text-cyan-300",
-      icon: <CarFront className="h-4 w-4 text-cyan-400" />,
+      icon: <TrendingUp className="h-4 w-4 text-cyan-400" />,
     },
     {
-      label: t("dashboard_page.active_alerts_short"),
-      value: `${dashboardData.alertsCount}`,
+      label: t("dashboard_page.most_predicted_today"),
+      value: trendingSummary.mostPredictedToday
+        ? `${trendingSummary.mostPredictedToday.brand} ${trendingSummary.mostPredictedToday.model}`
+        : t("dashboard_page.no_trend_data"),
+      meta: trendingSummary.mostPredictedToday
+        ? t("dashboard_page.most_predicted_today_meta", { count: trendingSummary.mostPredictedToday.count })
+        : t("dashboard_page.predictions_waiting"),
+      tone: "text-emerald-300",
+      icon: <Sparkles className="h-4 w-4 text-emerald-400" />,
+    },
+    {
+      label: t("dashboard_page.most_viewed_listing"),
+      value: trendingSummary.featuredListing
+        ? `${trendingSummary.featuredListing.brand} ${trendingSummary.featuredListing.model}`
+        : t("dashboard_page.no_trend_data"),
+      meta: trendingSummary.featuredListing
+        ? t("dashboard_page.most_viewed_listing_meta")
+        : t("dashboard_page.listing_tracking_waiting"),
       tone: "text-amber-300",
-      icon: <BellRing className="h-4 w-4 text-amber-400" />,
+      icon: <Eye className="h-4 w-4 text-amber-400" />,
     },
     {
-      label: t("dashboard_page.latest_estimate_short"),
-      value: summary.latestPredictionValue ? formatCompactCurrency(summary.latestPredictionValue) : t("dashboard_page.no_data"),
+      label: t("dashboard_page.most_active_brand_week"),
+      value: trendingSummary.activeBrand
+        ? trendingSummary.activeBrand.brand
+        : t("dashboard_page.no_trend_data"),
+      meta: trendingSummary.activeBrand
+        ? t("dashboard_page.most_active_brand_week_meta", { count: trendingSummary.activeBrand.count })
+        : t("dashboard_page.brand_waiting"),
       tone: "text-blue-300",
-      icon: <Sparkles className="h-4 w-4 text-blue-400" />,
+      icon: <CarFront className="h-4 w-4 text-blue-400" />,
     },
   ]
 
   const username = dashboardData.user?.username || dashboardData.user?.email?.split("@")[0] || t("dashboard_page.default_driver")
 
+  const handleMarkNotificationRead = (id) => {
+    markNotificationAsRead(dashboardData.user, id)
+    setDashboardNotifications((current) => current.filter((item) => item.id !== id))
+  }
+
+  const handleDismissNotification = (event, id) => {
+    event.stopPropagation()
+    dismissNotification(dashboardData.user, id)
+    setDashboardNotifications((current) => current.filter((item) => item.id !== id))
+  }
+
+  const notificationToneClasses = {
+    info: "border-blue-400/20 bg-blue-500/10 text-blue-100",
+    success: "border-emerald-400/20 bg-emerald-500/10 text-emerald-100",
+    default: "border-white/10 bg-white/8 text-slate-100",
+  }
+
   return (
-    <div className="min-h-screen bg-[#0f172a] p-5 md:p-8">
+    <div className="min-h-screen bg-[#0f172a] p-5 md:p-8 relative">
       <section className="relative overflow-hidden rounded-[32px] border border-slate-700/50 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.25),_transparent_34%),radial-gradient(circle_at_80%_20%,_rgba(16,185,129,0.18),_transparent_28%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.85))] px-6 py-7 md:px-8 md:py-8">
         <div className="absolute inset-y-0 right-0 hidden w-[38%] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0))] md:block" />
         <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-blue-500/10 blur-3xl" />
@@ -446,16 +683,16 @@ function Dashboard() {
           <div className="rounded-[30px] border border-slate-700/60 bg-slate-900/55 p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-white">{t("dashboard_page.market_pulse")}</h2>
-                <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.fast_signals")}</p>
+                <h2 className="text-2xl font-bold text-white">{t("dashboard_page.trending_section_title")}</h2>
+                <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.trending_section_subtitle")}</p>
               </div>
               <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
-                {t("dashboard_page.live")}
+                {t("dashboard_page.trending_live")}
               </span>
             </div>
 
             <div className="mt-6 grid gap-3">
-              {insightCards.map((item) => (
+              {trendingCards.map((item) => (
                 <div key={item.label} className="rounded-[22px] border border-slate-800/80 bg-slate-950/35 p-4">
                   <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500">
                     {item.icon}
@@ -483,6 +720,62 @@ function Dashboard() {
           </div>
         </div>
       </section>
+
+      {dashboardNotifications.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-40 w-[min(360px,calc(100vw-2rem))] space-y-3">
+          {dashboardNotifications.map((item) => (
+            <div
+              key={item.id}
+              className={`rounded-[24px] border p-4 shadow-[0_18px_40px_rgba(2,6,23,0.24)] backdrop-blur-xl ${notificationToneClasses[item.type] || notificationToneClasses.default}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 gap-3">
+                  <div className="mt-0.5 rounded-2xl bg-white/10 p-2.5">
+                    <MessageSquareText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-semibold">{item.title}</p>
+                      {item.timeLabel && (
+                        <span className="text-[11px] uppercase tracking-[0.14em] text-slate-300/70">
+                          {item.timeLabel}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-sm leading-5 text-slate-200/82">{item.message}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => handleDismissNotification(event, item.id)}
+                  className="rounded-xl p-1.5 text-slate-300/70 transition-colors hover:bg-white/10 hover:text-white"
+                  aria-label={t("dashboard_page.notifications_dismiss_aria")}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-4 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/notifications")}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200 transition-colors hover:bg-white/10"
+                >
+                  {t("dashboard_page.notifications_view")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMarkNotificationRead(item.id)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-950 transition-colors hover:bg-slate-100"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {t("dashboard_page.notifications_mark_read")}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

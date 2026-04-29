@@ -48,7 +48,7 @@ load_env_file(PROJECT_ROOT / ".env")
 load_env_file(PROJECT_ROOT / ".env.docker")
 load_env_file(Path(__file__).resolve().parent / ".env")
 MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
-REFERENCE_DATASET_PATH = Path(__file__).resolve().parents[1] / "ml" / "data" / "active" / "AutoValueLK_Finalized_Dataset_v2.csv"
+REFERENCE_DATASET_PATH = Path(__file__).resolve().parents[1] / "ml" / "data" / "active" / "AutoValueLK_Finalized_Dataset_v4.csv"
 ADMIN_DATA_PATH = Path(__file__).resolve().parent / "data" / "admin_store.json"
 ADMIN_STORE_PERSIST_ENABLED = os.getenv("ADMIN_STORE_PERSIST", "true").strip().lower() not in {"0", "false", "no"}
 OLDER_REFERENCE_LISTING_MONTH = 1
@@ -1928,86 +1928,41 @@ def get_payments(_token: str = Depends(require_admin)) -> dict[str, Any]:
     return {"payments": payments}
 
 
-def get_targeted_reference_price(features: dict[str, Any]) -> float | None:
+def get_prediction_warning(features: dict[str, Any], predicted_price: float) -> str | None:
     reference_df = price_model_state.reference_df
     if reference_df is None or reference_df.empty:
         return None
 
-    brand = features["brand"]
-    model = features["model"]
-    family_rows: pd.DataFrame | None = None
-    minimum_exact_matches = 3
-    minimum_nearby_matches = 3
-
-    if brand == "BMW" and "520" in model:
-        family_rows = reference_df[
-            reference_df["brand_norm"].eq("BMW") & reference_df["model_norm"].str.contains("520", na=False)
-        ].copy()
-    elif brand == "TESLA" and "MODEL 3" in model:
-        family_rows = reference_df[
-            reference_df["brand_norm"].eq("TESLA") & reference_df["model_norm"].str.contains("MODEL 3", na=False)
-        ].copy()
-    elif brand == "SUZUKI" and ("WAGON R" in model or "STINGRAY" in model):
-        family_rows = reference_df[
-            reference_df["brand_norm"].eq("SUZUKI")
-            & reference_df["model_norm"].str.contains("WAGON R|STINGRAY", na=False)
-        ].copy()
-        minimum_exact_matches = 2
-        minimum_nearby_matches = 2
-
-    if family_rows is None or family_rows.empty:
+    subset = reference_df[reference_df["brand_norm"].eq(features["brand"])].copy()
+    if subset.empty:
         return None
 
-    subset = family_rows.copy()
-    subset = subset[subset["condition"].astype(str).eq(features["condition"])]
-    if subset.empty:
-        subset = family_rows.copy()
+    exact_model_subset = subset[subset["model_norm"].eq(features["model"])]
+    if not exact_model_subset.empty:
+        subset = exact_model_subset
 
-    fuel_subset = subset[subset["fuel_type"].astype(str).str.lower().eq(features["fuel_type"])]
-    if not fuel_subset.empty:
-        subset = fuel_subset
+    nearby_year_subset = subset[subset["year"].sub(int(features["year"])).abs() <= 2]
+    if len(nearby_year_subset) >= 5:
+        subset = nearby_year_subset
 
-    if features["engine_cc"] == 0:
-        engine_subset = subset[subset["engine_cc"].fillna(-1).eq(0)]
-    else:
-        engine_subset = subset[subset["engine_cc"].sub(float(features["engine_cc"])).abs() <= 250]
-    if not engine_subset.empty:
-        subset = engine_subset
+    if len(subset) < 5:
+        return None
 
-    if brand == "SUZUKI" and ("WAGON R" in model or "STINGRAY" in model):
-        plausible_price_subset = subset[subset["price_lkr"].between(1_000_000, 20_000_000)]
-        if not plausible_price_subset.empty:
-            subset = plausible_price_subset
+    q1 = float(subset["price_lkr"].quantile(0.25))
+    q3 = float(subset["price_lkr"].quantile(0.75))
+    iqr = q3 - q1
+    if iqr <= 0:
+        return None
 
-        if len(subset) >= 4:
-            q1 = float(subset["price_lkr"].quantile(0.25))
-            q3 = float(subset["price_lkr"].quantile(0.75))
-            iqr = q3 - q1
-            lower_bound = max(0.0, q1 - (1.5 * iqr))
-            upper_bound = q3 + (1.5 * iqr)
-            iqr_filtered_subset = subset[subset["price_lkr"].between(lower_bound, upper_bound)]
-            if not iqr_filtered_subset.empty:
-                subset = iqr_filtered_subset
+    lower_bound = max(0.0, q1 - (3 * iqr))
+    upper_bound = q3 + (3 * iqr)
+    if predicted_price < lower_bound or predicted_price > upper_bound:
+        return (
+            "Predicted price is outside the broad reference range for similar brand/year records. "
+            "Please review the input details and treat this estimate with caution."
+        )
 
-    exact_year = subset[subset["year"].eq(int(features["year"]))]
-    if len(exact_year) >= minimum_exact_matches:
-        return float(exact_year["price_lkr"].median())
-
-    nearby_year = subset[subset["year"].sub(int(features["year"])).abs() <= 2]
-    if len(nearby_year) >= minimum_nearby_matches:
-        return float(nearby_year["price_lkr"].median())
-
-    family_median_price = float(subset["price_lkr"].median())
-    family_median_year = float(subset["year"].median())
-    input_year = float(features["year"])
-
-    if input_year < family_median_year:
-        year_factor = 0.93 ** (family_median_year - input_year)
-    else:
-        year_factor = 1.04 ** (input_year - family_median_year)
-
-    adjusted_price = family_median_price * year_factor
-    return float(max(0.0, adjusted_price))
+    return None
 
 
 @app.post("/predict")
@@ -2036,14 +1991,7 @@ def predict_price(
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {error}") from error
 
-    targeted_reference_price = get_targeted_reference_price(raw_features)
-    if targeted_reference_price is not None:
-        print(
-            f"Applying targeted reference calibration for {raw_features['brand']} {raw_features['model']}: "
-            f"{predicted_price:,.2f} -> {targeted_reference_price:,.2f}",
-            flush=True,
-        )
-        predicted_price = targeted_reference_price
+    prediction_warning = get_prediction_warning(raw_features, predicted_price)
 
     cloud_saved = sync_prediction_to_supabase(raw_features, predicted_price, requester)
     save_status = "cloud" if cloud_saved else "local_only"
@@ -2053,8 +2001,12 @@ def predict_price(
         else "Prediction saved only on this device."
     )
 
-    return {
+    response = {
         "predicted_price_lkr": round(predicted_price, 2),
         "save_status": save_status,
         "save_message": save_message,
     }
+    if prediction_warning:
+        response["warning"] = prediction_warning
+
+    return response

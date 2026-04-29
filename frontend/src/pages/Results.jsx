@@ -11,6 +11,7 @@ import { getCurrentUser } from "../utils/auth"
 import { supabase } from "../utils/supabaseClient"
 import { loadUserAlerts, upsertUserAlert } from "../utils/userAlerts"
 import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png"
+import AppModal from "../components/AppModal"
 
 function Results() {
   const { t } = useTranslation()
@@ -26,6 +27,7 @@ function Results() {
   const [downloading, setDownloading] = useState(false)
   const [loanPlans, setLoanPlans] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [dialog, setDialog] = useState(null)
   const themeStyles =
     typeof window !== "undefined"
       ? getComputedStyle(document.documentElement)
@@ -231,7 +233,12 @@ function Results() {
       doc.save(`AutoValueLK_${vehicle?.brand || "Report"}_${vehicle?.model || ""}.pdf`)
     } catch (err) {
       console.error("PDF generation failed", err)
-      alert(t("results_page.pdf_failed"))
+      setDialog({
+        tone: "warning",
+        eyebrow: t("results_page.dialog_eyebrow", { defaultValue: "Results" }),
+        title: t("results_page.pdf_failed_title", { defaultValue: "PDF generation failed" }),
+        message: t("results_page.pdf_failed"),
+      })
     } finally {
       setDownloading(false)
     }
@@ -240,7 +247,12 @@ function Results() {
   const handleSetAlert = async () => {
     const user = await getCurrentUser()
     if (!user) {
-      alert(t("results_page.alerts_login_required"))
+      setDialog({
+        tone: "info",
+        eyebrow: t("results_page.dialog_eyebrow", { defaultValue: "Results" }),
+        title: t("results_page.login_required_title", { defaultValue: "Sign in required" }),
+        message: t("results_page.alerts_login_required"),
+      })
       return
     }
 
@@ -266,6 +278,15 @@ function Results() {
 
   return (
     <div className="app-page-shell">
+      <AppModal
+        isOpen={Boolean(dialog)}
+        tone={dialog?.tone || "info"}
+        eyebrow={dialog?.eyebrow || ""}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        confirmLabel={t("common.ok", { defaultValue: "OK" })}
+        onConfirm={() => setDialog(null)}
+      />
       {!vehicle && (
         <div className="app-inline-banner app-inline-banner-info mb-4 animate-fade-in">
           <svg className="w-5 h-5 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

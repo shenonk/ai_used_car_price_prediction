@@ -5,6 +5,7 @@ import logo from "../assets/logo/autovaluelk-logo.png"
 import brandModelOptions from "../data/brand_model_options.json"
 import { savePredictionHistoryEntry } from "../utils/predictionHistory"
 import { supabase } from "../utils/supabaseClient"
+import AppModal from "../components/AppModal"
 
 const GEAR_TYPE_OPTIONS = [
   { label: "Automatic", value: "automatic" },
@@ -45,6 +46,7 @@ function PriceCheck() {
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+  const [dialog, setDialog] = useState(null)
   const gearTypeOptions = useMemo(() => ([
     { label: t("price_check_page.options.automatic"), value: "automatic" },
     { label: t("price_check_page.options.manual"), value: "manual" },
@@ -166,15 +168,30 @@ function PriceCheck() {
     } catch (error) {
       setIsLoading(false)
       if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
-        alert(t("price_check_page.errors.server_not_connected", { url: API_BASE_URL }))
+        setDialog({
+          title: t("price_check_page.errors.connection_title", { defaultValue: "Backend unavailable" }),
+          message: t("price_check_page.errors.server_not_connected", { url: API_BASE_URL }),
+        })
       } else {
-        alert(t("price_check_page.errors.prediction_failed", { message: error.message }))
+        setDialog({
+          title: t("price_check_page.errors.prediction_failed_title", { defaultValue: "Prediction failed" }),
+          message: t("price_check_page.errors.prediction_failed", { message: error.message }),
+        })
       }
     }
   }
 
   return (
     <div className="app-page-shell">
+      <AppModal
+        isOpen={Boolean(dialog)}
+        tone="warning"
+        eyebrow={t("price_check_page.errors.dialog_eyebrow", { defaultValue: "Price Check" })}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        confirmLabel={t("common.ok", { defaultValue: "OK" })}
+        onConfirm={() => setDialog(null)}
+      />
       <div className="dashboard-page-hero mb-8 animate-fade-in">
         <div className="dashboard-page-eyebrow mb-4">
           <svg className="h-3.5 w-3.5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

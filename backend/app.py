@@ -46,6 +46,7 @@ def load_env_file(path: Path) -> None:
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 load_env_file(PROJECT_ROOT / ".env")
 load_env_file(PROJECT_ROOT / ".env.docker")
+load_env_file(Path(__file__).resolve().parent / ".env")
 MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
 REFERENCE_DATASET_PATH = Path(__file__).resolve().parents[1] / "ml" / "data" / "active" / "AutoValueLK_Finalized_Dataset_v2.csv"
 ADMIN_DATA_PATH = Path(__file__).resolve().parent / "data" / "admin_store.json"
@@ -94,21 +95,28 @@ Answer user questions clearly and briefly. Prefer practical app guidance over ge
 
 Core app facts:
 - Price Check estimates vehicle value from brand, model, year, engine/fuel/gearbox, mileage, condition, town, and market timing.
+- Results shows the latest Price Check output after a prediction. The predicted price is an AI estimate, not a guaranteed final selling price.
 - Marketplace users can publish vehicle ads. New ads are pending until an admin approves them.
 - Public marketplace listings only show approved ads.
 - Users can track submitted ads under Marketplace > My submitted ads.
+- Admin can approve, reject, or mark marketplace ads as sold.
+- Buyers use the seller details shown on approved marketplace listings to contact the seller.
 - Marketplace boost ups are optional paid ad promotions:
-  - Urgent: marks the ad as urgent so buyers notice it faster.
-  - Spotlight: visually highlights/features the listing.
-  - Bump Up: lifts or refreshes the ad's visibility in the marketplace.
+  - Urgent costs LKR 500 and marks the ad as urgent so buyers notice it faster.
+  - Spotlight costs LKR 750 and visually highlights/features the listing.
+  - Bump Up costs LKR 300 and lifts or refreshes the ad's visibility in the marketplace.
 - Boosts do not bypass admin approval; an ad still needs admin review before public publishing.
-- Financing helps users compare vehicle loan/lease options and estimate monthly payments.
+- Financing helps users compare vehicle loan, leasing, and vehicle draft options, estimate monthly payments, adjust down payment and tenure, compare institution rates, and download a financing report.
+- Analytics shows saved Price Check predictions, vehicle value trend charts, estimated current value, dataset-backed market trends or depreciation projections, and prediction history with search, brand filter, and delete controls.
+- Notifications show active app updates and announcements. Admins can create system notifications from the admin dashboard.
+- Boost payments are processed through Stripe card checkout. After a paid checkout is verified, the selected boost flags are applied to the user's own listing and the payment is recorded for admin review.
 - For account/password issues, guide users to Login, Forgot Password, or Settings.
 - For problems needing a human admin, tell users to click Talk to Human in the chatbot or use Help Center.
 
 Rules:
 - If you are unsure about live prices, legal/financial terms, payments, or account-specific status, say the admin team can confirm it.
 - Do not claim a marketplace ad is approved/rejected unless the user can see that status in the app.
+- The chatbot cannot approve ads, guarantee prices, provide legal/financial advice, or confirm exact account/payment status.
 - Keep answers under 120 words unless the user asks for details.
 """.strip()
 
@@ -600,12 +608,15 @@ def make_supabase_rest_request(
     return json.loads(raw)
 
 
-def get_openai_api_key() -> str:
-    return os.getenv("OPENAI_API_KEY", "").strip()
+def get_gemini_api_key() -> str:
+    api_key = (os.getenv("GEMINI_API_KEY", "") or os.getenv("GOOGLE_API_KEY", "")).strip()
+    if not api_key or api_key == "your_gemini_api_key_here":
+        return ""
+    return api_key
 
 
-def get_openai_model() -> str:
-    return os.getenv("OPENAI_MODEL", "gpt-5-mini").strip() or "gpt-5-mini"
+def get_gemini_model() -> str:
+    return os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite").strip() or "gemini-2.5-flash-lite"
 
 
 def build_local_chatbot_reply(message: str, pathname: str = "/") -> str:
@@ -619,11 +630,150 @@ def build_local_chatbot_reply(message: str, pathname: str = "/") -> str:
             "account help, and contacting admin. What would you like to do?"
         )
 
-    if any(term in normalized for term in ("boost", "boost up", "urgent", "spotlight", "bump")):
+    if "final selling price" in normalized or ("selling price" in normalized and "prediction" in normalized):
         return (
-            "Boost ups are optional marketplace promotions. Urgent marks the ad as urgent, "
-            "Spotlight highlights it more visually, and Bump Up refreshes/lifts its visibility. "
-            "Boosts help buyers notice the ad, but they do not skip admin approval."
+            "No. The predicted price is an AI estimate to guide your decision, not a guaranteed final selling price. "
+            "The real sale price can change based on buyer demand, vehicle condition, documents, negotiation, and market timing."
+        )
+
+    if "predicted price" in normalized and any(term in normalized for term in ("mean", "means", "meaning")):
+        return (
+            "The predicted price is the app's estimated current market value in LKR based on the vehicle details you entered. "
+            "Use it as guidance, not a guaranteed selling price."
+        )
+
+    if "check" in normalized and "value" in normalized:
+        return (
+            "Yes. Open Price Check and enter the vehicle's brand, model, year, fuel type, gearbox, condition, town, and mileage. "
+            "For a Toyota Aqua 2018, choose Toyota as the brand, Aqua as the model, and 2018 as the year."
+        )
+
+    if any(term in normalized for term in ("latest prediction", "latest result", "prediction result", "results page", "see my result")):
+        return (
+            "Your latest prediction result appears on the Results page after you run Price Check. "
+            "Saved predictions can also be reviewed later in Analytics."
+        )
+
+    if any(term in normalized for term in ("save my prediction", "save prediction", "saved prediction", "saved predictions")):
+        return (
+            "Yes. Predictions are saved so you can review them in Analytics. If you are signed in, they can be loaded from your account; "
+            "otherwise the app can use local browser history."
+        )
+
+    if any(term in normalized for term in ("analytics", "trend", "history", "market value chart", "trend chart", "estimated current value", "depreciation projection", "delete old prediction")):
+        if "saved" in normalized or "see my" in normalized:
+            return "Open Analytics to see your saved Price Check predictions and prediction history."
+        if "trend" in normalized or "chart" in normalized:
+            return (
+                "The market value trend chart shows how the selected saved vehicle's estimated value changes over time, "
+                "using matching market data when available or a depreciation projection when data is sparse."
+            )
+        if "estimated current value" in normalized:
+            return "Estimated current value is the app's current LKR value estimate for the selected saved vehicle in Analytics."
+        if "delete" in normalized:
+            return "Yes. In Analytics, use the delete button beside a prediction history row to remove an old prediction record."
+        if "depreciation" in normalized:
+            return (
+                "Analytics uses a depreciation projection when there is not enough matching market trend data for that vehicle. "
+                "It fills the missing years with an estimated value curve."
+            )
+        return (
+            "Analytics shows saved Price Check predictions, market value trend charts, estimated current value, "
+            "and prediction history. You can search, filter by brand, select a saved vehicle, and delete old prediction records."
+        )
+
+    if "submitted ads" in normalized or "my submitted ads" in normalized or "my ads" in normalized:
+        return "Go to Marketplace > My submitted ads to see the ads you have posted and their current status."
+
+    if "sign in" in normalized and ("publish" in normalized or "ad" in normalized):
+        return "You should sign in before publishing an ad so the listing is linked to your account and you can track it under Marketplace > My submitted ads."
+
+    if any(term in normalized for term in ("forgot my password", "forgot password", "reset password")):
+        return "Use Forgot Password on the Login page. Enter your email address and the app will send a secure password reset link."
+
+    if "settings" in normalized:
+        return "Open Settings to update profile preferences, notification preferences, security/password details, and language settings."
+
+    if "login" in normalized and ("save" in normalized or "prediction" in normalized):
+        return "You can save predictions locally, but signing in lets the app load your saved prediction history from your account across sessions."
+
+    if "app update" in normalized or "app updates" in normalized or "where can i see updates" in normalized:
+        return "You can see app updates and active announcements in Notifications."
+
+    if "notification" in normalized or "system announcement" in normalized or "announcements" in normalized:
+        if "admin" in normalized or "announcement" in normalized:
+            return "Yes. Admins can create active system notifications and announcements that users see in Notifications."
+        return "Notifications show active app updates, system messages, market notices, and other announcements from AutoValueLK."
+
+    if "sent a message" in normalized and "admin" in normalized:
+        return "Your message goes to the admin Contact Messages inbox. Admin can use your provided email or account details to follow up."
+
+    if "where does" in normalized and "support message" in normalized:
+        return "Your support message is saved in the admin Contact Messages inbox so the admin team can review it."
+
+    if "how will" in normalized and ("reply" in normalized or "contact me" in normalized):
+        return "Admin can follow up using the email address or account details you provided with your support message."
+
+    if "approve my ad" in normalized or "approve ad" in normalized:
+        return "I cannot approve ads. Only an admin can approve, reject, or mark marketplace listings as sold."
+
+    if "exact payment status" in normalized or ("payment status" in normalized and "exact" in normalized):
+        return "I cannot confirm your exact payment status in chat. Check the payment result in Marketplace, or contact admin if it looks wrong."
+
+    if "guarantee" in normalized and ("price" in normalized or "car" in normalized):
+        return "No. Price Check gives an AI estimate, not a guaranteed sale price. The final price depends on condition, documents, buyer demand, and negotiation."
+
+    if "legal" in normalized or "financial advice" in normalized:
+        return "I can explain app features, but I cannot provide legal or financial advice. Please confirm important loan, legal, or payment decisions with a qualified professional or admin."
+
+    if "ai is unsure" in normalized or "if the ai is unsure" in normalized or "unsure" in normalized:
+        return "If the AI is unsure, treat the answer as guidance only and contact admin for confirmation, especially for live prices, payment status, legal, or financial questions."
+
+    if "card" in normalized or "payment" in normalized or "pay for a boost" in normalized or "payment is cancelled" in normalized or "payment cancelled" in normalized or "boost activate" in normalized or "confirms my payment" in normalized:
+        if "safe" in normalized or "card" in normalized:
+            return "Boost payments use Stripe card checkout, so card details are handled by Stripe rather than stored directly by AutoValueLK."
+        if "cancel" in normalized:
+            return "If a boost payment is cancelled, the checkout returns to Marketplace and the boost is not confirmed or applied."
+        if "after" in normalized or "pay for a boost" in normalized:
+            return "After a successful boost payment, the backend verifies the Stripe checkout session, records the payment, and applies the selected boost to your listing."
+        if "immediately" in normalized or "activate" in normalized:
+            return "A boost is applied after Stripe confirms the payment. It still does not bypass admin approval for public listing visibility."
+        if "who" in normalized or "confirm" in normalized:
+            return "Stripe confirms the card payment, then AutoValueLK verifies that checkout session and records the payment for admin."
+        return "Boost payments are handled through Stripe checkout and are verified by the backend before boosts are applied."
+
+    if "admin reject" in normalized or "reject my ad" in normalized or "rejected" in normalized:
+        return "Yes. Admin can reject an ad if it needs changes, has missing details, or does not meet marketplace rules."
+
+    if "not visible" in normalized or "not showing" in normalized or "not appear" in normalized:
+        return "Your ad may not be visible publicly because only approved marketplace ads are shown. Check Marketplace > My submitted ads for its status."
+
+    if "buyers contact" in normalized or "buyer contact" in normalized or "contact the seller" in normalized:
+        return "Buyers can contact the seller using the seller details shown on an approved marketplace listing."
+
+    if "more than one boost" in normalized or "multiple boost" in normalized or "buy more than one" in normalized:
+        return (
+            "Yes. You can select more than one boost for your marketplace ad. The total is added together: "
+            "Urgent is LKR 500, Spotlight is LKR 750, and Bump Up is LKR 300."
+        )
+
+    if "urgent" in normalized and "how much" in normalized:
+        return "Urgent costs LKR 500. It marks your ad as urgent so buyers notice it faster."
+
+    if "spotlight" in normalized:
+        return "Spotlight costs LKR 750. It visually highlights or features your listing in the marketplace."
+
+    if "bump" in normalized:
+        return "Bump Up costs LKR 300. It refreshes or lifts your ad's visibility in the marketplace."
+
+    if "skip admin approval" in normalized or "bypass admin approval" in normalized:
+        return "No. Boost ups do not skip admin approval. Your ad still needs admin review before it appears publicly."
+
+    if any(term in normalized for term in ("boost", "boost up", "urgent")):
+        return (
+            "Boost ups are optional marketplace promotions. Urgent costs LKR 500, "
+            "Spotlight costs LKR 750, and Bump Up costs LKR 300. They help buyers notice the ad, "
+            "but they do not skip admin approval."
         )
 
     if any(term in normalized for term in ("sell", "publish", "post ad", "submit ad")):
@@ -632,20 +782,26 @@ def build_local_chatbot_reply(message: str, pathname: str = "/") -> str:
             "then submit it. The ad stays pending until admin approves it."
         )
 
-    if any(term in normalized for term in ("pending", "approved", "review", "rejected", "my ads")):
+    if any(term in normalized for term in ("pending", "approved", "review")):
         return (
             "New marketplace ads start as pending review. Admin can approve, reject, or mark them sold. "
             "You can track your own ad status under Marketplace > My submitted ads."
         )
 
-    if any(term in normalized for term in ("price", "prediction", "valuation", "accuracy", "value")):
+    if any(term in normalized for term in ("price check", "valuation", "accuracy", "vehicle value", "car value")):
         return (
             "Use Price Check to estimate a vehicle value. Enter the exact brand, model, year, fuel type, "
             "gearbox, condition, town, and mileage for the best result."
         )
 
-    if any(term in normalized for term in ("finance", "loan", "leasing", "installment")):
-        return "Open Financing to compare loan or lease options and estimate monthly payments."
+    if any(term in normalized for term in ("finance", "financing", "loan", "leasing", "installment", "monthly payment", "down payment", "loan rate")):
+        if "monthly payment" in normalized or "calculated" in normalized:
+            return "The monthly payment is estimated from the vehicle price, down payment, loan amount, selected institution interest rate, and tenure."
+        if "minimum down payment" in normalized or "min down" in normalized:
+            return "Minimum down payment comes from the selected institution's financing rules. If no institution data is available, the app uses 20% as the default."
+        if "loan rate" in normalized or "rate change" in normalized:
+            return "Yes. Loan rates can change when admins update rates or when institution data changes, so Financing should be treated as an estimate."
+        return "Open Financing to compare vehicle loan, leasing, and draft options, adjust down payment and tenure, and estimate monthly payments."
 
     if any(term in normalized for term in ("admin", "human", "support", "contact", "help")):
         return "Click Talk to Human in the chatbot to send a message directly to the admin Contact Messages inbox."
@@ -653,64 +809,68 @@ def build_local_chatbot_reply(message: str, pathname: str = "/") -> str:
     if pathname == "/marketplace":
         return "I can help with marketplace ads, boost ups, approvals, searching listings, and contacting sellers."
 
+    if pathname == "/analytics":
+        return "I can help explain saved predictions, market value trends, estimated current value, and prediction history."
+
     return CHATBOT_FALLBACK_MESSAGE
 
 
-def extract_openai_response_text(payload: dict[str, Any]) -> str:
-    output_text = str(payload.get("output_text") or "").strip()
-    if output_text:
-        return output_text
-
+def extract_gemini_response_text(payload: dict[str, Any]) -> str:
     chunks: list[str] = []
-    for output_item in payload.get("output") or []:
-        if not isinstance(output_item, dict):
+    for candidate in payload.get("candidates") or []:
+        if not isinstance(candidate, dict):
             continue
-        for content_item in output_item.get("content") or []:
-            if not isinstance(content_item, dict):
+        content = candidate.get("content") or {}
+        for part in content.get("parts") or []:
+            if not isinstance(part, dict):
                 continue
-            text = content_item.get("text")
+            text = part.get("text")
             if isinstance(text, str) and text.strip():
                 chunks.append(text.strip())
 
     return "\n".join(chunks).strip()
 
 
-def build_chatbot_input(payload: ChatRequest) -> list[dict[str, str]]:
+def build_chatbot_contents(payload: ChatRequest) -> list[dict[str, Any]]:
     recent_history = payload.history[-8:]
-    messages = [
+    contents = [
         {
-            "role": item.role,
-            "content": item.content.strip(),
+            "role": "model" if item.role == "assistant" else "user",
+            "parts": [{"text": item.content.strip()}],
         }
         for item in recent_history
         if item.content.strip()
     ]
-    messages.append(
+    contents.append(
         {
             "role": "user",
-            "content": f"Current app page: {payload.pathname}\nUser question: {payload.message.strip()}",
+            "parts": [{"text": f"Current app page: {payload.pathname}\nUser question: {payload.message.strip()}"}],
         }
     )
-    return messages
+    return contents
 
 
-def request_openai_chatbot_reply(payload: ChatRequest) -> str:
-    api_key = get_openai_api_key()
+def request_gemini_chatbot_reply(payload: ChatRequest) -> str:
+    api_key = get_gemini_api_key()
     if not api_key:
         return build_local_chatbot_reply(payload.message, payload.pathname)
 
     request_payload = {
-        "model": get_openai_model(),
-        "instructions": CHATBOT_SYSTEM_PROMPT,
-        "input": build_chatbot_input(payload),
-        "max_output_tokens": 350,
+        "systemInstruction": {
+            "parts": [{"text": CHATBOT_SYSTEM_PROMPT}],
+        },
+        "contents": build_chatbot_contents(payload),
+        "generationConfig": {
+            "maxOutputTokens": 350,
+            "temperature": 0.4,
+        },
     }
+    model = quote(get_gemini_model(), safe="")
     request = UrlRequest(
-        "https://api.openai.com/v1/responses",
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={quote(api_key, safe='')}",
         method="POST",
         data=json.dumps(request_payload).encode("utf-8"),
         headers={
-            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
     )
@@ -720,13 +880,13 @@ def request_openai_chatbot_reply(payload: ChatRequest) -> str:
             response_payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as error:
         raw_error = error.read().decode("utf-8", errors="replace")
-        log_warning(f"OpenAI chatbot request failed: {error.code} {raw_error[:300]}")
+        log_warning(f"Gemini chatbot request failed: {error.code} {raw_error[:300]}")
         return build_local_chatbot_reply(payload.message, payload.pathname)
     except (URLError, TimeoutError) as error:
-        log_warning(f"OpenAI chatbot request failed: {error}")
+        log_warning(f"Gemini chatbot request failed: {error}")
         return build_local_chatbot_reply(payload.message, payload.pathname)
 
-    reply = extract_openai_response_text(response_payload)
+    reply = extract_gemini_response_text(response_payload)
     if not reply:
         return build_local_chatbot_reply(payload.message, payload.pathname)
 
@@ -1337,8 +1497,8 @@ def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]
 @app.post("/api/chat")
 def create_chatbot_reply(payload: ChatRequest) -> dict[str, str]:
     return {
-        "message": request_openai_chatbot_reply(payload),
-        "model": get_openai_model() if get_openai_api_key() else "local-fallback",
+        "message": request_gemini_chatbot_reply(payload),
+        "model": get_gemini_model() if get_gemini_api_key() else "local-fallback",
     }
 
 

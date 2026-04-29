@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Line } from "react-chartjs-2"
-import { BarChart3, Search, Sparkles, Trash2 } from "lucide-react"
+import { BarChart3, Search, Sparkles, Trash2, X } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
@@ -361,6 +361,7 @@ function Analytics() {
   const [historySource, setHistorySource] = useState("local")
   const [isHistoryLoading, setIsHistoryLoading] = useState(true)
   const [deletingPredictionId, setDeletingPredictionId] = useState("")
+  const [pendingDeletePrediction, setPendingDeletePrediction] = useState(null)
   const [toast, setToast] = useState({
     isOpen: false,
     type: "success",
@@ -574,17 +575,22 @@ function Analytics() {
 
   const displayedPredictions = showAll ? filteredPredictions : filteredPredictions.slice(0, 4)
 
-  const handleDeletePrediction = async (prediction) => {
-    const confirmed = window.confirm(
-      t("analytics_page.delete_confirm", {
-        label: `${prediction.brand} ${prediction.model} ${prediction.year}`,
-      })
-    )
+  const requestDeletePrediction = (prediction) => {
+    setPendingDeletePrediction(prediction)
+  }
 
-    if (!confirmed) {
+  const cancelDeletePrediction = () => {
+    if (deletingPredictionId) {
       return
     }
+    setPendingDeletePrediction(null)
+  }
 
+  const confirmDeletePrediction = async () => {
+    const prediction = pendingDeletePrediction
+    if (!prediction) {
+      return
+    }
     setDeletingPredictionId(prediction.id)
 
     try {
@@ -618,6 +624,7 @@ function Analytics() {
         t("analytics_page.delete_success_title"),
         t("analytics_page.delete_success_subtitle")
       )
+      setPendingDeletePrediction(null)
     } catch (error) {
       console.error("Failed to delete prediction:", error)
       showToast(
@@ -637,6 +644,66 @@ function Analytics() {
         message={toast.message}
         subMessage={toast.subMessage}
       />
+      {pendingDeletePrediction && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-700/70 bg-slate-950/95 shadow-[0_24px_80px_rgba(2,6,23,0.6)]">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-rose-300">
+                  {t("analytics_page.delete_modal_eyebrow", { defaultValue: "Delete prediction" })}
+                </p>
+                <h3 className="mt-2 text-xl font-semibold text-white">
+                  {t("analytics_page.delete_modal_title", { defaultValue: "Remove saved record?" })}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={cancelDeletePrediction}
+                disabled={Boolean(deletingPredictionId)}
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label={t("analytics_page.delete_modal_close", { defaultValue: "Close delete dialog" })}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-6 py-6">
+              <p className="text-sm leading-6 text-slate-300">
+                {t("analytics_page.delete_modal_message", {
+                  label: buildVehicleLabel(pendingDeletePrediction),
+                  defaultValue: "This will permanently remove {{label}} from your prediction history.",
+                })}
+              </p>
+              <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
+                <p className="text-sm font-semibold text-white">{buildVehicleLabel(pendingDeletePrediction)}</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  LKR {CURRENCY_FORMATTER.format(Math.round(pendingDeletePrediction.predictedPrice))}
+                </p>
+              </div>
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={cancelDeletePrediction}
+                  disabled={Boolean(deletingPredictionId)}
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {t("analytics_page.delete_modal_cancel", { defaultValue: "Cancel" })}
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeletePrediction}
+                  disabled={Boolean(deletingPredictionId)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-400 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deletingPredictionId
+                    ? t("analytics_page.delete_modal_deleting", { defaultValue: "Deleting..." })
+                    : t("analytics_page.delete_modal_confirm", { defaultValue: "Delete prediction" })}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {toast.isOpen && toast.type === "error" && (
         <div className="fixed top-6 right-6 z-50 animate-slide-in-right">
           <div className="theme-surface rounded-r-xl border-l-4 border-rose-500 p-4 min-w-[300px] flex items-start gap-4">
@@ -818,7 +885,7 @@ function Analytics() {
                     <td className="text-right">
                       <button
                         type="button"
-                        onClick={() => handleDeletePrediction(item)}
+                        onClick={() => requestDeletePrediction(item)}
                         disabled={deletingPredictionId === item.id}
                         className="btn-danger p-2 disabled:cursor-not-allowed disabled:opacity-60"
                         aria-label={t("analytics_page.delete_aria_label", {

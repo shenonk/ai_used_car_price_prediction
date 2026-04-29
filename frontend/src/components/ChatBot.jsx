@@ -407,14 +407,17 @@ const ChatBot = () => {
       )}
 
       <div className="relative">
-        <span className="pointer-events-none absolute inset-0 rounded-full bg-[#2563eb]/35 animate-ping"></span>
+        <span className="pointer-events-none absolute inset-0 rounded-full bg-cyan-300/20 blur-xl animate-ping"></span>
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           aria-label={isOpen ? "Hide support bot" : "Open support bot"}
-          className="relative inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#2563eb] text-white shadow-[0_16px_40px_rgba(37,99,235,0.4)] transition hover:scale-105 hover:bg-[#1d4ed8]"
+          className="relative inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white/10 text-white shadow-[0_18px_45px_rgba(37,99,235,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition duration-300 hover:scale-105 hover:border-cyan-200/60 hover:bg-white/15 hover:shadow-[0_22px_55px_rgba(34,211,238,0.28),inset_0_1px_0_rgba(255,255,255,0.55)]"
+          style={{ backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" }}
         >
-          <MessageCircle className="h-7 w-7" />
+          <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/35 via-cyan-300/18 to-blue-600/30"></span>
+          <span className="pointer-events-none absolute left-3 top-2 h-5 w-7 rounded-full bg-white/35 blur-sm"></span>
+          <MessageCircle className="relative h-7 w-7 drop-shadow-[0_2px_8px_rgba(15,23,42,0.35)]" />
         </button>
       </div>
     </div>

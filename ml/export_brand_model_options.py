@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 
-INPUT_PATH = Path("ml/data/active/AutoValueLK_Finalized_Dataset_v2.csv")
+INPUT_PATH = Path("ml/data/active/AutoValueLK_Finalized_Dataset_v4.csv")
 OUTPUT_PATH = Path("frontend/src/data/brand_model_options.json")
 
 

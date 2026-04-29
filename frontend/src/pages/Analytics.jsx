@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { Line } from "react-chartjs-2"
-import { Trash2 } from "lucide-react"
+import { BarChart3, Search, Sparkles, Trash2 } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { Link } from "react-router-dom"
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -442,6 +443,53 @@ function Analytics() {
     return Math.round(selectedPrediction.predictedPrice)
   }, [chartSeries.source, chartSeries.values, selectedPrediction])
 
+  const trendSourceMeta = useMemo(() => {
+    if (!selectedPrediction) {
+      return {
+        label: t("analytics_page.no_trend_source", { defaultValue: "Waiting for a prediction" }),
+        tone: "border-slate-700/70 bg-slate-800/50 text-slate-300",
+        title: t("analytics_page.no_trend_title", { defaultValue: "No trend to chart yet" }),
+        summary: t("analytics_page.no_trend_summary", {
+          defaultValue: "Run Price Check first. Analytics will build a trend view as soon as a prediction is saved.",
+        }),
+      }
+    }
+
+    if (chartSeries.source === "projection") {
+      return {
+        label: t("analytics_page.projection_badge", { defaultValue: "Projection" }),
+        tone: "border-amber-400/25 bg-amber-400/10 text-amber-200",
+        title: t("analytics_page.approximate_projection"),
+        summary: t("analytics_page.projection_summary", {
+          defaultValue:
+            "Matching market history is limited, so this line is estimated from the saved prediction and staged depreciation assumptions.",
+        }),
+      }
+    }
+
+    if (chartSeries.source === "market" || chartSeries.source === "market_family" || chartSeries.source === "market_variant") {
+      return {
+        label: t("analytics_page.market_data_badge", { defaultValue: "Market data" }),
+        tone: "border-emerald-400/25 bg-emerald-400/10 text-emerald-200",
+        title: t("analytics_page.dataset_market_trend"),
+        summary: t("analytics_page.market_data_summary", {
+          defaultValue:
+            "This trend uses matching or related marketplace rows for the selected vehicle, so it is closer to observed market movement.",
+        }),
+      }
+    }
+
+    return {
+      label: t("analytics_page.dataset_badge", { defaultValue: "Dataset trend" }),
+      tone: "border-blue-400/25 bg-blue-400/10 text-blue-200",
+      title: t("analytics_page.dataset_market_trend"),
+      summary: t("analytics_page.dataset_summary", {
+        defaultValue:
+          "This trend uses matching dataset rows and fills missing years so you can compare a complete annual value path.",
+      }),
+    }
+  }, [chartSeries.source, selectedPrediction, t])
+
   const data = {
     labels: chartSeries.labels,
     datasets: [
@@ -463,6 +511,11 @@ function Analytics() {
 
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      intersect: false,
+      mode: "index",
+    },
     plugins: {
       legend: { labels: { color: themeTextSecondary } },
       tooltip: {
@@ -479,11 +532,20 @@ function Analytics() {
       },
     },
     scales: {
-      x: { grid: { color: themeBorder }, ticks: { color: themeTextSecondary } },
+      x: {
+        grid: { color: themeBorder },
+        ticks: {
+          color: themeTextSecondary,
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 6,
+        },
+      },
       y: {
         grid: { color: themeBorder },
         ticks: {
           color: themeTextSecondary,
+          maxTicksLimit: 5,
           callback: (value) => `LKR ${CURRENCY_FORMATTER.format(value)}`,
         },
       },
@@ -603,13 +665,21 @@ function Analytics() {
       </div>
 
       <div className="dashboard-page-panel mb-8 animate-fade-in animate-delay-100">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
-            {t("analytics_page.market_value_trend")}
-          </h2>
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+                {t("analytics_page.market_value_trend")}
+              </h2>
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${trendSourceMeta.tone}`}>
+                {trendSourceMeta.label}
+              </span>
+            </div>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{trendSourceMeta.summary}</p>
+          </div>
           <select
-            className="input w-auto max-w-full text-sm py-2"
+            className="input w-full text-sm py-2 sm:w-auto sm:min-w-64"
             value={selectedPrediction?.id || ""}
             onChange={(e) => setSelectedPredictionId(e.target.value)}
             disabled={savedPredictions.length === 0}
@@ -627,7 +697,9 @@ function Analytics() {
         </div>
         {selectedPrediction ? (
           <>
-            <div className="h-72"><Line data={data} options={options} /></div>
+            <div className="h-[22rem] min-h-72 overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/25 p-3 sm:p-4">
+              <Line data={data} options={options} />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
               <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
                 <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("analytics_page.selected_vehicle")}</p>
@@ -648,21 +720,28 @@ function Analytics() {
             </div>
           </>
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-900/30 px-6 py-14 text-center">
-            <p className="text-lg font-medium text-white">{t("analytics_page.no_saved_predictions")}</p>
-            <p className="mt-2 text-sm text-slate-400">
+          <div className="rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 px-6 py-14 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 text-amber-300">
+              <BarChart3 className="h-6 w-6" />
+            </div>
+            <p className="mt-5 text-lg font-semibold text-white">{t("analytics_page.no_saved_predictions")}</p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">
               {t("analytics_page.run_prediction_hint")}
             </p>
+            <Link
+              to="/price-check"
+              className="mt-6 inline-flex items-center justify-center rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-400"
+            >
+              {t("analytics_page.run_price_check", { defaultValue: "Run Price Check" })}
+            </Link>
           </div>
         )}
-        <div className="mt-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-          <div className="flex items-center gap-3">
-            <svg className="w-6 h-6 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+        <div className={`mt-6 rounded-xl border p-4 ${trendSourceMeta.tone}`}>
+          <div className="flex items-start gap-3">
+            <Sparkles className="mt-0.5 h-5 w-5 flex-shrink-0" />
             <div>
-              <p className="font-semibold text-white">
-                {chartSeries.source === "projection" ? t("analytics_page.approximate_projection") : t("analytics_page.dataset_market_trend")}
-              </p>
-              <p className="text-sm text-slate-400">
+              <p className="font-semibold text-white">{trendSourceMeta.title}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-300">
                 {chartSeries.note || t("analytics_page.chart_guidance")}
               </p>
             </div>
@@ -685,16 +764,16 @@ function Analytics() {
                   : t("analytics_page.local_browser_history")}
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <input
               type="text"
               placeholder={t("analytics_page.search_placeholder")}
-              className="input w-48 text-sm py-2"
+              className="input w-full text-sm py-2 sm:w-52"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
             <select
-              className="input w-auto text-sm py-2"
+              className="input w-full text-sm py-2 sm:w-auto"
               value={brandFilter}
               onChange={(e) => setBrandFilter(e.target.value)}
             >
@@ -754,7 +833,19 @@ function Analytics() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="text-center text-slate-500 py-8">{t("analytics_page.no_matching_predictions")}</td>
+                  <td colSpan="7" className="py-12">
+                    <div className="flex flex-col items-center text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-700/70 bg-slate-900/60 text-slate-400">
+                        <Search className="h-5 w-5" />
+                      </div>
+                      <p className="mt-4 font-medium text-white">{t("analytics_page.no_matching_predictions")}</p>
+                      <p className="mt-1 max-w-sm text-sm text-slate-500">
+                        {t("analytics_page.no_matching_predictions_hint", {
+                          defaultValue: "Try clearing the search term or choosing All Brands.",
+                        })}
+                      </p>
+                    </div>
+                  </td>
                 </tr>
               )}
             </tbody>

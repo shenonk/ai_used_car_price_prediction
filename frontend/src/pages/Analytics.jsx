@@ -221,6 +221,33 @@ function buildFullAnnualTrend(prediction, basePoints, sourceLabel, baseNote) {
   }
 }
 
+function anchorCurrentYearToPrediction(prediction, series) {
+  const currentYear = new Date().getFullYear()
+  const predictedPrice = Math.round(Number(prediction.predictedPrice) || 0)
+  const points = series.labels.map((label, index) => ({
+    year: Number(label),
+    value: Number(series.values[index]) || 0,
+  }))
+  const currentYearPoint = points.find((point) => point.year === currentYear)
+
+  if (currentYearPoint) {
+    currentYearPoint.value = predictedPrice
+  } else {
+    points.push({ year: currentYear, value: predictedPrice })
+  }
+
+  const sortedPoints = points
+    .filter((point) => Number.isFinite(point.year))
+    .sort((a, b) => a.year - b.year)
+
+  return {
+    ...series,
+    labels: sortedPoints.map((point) => String(point.year)),
+    values: sortedPoints.map((point) => Math.round(point.value)),
+    note: `${series.note} The ${currentYear} chart point is anchored to the saved predicted price so the analytics current value matches the prediction result.`,
+  }
+}
+
 function filterPlausibleMarketPoints(prediction, points) {
   if (!isSuzukiWagonFamily(prediction)) {
     return points
@@ -310,36 +337,42 @@ function getDatasetTrendSeries(prediction) {
     marketTrends.exactTrends?.[buildMarketTrendKey(prediction)] || []
   )
   if (marketTrend.length >= 1) {
-    return {
+    return anchorCurrentYearToPrediction(prediction, {
       labels: marketTrend.map((point) => String(point.trendYear)),
       values: marketTrend.map((point) => Math.round(point.marketValueLkr)),
       source: "market",
       note: "Based on the market trends dataset for the same brand, model, and manufacture year.",
-    }
+    })
   }
 
   const variantMarketTrend = buildVariantMarketTrendSeries(prediction)
   if (variantMarketTrend) {
-    return variantMarketTrend
+    return anchorCurrentYearToPrediction(prediction, variantMarketTrend)
   }
 
   const exactTrend = analyticsTrends.exactYearTrends?.[buildExactTrendKey(prediction)] || []
   if (exactTrend.length >= 1) {
-    return buildFullAnnualTrend(
+    return anchorCurrentYearToPrediction(
       prediction,
-      exactTrend,
-      "exact",
-      "Based on matching dataset rows for the same brand, model, and manufacture year."
+      buildFullAnnualTrend(
+        prediction,
+        exactTrend,
+        "exact",
+        "Based on matching dataset rows for the same brand, model, and manufacture year."
+      )
     )
   }
 
   const familyTrend = analyticsTrends.modelFamilyTrends?.[buildFamilyTrendKey(prediction)] || []
   if (familyTrend.length >= 1) {
-    return buildFullAnnualTrend(
+    return anchorCurrentYearToPrediction(
       prediction,
-      familyTrend,
-      "family",
-      "Based on matching dataset rows for the same brand and model, aggregated across available manufacture years."
+      buildFullAnnualTrend(
+        prediction,
+        familyTrend,
+        "family",
+        "Based on matching dataset rows for the same brand and model, aggregated across available manufacture years."
+      )
     )
   }
 

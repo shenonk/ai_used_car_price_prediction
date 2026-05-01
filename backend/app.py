@@ -279,7 +279,7 @@ BOOST_PRICING = {
 def get_default_admin_store() -> dict[str, Any]:
     return {
         "stats": {
-            "total_predictions": 1248,
+            "total_predictions": 0,
             "r2_score": 0.9234,
             "mae": 285000,
             "last_training_date": "2026-02-28",
@@ -1025,6 +1025,87 @@ def sync_prediction_to_supabase(
         return False
 
 
+def parse_supabase_count_header(content_range: str | None) -> int | None:
+    if not content_range or "/" not in content_range:
+        return None
+
+    total = content_range.rsplit("/", 1)[-1].strip()
+    if not total or total == "*":
+        return None
+
+    try:
+        return int(total)
+    except ValueError:
+        return None
+
+
+def fetch_prediction_count_from_supabase() -> int | None:
+    supabase_url = get_supabase_base_url()
+    supabase_key = get_supabase_api_key()
+    if not supabase_url or not supabase_key:
+        return None
+
+    request = UrlRequest(
+        f"{supabase_url}/rest/v1/predictions?select=id",
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Prefer": "count=exact",
+            "Range-Unit": "items",
+            "Range": "0-0",
+        },
+    )
+
+    try:
+        with urlopen(request) as response:
+            raw = response.read().decode("utf-8")
+            count = parse_supabase_count_header(response.headers.get("Content-Range"))
+    except HTTPError as error:
+        count = parse_supabase_count_header(error.headers.get("Content-Range"))
+        if count is not None:
+            return count
+        log_warning(f"Unable to count predictions from Supabase: {error}")
+        return None
+    except Exception as error:
+        log_warning(f"Unable to count predictions from Supabase: {error}")
+        return None
+
+    if count is not None:
+        return count
+
+    try:
+        rows = json.loads(raw) if raw else []
+    except json.JSONDecodeError:
+        return None
+
+    return len(rows) if isinstance(rows, list) else None
+
+
+def get_stored_prediction_count(stats: dict[str, Any]) -> int:
+    try:
+        value = int(stats.get("total_predictions") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+    if (
+        value == 1248
+        and stats.get("r2_score") == 0.9234
+        and stats.get("mae") == 285000
+        and stats.get("last_training_date") == "2026-02-28"
+    ):
+        return 0
+
+    return max(0, value)
+
+
+def record_prediction_metric() -> None:
+    with price_model_state.admin_lock:
+        stats = price_model_state.admin_store.setdefault("stats", {})
+        stats["total_predictions"] = get_stored_prediction_count(stats) + 1
+        persist_admin_store()
+
+
 def hydrate_admin_store_from_supabase() -> None:
     try:
         supabase_listings = fetch_marketplace_listings_from_supabase("all")
@@ -1715,8 +1796,16 @@ def get_admin_stats(_token: str = Depends(require_admin)) -> dict[str, Any]:
     stats = dict(price_model_state.admin_store.get("stats", {}))
     stats["active_loan_rate"] = price_model_state.admin_store.get("loan_rate", {}).get("interest_rate")
 
-    if price_model_state.reference_df is not None:
-        stats["total_predictions"] = int(stats.get("total_predictions") or len(price_model_state.reference_df))
+    stored_prediction_count = get_stored_prediction_count(stats)
+    live_prediction_count = fetch_prediction_count_from_supabase()
+    stats["total_predictions"] = max(
+        stored_prediction_count,
+        live_prediction_count if live_prediction_count is not None else 0,
+    )
+    if stats["total_predictions"] > stored_prediction_count:
+        with price_model_state.admin_lock:
+            price_model_state.admin_store.setdefault("stats", {})["total_predictions"] = stats["total_predictions"]
+            persist_admin_store()
 
     if price_model_state.load_error and price_model_state.model is None:
         stats["model_status"] = "unavailable"
@@ -1992,6 +2081,7 @@ def predict_price(
         raise HTTPException(status_code=500, detail=f"Prediction failed: {error}") from error
 
     prediction_warning = get_prediction_warning(raw_features, predicted_price)
+    record_prediction_metric()
 
     cloud_saved = sync_prediction_to_supabase(raw_features, predicted_price, requester)
     save_status = "cloud" if cloud_saved else "local_only"

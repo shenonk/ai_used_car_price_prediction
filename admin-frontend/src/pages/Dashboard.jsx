@@ -148,7 +148,7 @@ function Dashboard() {
         } catch {
             setError('Unable to load dashboard stats. Backend may be unavailable.');
             setStats({
-                total_predictions: 1248,
+                total_predictions: 0,
                 r2_score: 0.9234,
                 mae: 285000,
                 last_training_date: '2026-02-28',

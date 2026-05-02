@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
 import { getAlertsStorageKey, getPrefsStorageKey, loadUserAlerts, saveUserAlerts } from "../utils/userAlerts";
 import SuccessToast from "../components/auth/SuccessToast";
 import { getStoredTheme, saveTheme } from "../utils/theme";
+import AppModal from "../components/AppModal";
 
 function Settings() {
   const { t, i18n } = useTranslation();
@@ -50,6 +51,7 @@ function Settings() {
     message: "",
     subMessage: "",
   });
+  const [isClearDataModalOpen, setIsClearDataModalOpen] = useState(false);
 
   const showToast = (type, message, subMessage = "") => {
     setToast({ isOpen: true, type, message, subMessage });
@@ -210,18 +212,21 @@ function Settings() {
   };
 
   const clearAllData = () => {
-    if (window.confirm("Are you sure you want to clear all local data? This includes your price alerts and preferences.")) {
-      localStorage.removeItem(getPrefsStorageKey(userInfo));
-      localStorage.removeItem(getAlertsStorageKey(userInfo));
-      setAlerts([]);
-      setPrefs({
-        priceAlerts: true,
-        marketUpdates: true,
-        loanRates: true,
-        systemUpdates: false,
-      });
-      alert("Local data cleared successfully.");
-    }
+    setIsClearDataModalOpen(true);
+  };
+
+  const confirmClearAllData = () => {
+    localStorage.removeItem(getPrefsStorageKey(userInfo));
+    localStorage.removeItem(getAlertsStorageKey(userInfo));
+    setAlerts([]);
+    setPrefs({
+      priceAlerts: true,
+      marketUpdates: true,
+      loanRates: true,
+      systemUpdates: false,
+    });
+    setIsClearDataModalOpen(false);
+    showToast("success", "Local data cleared.", "Your price alerts and local preferences were removed.");
   };
 
   const handleLogout = () => {
@@ -257,6 +262,18 @@ function Settings() {
         isOpen={toast.isOpen && toast.type === "success"}
         message={toast.message}
         subMessage={toast.subMessage}
+      />
+      <AppModal
+        isOpen={isClearDataModalOpen}
+        tone="danger"
+        eyebrow="Clear local data"
+        title="Remove local preferences and alerts?"
+        message="This will clear local price alerts and saved preferences from this browser. This action cannot be undone."
+        confirmLabel="Clear local data"
+        cancelLabel="Cancel"
+        showCancel
+        onCancel={() => setIsClearDataModalOpen(false)}
+        onConfirm={confirmClearAllData}
       />
       {toast.isOpen && toast.type === "error" && (
         <div className="fixed top-6 right-6 z-50 animate-slide-in-right">

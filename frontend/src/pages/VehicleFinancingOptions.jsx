@@ -5,6 +5,7 @@ import autoTable from "jspdf-autotable";
 import { getCurrentUser } from "../utils/auth";
 import { supabase } from "../utils/supabaseClient";
 import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png";
+import AppModal from "../components/AppModal";
 
 // ============================================
 // COMPONENT
@@ -25,6 +26,7 @@ function VehicleFinancingOptions() {
     const [downPaymentPercent, setDownPaymentPercent] = useState(20);
     const [tenure, setTenure] = useState(36); // months
     const [downloading, setDownloading] = useState(false);
+    const [dialog, setDialog] = useState(null);
 
     useEffect(() => {
         fetchInstitutions();
@@ -234,7 +236,10 @@ function VehicleFinancingOptions() {
             doc.save(`AutoValueLK_Financing_${vehicle?.brand || "Report"}_${vehicle?.model || ""}.pdf`);
         } catch (err) {
             console.error("PDF generation failed", err);
-            alert("Failed to generate PDF report.");
+            setDialog({
+                title: "PDF generation failed",
+                message: "Failed to generate the financing PDF report. Please try again.",
+            });
         } finally {
             setDownloading(false);
         }
@@ -242,6 +247,15 @@ function VehicleFinancingOptions() {
 
     return (
         <div className="min-h-screen bg-[#0f172a] p-8">
+            <AppModal
+                isOpen={Boolean(dialog)}
+                tone="warning"
+                eyebrow="Financing"
+                title={dialog?.title || ""}
+                message={dialog?.message || ""}
+                confirmLabel="OK"
+                onConfirm={() => setDialog(null)}
+            />
             {/* No vehicle data warning */}
             {!vehicle && (
                 <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 animate-fade-in">

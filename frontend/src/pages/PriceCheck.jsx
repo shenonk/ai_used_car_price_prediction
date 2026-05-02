@@ -5,6 +5,7 @@ import logo from "../assets/logo/autovaluelk-logo.png"
 import brandModelOptions from "../data/brand_model_options.json"
 import { savePredictionHistoryEntry } from "../utils/predictionHistory"
 import { supabase } from "../utils/supabaseClient"
+import AppModal from "../components/AppModal"
 
 const GEAR_TYPE_OPTIONS = [
   { label: "Automatic", value: "automatic" },
@@ -28,6 +29,12 @@ const MODEL_REFERENCE_LISTING_MONTH = 1
 const MODEL_REFERENCE_LISTING_YEAR = 2025
 const BRAND_OPTIONS = Object.keys(brandModelOptions).sort()
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+const MAX_BRAND_SUGGESTIONS = 80
+const MAX_MODEL_SUGGESTIONS = 80
+
+function normalizeModelSearch(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "")
+}
 
 function PriceCheck() {
   const navigate = useNavigate()
@@ -45,6 +52,9 @@ function PriceCheck() {
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+  const [dialog, setDialog] = useState(null)
+  const [isBrandPickerOpen, setIsBrandPickerOpen] = useState(false)
+  const [isModelPickerOpen, setIsModelPickerOpen] = useState(false)
   const gearTypeOptions = useMemo(() => ([
     { label: t("price_check_page.options.automatic"), value: "automatic" },
     { label: t("price_check_page.options.manual"), value: "manual" },
@@ -60,14 +70,45 @@ function PriceCheck() {
     { label: t("price_check_page.options.brand_new"), value: "BRAND NEW" },
     { label: t("price_check_page.options.reconditioned"), value: "RECONDITIONED" },
   ]), [t])
+  const brandSuggestions = useMemo(() => {
+    const query = form.brand.trim()
+    const normalizedQuery = normalizeModelSearch(query)
+
+    if (!normalizedQuery) {
+      return BRAND_OPTIONS.slice(0, MAX_BRAND_SUGGESTIONS)
+    }
+
+    return BRAND_OPTIONS
+      .filter((brand) => {
+        const normalizedBrand = normalizeModelSearch(brand)
+        return brand.toLowerCase().includes(query.toLowerCase()) || normalizedBrand.includes(normalizedQuery)
+      })
+      .slice(0, MAX_BRAND_SUGGESTIONS)
+  }, [form.brand])
   const availableModels = useMemo(
     () => (form.brand ? (brandModelOptions[form.brand] || []) : []),
     [form.brand]
   )
+  const modelSuggestions = useMemo(() => {
+    const query = form.model.trim()
+    const normalizedQuery = normalizeModelSearch(query)
+
+    if (!normalizedQuery) {
+      return availableModels.slice(0, MAX_MODEL_SUGGESTIONS)
+    }
+
+    return availableModels
+      .filter((model) => {
+        const normalizedModel = normalizeModelSearch(model)
+        return model.toLowerCase().includes(query.toLowerCase()) || normalizedModel.includes(normalizedQuery)
+      })
+      .slice(0, MAX_MODEL_SUGGESTIONS)
+  }, [availableModels, form.model])
 
   const handleChange = (field, value) => {
     setForm(prev => {
       if (field === "brand") {
+        setIsModelPickerOpen(false)
         return { ...prev, brand: value, model: "" }
       }
 
@@ -166,15 +207,30 @@ function PriceCheck() {
     } catch (error) {
       setIsLoading(false)
       if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
-        alert(t("price_check_page.errors.server_not_connected", { url: API_BASE_URL }))
+        setDialog({
+          title: t("price_check_page.errors.connection_title", { defaultValue: "Backend unavailable" }),
+          message: t("price_check_page.errors.server_not_connected", { url: API_BASE_URL }),
+        })
       } else {
-        alert(t("price_check_page.errors.prediction_failed", { message: error.message }))
+        setDialog({
+          title: t("price_check_page.errors.prediction_failed_title", { defaultValue: "Prediction failed" }),
+          message: t("price_check_page.errors.prediction_failed", { message: error.message }),
+        })
       }
     }
   }
 
   return (
     <div className="app-page-shell">
+      <AppModal
+        isOpen={Boolean(dialog)}
+        tone="warning"
+        eyebrow={t("price_check_page.errors.dialog_eyebrow", { defaultValue: "Price Check" })}
+        title={dialog?.title || ""}
+        message={dialog?.message || ""}
+        confirmLabel={t("common.ok", { defaultValue: "OK" })}
+        onConfirm={() => setDialog(null)}
+      />
       <div className="dashboard-page-hero mb-8 animate-fade-in">
         <div className="dashboard-page-eyebrow mb-4">
           <svg className="h-3.5 w-3.5 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,39 +263,95 @@ function PriceCheck() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
               {/* Brand */}
-              <div className="animate-fade-in animate-delay-100">
+              <div className="relative z-50 animate-fade-in animate-delay-100">
                 <label className="label">{t("price_check_page.brand")}</label>
-                <select
-                  className={`input ${errors.brand ? 'border-rose-500/50' : ''}`}
-                  value={form.brand}
-                  onChange={(e) => handleChange('brand', e.target.value)}
-                >
-                  <option value="">{t("price_check_page.select_brand")}</option>
-                  {BRAND_OPTIONS.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <input
+                    className={`input ${errors.brand ? 'border-rose-500/50' : ''}`}
+                    placeholder={t("price_check_page.select_brand")}
+                    value={form.brand}
+                    onChange={(e) => {
+                      handleChange('brand', e.target.value)
+                      setIsBrandPickerOpen(true)
+                    }}
+                    onFocus={() => setIsBrandPickerOpen(true)}
+                    onBlur={() => setTimeout(() => setIsBrandPickerOpen(false), 120)}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-expanded={isBrandPickerOpen && brandSuggestions.length > 0}
+                    aria-controls="price-check-brand-options"
+                  />
+                  {isBrandPickerOpen && brandSuggestions.length > 0 && (
+                    <div
+                      id="price-check-brand-options"
+                      className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-2 shadow-2xl shadow-black/60"
+                      role="listbox"
+                    >
+                      {brandSuggestions.map((brand) => (
+                        <button
+                          key={brand}
+                          type="button"
+                          className="block w-full rounded-xl px-4 py-2.5 text-left text-sm font-semibold text-slate-100 transition hover:bg-blue-500/15 hover:text-white focus:bg-blue-500/20 focus:outline-none"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            handleChange('brand', brand)
+                            setIsBrandPickerOpen(false)
+                          }}
+                          role="option"
+                        >
+                          {brand}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {errors.brand && <p className="text-rose-400 text-xs mt-1">{errors.brand}</p>}
               </div>
 
               {/* Model */}
-              <div className="animate-fade-in animate-delay-200">
+              <div className="relative z-40 animate-fade-in animate-delay-200">
                 <label className="label">{t("price_check_page.model")}</label>
-                <input
-                  list="price-check-model-options"
-                  className={`input ${errors.model ? 'border-rose-500/50' : ''}`}
-                  placeholder={form.brand ? t("price_check_page.select_model_or_search") : t("price_check_page.select_brand_first")}
-                  value={form.model}
-                  onChange={(e) => handleChange('model', e.target.value)}
-                  disabled={!form.brand}
-                />
-                <datalist id="price-check-model-options">
-                  {availableModels.map((model) => (
-                    <option key={model} value={model} />
-                  ))}
-                </datalist>
+                <div className="relative">
+                  <input
+                    className={`input ${errors.model ? 'border-rose-500/50' : ''}`}
+                    placeholder={form.brand ? t("price_check_page.select_model_or_search") : t("price_check_page.select_brand_first")}
+                    value={form.model}
+                    onChange={(e) => {
+                      handleChange('model', e.target.value)
+                      setIsModelPickerOpen(Boolean(form.brand))
+                    }}
+                    onFocus={() => setIsModelPickerOpen(Boolean(form.brand))}
+                    onBlur={() => setTimeout(() => setIsModelPickerOpen(false), 120)}
+                    disabled={!form.brand}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-expanded={isModelPickerOpen && modelSuggestions.length > 0}
+                    aria-controls="price-check-model-options"
+                  />
+                  {isModelPickerOpen && form.brand && modelSuggestions.length > 0 && (
+                    <div
+                      id="price-check-model-options"
+                      className="absolute left-0 right-0 top-full z-50 mt-2 max-h-64 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950 p-2 shadow-2xl shadow-black/60"
+                      role="listbox"
+                    >
+                      {modelSuggestions.map((model) => (
+                        <button
+                          key={model}
+                          type="button"
+                          className="block w-full rounded-xl px-4 py-2.5 text-left text-sm font-semibold text-slate-100 transition hover:bg-blue-500/15 hover:text-white focus:bg-blue-500/20 focus:outline-none"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            handleChange('model', model)
+                            setIsModelPickerOpen(false)
+                          }}
+                          role="option"
+                        >
+                          {model}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {errors.model && <p className="text-rose-400 text-xs mt-1">{errors.model}</p>}
               </div>
 

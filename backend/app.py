@@ -48,7 +48,7 @@ load_env_file(PROJECT_ROOT / ".env")
 load_env_file(PROJECT_ROOT / ".env.docker")
 load_env_file(Path(__file__).resolve().parent / ".env")
 MODEL_PATH = Path(__file__).resolve().parents[1] / "ml" / "models" / "price_model.joblib"
-REFERENCE_DATASET_PATH = Path(__file__).resolve().parents[1] / "ml" / "data" / "active" / "AutoValueLK_Finalized_Dataset_v2.csv"
+REFERENCE_DATASET_PATH = Path(__file__).resolve().parents[1] / "ml" / "data" / "active" / "AutoValueLK_Finalized_Dataset_v4.csv"
 ADMIN_DATA_PATH = Path(__file__).resolve().parent / "data" / "admin_store.json"
 ADMIN_STORE_PERSIST_ENABLED = os.getenv("ADMIN_STORE_PERSIST", "true").strip().lower() not in {"0", "false", "no"}
 OLDER_REFERENCE_LISTING_MONTH = 1
@@ -279,7 +279,7 @@ BOOST_PRICING = {
 def get_default_admin_store() -> dict[str, Any]:
     return {
         "stats": {
-            "total_predictions": 1248,
+            "total_predictions": 0,
             "r2_score": 0.9234,
             "mae": 285000,
             "last_training_date": "2026-02-28",
@@ -1025,6 +1025,87 @@ def sync_prediction_to_supabase(
         return False
 
 
+def parse_supabase_count_header(content_range: str | None) -> int | None:
+    if not content_range or "/" not in content_range:
+        return None
+
+    total = content_range.rsplit("/", 1)[-1].strip()
+    if not total or total == "*":
+        return None
+
+    try:
+        return int(total)
+    except ValueError:
+        return None
+
+
+def fetch_prediction_count_from_supabase() -> int | None:
+    supabase_url = get_supabase_base_url()
+    supabase_key = get_supabase_api_key()
+    if not supabase_url or not supabase_key:
+        return None
+
+    request = UrlRequest(
+        f"{supabase_url}/rest/v1/predictions?select=id",
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Prefer": "count=exact",
+            "Range-Unit": "items",
+            "Range": "0-0",
+        },
+    )
+
+    try:
+        with urlopen(request) as response:
+            raw = response.read().decode("utf-8")
+            count = parse_supabase_count_header(response.headers.get("Content-Range"))
+    except HTTPError as error:
+        count = parse_supabase_count_header(error.headers.get("Content-Range"))
+        if count is not None:
+            return count
+        log_warning(f"Unable to count predictions from Supabase: {error}")
+        return None
+    except Exception as error:
+        log_warning(f"Unable to count predictions from Supabase: {error}")
+        return None
+
+    if count is not None:
+        return count
+
+    try:
+        rows = json.loads(raw) if raw else []
+    except json.JSONDecodeError:
+        return None
+
+    return len(rows) if isinstance(rows, list) else None
+
+
+def get_stored_prediction_count(stats: dict[str, Any]) -> int:
+    try:
+        value = int(stats.get("total_predictions") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+    if (
+        value == 1248
+        and stats.get("r2_score") == 0.9234
+        and stats.get("mae") == 285000
+        and stats.get("last_training_date") == "2026-02-28"
+    ):
+        return 0
+
+    return max(0, value)
+
+
+def record_prediction_metric() -> None:
+    with price_model_state.admin_lock:
+        stats = price_model_state.admin_store.setdefault("stats", {})
+        stats["total_predictions"] = get_stored_prediction_count(stats) + 1
+        persist_admin_store()
+
+
 def hydrate_admin_store_from_supabase() -> None:
     try:
         supabase_listings = fetch_marketplace_listings_from_supabase("all")
@@ -1715,8 +1796,16 @@ def get_admin_stats(_token: str = Depends(require_admin)) -> dict[str, Any]:
     stats = dict(price_model_state.admin_store.get("stats", {}))
     stats["active_loan_rate"] = price_model_state.admin_store.get("loan_rate", {}).get("interest_rate")
 
-    if price_model_state.reference_df is not None:
-        stats["total_predictions"] = int(stats.get("total_predictions") or len(price_model_state.reference_df))
+    stored_prediction_count = get_stored_prediction_count(stats)
+    live_prediction_count = fetch_prediction_count_from_supabase()
+    stats["total_predictions"] = max(
+        stored_prediction_count,
+        live_prediction_count if live_prediction_count is not None else 0,
+    )
+    if stats["total_predictions"] > stored_prediction_count:
+        with price_model_state.admin_lock:
+            price_model_state.admin_store.setdefault("stats", {})["total_predictions"] = stats["total_predictions"]
+            persist_admin_store()
 
     if price_model_state.load_error and price_model_state.model is None:
         stats["model_status"] = "unavailable"
@@ -1928,86 +2017,41 @@ def get_payments(_token: str = Depends(require_admin)) -> dict[str, Any]:
     return {"payments": payments}
 
 
-def get_targeted_reference_price(features: dict[str, Any]) -> float | None:
+def get_prediction_warning(features: dict[str, Any], predicted_price: float) -> str | None:
     reference_df = price_model_state.reference_df
     if reference_df is None or reference_df.empty:
         return None
 
-    brand = features["brand"]
-    model = features["model"]
-    family_rows: pd.DataFrame | None = None
-    minimum_exact_matches = 3
-    minimum_nearby_matches = 3
-
-    if brand == "BMW" and "520" in model:
-        family_rows = reference_df[
-            reference_df["brand_norm"].eq("BMW") & reference_df["model_norm"].str.contains("520", na=False)
-        ].copy()
-    elif brand == "TESLA" and "MODEL 3" in model:
-        family_rows = reference_df[
-            reference_df["brand_norm"].eq("TESLA") & reference_df["model_norm"].str.contains("MODEL 3", na=False)
-        ].copy()
-    elif brand == "SUZUKI" and ("WAGON R" in model or "STINGRAY" in model):
-        family_rows = reference_df[
-            reference_df["brand_norm"].eq("SUZUKI")
-            & reference_df["model_norm"].str.contains("WAGON R|STINGRAY", na=False)
-        ].copy()
-        minimum_exact_matches = 2
-        minimum_nearby_matches = 2
-
-    if family_rows is None or family_rows.empty:
+    subset = reference_df[reference_df["brand_norm"].eq(features["brand"])].copy()
+    if subset.empty:
         return None
 
-    subset = family_rows.copy()
-    subset = subset[subset["condition"].astype(str).eq(features["condition"])]
-    if subset.empty:
-        subset = family_rows.copy()
+    exact_model_subset = subset[subset["model_norm"].eq(features["model"])]
+    if not exact_model_subset.empty:
+        subset = exact_model_subset
 
-    fuel_subset = subset[subset["fuel_type"].astype(str).str.lower().eq(features["fuel_type"])]
-    if not fuel_subset.empty:
-        subset = fuel_subset
+    nearby_year_subset = subset[subset["year"].sub(int(features["year"])).abs() <= 2]
+    if len(nearby_year_subset) >= 5:
+        subset = nearby_year_subset
 
-    if features["engine_cc"] == 0:
-        engine_subset = subset[subset["engine_cc"].fillna(-1).eq(0)]
-    else:
-        engine_subset = subset[subset["engine_cc"].sub(float(features["engine_cc"])).abs() <= 250]
-    if not engine_subset.empty:
-        subset = engine_subset
+    if len(subset) < 5:
+        return None
 
-    if brand == "SUZUKI" and ("WAGON R" in model or "STINGRAY" in model):
-        plausible_price_subset = subset[subset["price_lkr"].between(1_000_000, 20_000_000)]
-        if not plausible_price_subset.empty:
-            subset = plausible_price_subset
+    q1 = float(subset["price_lkr"].quantile(0.25))
+    q3 = float(subset["price_lkr"].quantile(0.75))
+    iqr = q3 - q1
+    if iqr <= 0:
+        return None
 
-        if len(subset) >= 4:
-            q1 = float(subset["price_lkr"].quantile(0.25))
-            q3 = float(subset["price_lkr"].quantile(0.75))
-            iqr = q3 - q1
-            lower_bound = max(0.0, q1 - (1.5 * iqr))
-            upper_bound = q3 + (1.5 * iqr)
-            iqr_filtered_subset = subset[subset["price_lkr"].between(lower_bound, upper_bound)]
-            if not iqr_filtered_subset.empty:
-                subset = iqr_filtered_subset
+    lower_bound = max(0.0, q1 - (3 * iqr))
+    upper_bound = q3 + (3 * iqr)
+    if predicted_price < lower_bound or predicted_price > upper_bound:
+        return (
+            "Predicted price is outside the broad reference range for similar brand/year records. "
+            "Please review the input details and treat this estimate with caution."
+        )
 
-    exact_year = subset[subset["year"].eq(int(features["year"]))]
-    if len(exact_year) >= minimum_exact_matches:
-        return float(exact_year["price_lkr"].median())
-
-    nearby_year = subset[subset["year"].sub(int(features["year"])).abs() <= 2]
-    if len(nearby_year) >= minimum_nearby_matches:
-        return float(nearby_year["price_lkr"].median())
-
-    family_median_price = float(subset["price_lkr"].median())
-    family_median_year = float(subset["year"].median())
-    input_year = float(features["year"])
-
-    if input_year < family_median_year:
-        year_factor = 0.93 ** (family_median_year - input_year)
-    else:
-        year_factor = 1.04 ** (input_year - family_median_year)
-
-    adjusted_price = family_median_price * year_factor
-    return float(max(0.0, adjusted_price))
+    return None
 
 
 @app.post("/predict")
@@ -2036,14 +2080,8 @@ def predict_price(
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {error}") from error
 
-    targeted_reference_price = get_targeted_reference_price(raw_features)
-    if targeted_reference_price is not None:
-        print(
-            f"Applying targeted reference calibration for {raw_features['brand']} {raw_features['model']}: "
-            f"{predicted_price:,.2f} -> {targeted_reference_price:,.2f}",
-            flush=True,
-        )
-        predicted_price = targeted_reference_price
+    prediction_warning = get_prediction_warning(raw_features, predicted_price)
+    record_prediction_metric()
 
     cloud_saved = sync_prediction_to_supabase(raw_features, predicted_price, requester)
     save_status = "cloud" if cloud_saved else "local_only"
@@ -2053,8 +2091,12 @@ def predict_price(
         else "Prediction saved only on this device."
     )
 
-    return {
+    response = {
         "predicted_price_lkr": round(predicted_price, 2),
         "save_status": save_status,
         "save_message": save_message,
     }
+    if prediction_warning:
+        response["warning"] = prediction_warning
+
+    return response

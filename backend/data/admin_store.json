@@ -5,6 +5,7 @@
     "mae": 285000,
     "last_training_date": "2026-02-28"
   },
+  "prediction_daily_counts": {},
   "loan_rate": {
     "interest_rate": 12.5,
     "min_down_payment": 20,

@@ -28,7 +28,30 @@ const formatRelativeTime = (dateStr) => {
     return `${days} day${days !== 1 ? 's' : ''} ago`;
 };
 
-function PredictionTrendPopover({ trendData, loading, error }) {
+const getDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getRecentDateKeys = (days) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return Array.from({ length: days }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() - (days - 1 - index));
+        return getDateKey(date);
+    });
+};
+
+const formatTrendLabel = (dateKey) => {
+    const date = new Date(`${dateKey}T00:00:00`);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+function ActivityTrendPopover({ trendData, loading, error, title, subtitle, todayLabel = 'today', chartLabel }) {
     const trend = trendData?.trend || [];
     const todayCount = trendData?.today?.count ?? 0;
     const weekTotal = trend.reduce((sum, item) => sum + Number(item.count || 0), 0);
@@ -53,12 +76,12 @@ function PredictionTrendPopover({ trendData, loading, error }) {
             <div className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-l-2 border-t-2 border-blue-300/45 bg-slate-950" />
             <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">Prediction activity</p>
-                    <p className="mt-1 text-sm text-slate-300">Daily prediction trend for the last 7 days</p>
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">{title}</p>
+                    <p className="mt-1 text-sm text-slate-300">{subtitle}</p>
                 </div>
                 <div className="rounded-2xl border border-blue-300/25 bg-blue-400/10 px-4 py-3 text-right">
                     <p className="text-3xl font-bold text-white">{Number(todayCount).toLocaleString()}</p>
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">today</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">{todayLabel}</p>
                 </div>
             </div>
 
@@ -77,7 +100,7 @@ function PredictionTrendPopover({ trendData, loading, error }) {
             ) : (
                 <>
                     <div className="rounded-2xl border border-slate-700/70 bg-slate-900/70 px-3 py-4">
-                    <svg className="h-40 w-full overflow-visible" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label="Daily prediction trend chart">
+                    <svg className="h-40 w-full overflow-visible" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={chartLabel}>
                         <defs>
                             <linearGradient id="predictionTrendArea" x1="0" x2="0" y1="0" y2="1">
                                 <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.55" />
@@ -137,6 +160,9 @@ function Dashboard() {
     const [predictionTrend, setPredictionTrend] = useState(null);
     const [predictionTrendLoading, setPredictionTrendLoading] = useState(false);
     const [predictionTrendError, setPredictionTrendError] = useState('');
+    const [dauTrend, setDauTrend] = useState(null);
+    const [dauTrendLoading, setDauTrendLoading] = useState(false);
+    const [dauTrendError, setDauTrendError] = useState('');
     const insightDelayRef = useRef(null);
 
     useEffect(() => {
@@ -280,12 +306,80 @@ function Dashboard() {
         }
     };
 
+    const buildDauTrendFromUsers = (users) => {
+        const dateKeys = getRecentDateKeys(7);
+        const counts = Object.fromEntries(dateKeys.map((dateKey) => [dateKey, 0]));
+
+        (users || []).forEach((user) => {
+            if (!user.last_sign_in_at) return;
+            const dateKey = getDateKey(new Date(user.last_sign_in_at));
+            if (dateKey in counts) {
+                counts[dateKey] += 1;
+            }
+        });
+
+        const trend = dateKeys.map((dateKey) => ({
+            date: dateKey,
+            label: formatTrendLabel(dateKey),
+            count: counts[dateKey],
+        }));
+
+        return {
+            days: 7,
+            today: trend[trend.length - 1],
+            trend,
+        };
+    };
+
+    const fetchDauTrend = async () => {
+        if (dauTrend || dauTrendLoading) return;
+
+        try {
+            setDauTrendLoading(true);
+            setDauTrendError('');
+
+            if (!supabaseAdmin) {
+                throw new Error('No service role key found.');
+            }
+
+            const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
+                page: 1,
+                perPage: 1000,
+            });
+
+            if (usersError) {
+                throw usersError;
+            }
+
+            setDauTrend(buildDauTrendFromUsers(data?.users || []));
+        } catch (err) {
+            console.warn('DAU trend fetch issue:', err.message);
+            const dateKeys = getRecentDateKeys(7);
+            const emptyTrend = dateKeys.map((dateKey) => ({
+                date: dateKey,
+                label: formatTrendLabel(dateKey),
+                count: 0,
+            }));
+            setDauTrend({
+                days: 7,
+                today: emptyTrend[emptyTrend.length - 1],
+                trend: emptyTrend,
+            });
+            setDauTrendError('Unable to load DAU trend right now.');
+        } finally {
+            setDauTrendLoading(false);
+        }
+    };
+
     const scheduleInsight = (insightName) => {
         window.clearTimeout(insightDelayRef.current);
         insightDelayRef.current = window.setTimeout(() => {
             setActiveInsightCard(insightName);
             if (insightName === 'predictions') {
                 fetchPredictionTrend();
+            }
+            if (insightName === 'dau') {
+                fetchDauTrend();
             }
         }, 1000);
     };
@@ -322,6 +416,7 @@ function Dashboard() {
                     dauCount.toLocaleString()
                 ),
                 subtext: 'Unique logins in the last 24 hours',
+                insight: 'dau',
                 icon: <Users className="w-6 h-6" strokeWidth={1.8} />,
                 color: 'emerald',
             },
@@ -429,10 +524,24 @@ function Dashboard() {
                             </p>
                             {card.subtext && <p className="text-slate-500 text-xs mt-1">{card.subtext}</p>}
                             {card.insight === 'predictions' && activeInsightCard === 'predictions' && (
-                                <PredictionTrendPopover
+                                <ActivityTrendPopover
                                     trendData={predictionTrend}
                                     loading={predictionTrendLoading}
                                     error={predictionTrendError}
+                                    title="Prediction activity"
+                                    subtitle="Daily prediction trend for the last 7 days"
+                                    chartLabel="Daily prediction trend chart"
+                                />
+                            )}
+                            {card.insight === 'dau' && activeInsightCard === 'dau' && (
+                                <ActivityTrendPopover
+                                    trendData={dauTrend}
+                                    loading={dauTrendLoading}
+                                    error={dauTrendError}
+                                    title="DAU activity"
+                                    subtitle="Daily active user trend from latest sign-ins"
+                                    todayLabel="active today"
+                                    chartLabel="Daily active user trend chart"
                                 />
                             )}
                         </div>

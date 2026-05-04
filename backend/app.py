@@ -168,7 +168,8 @@ class NotificationPayload(BaseModel):
 
 
 class SupportTicketStatusPayload(BaseModel):
-    status: str = Field(..., pattern="^(open|read|closed)$")
+    status: str | None = Field(default=None, pattern="^(open|read|closed)$")
+    admin_reply: str | None = Field(default=None, max_length=4000)
 
 
 class SupportTicketCreatePayload(BaseModel):
@@ -1650,12 +1651,34 @@ def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]
             "user_email": payload.user_email.strip(),
             "message": payload.message.strip(),
             "status": payload.status,
+            "admin_reply": "",
+            "admin_replied_at": None,
             "created_at": utc_now_iso(),
         }
         tickets.append(ticket)
         persist_admin_store()
 
     return {"message": "Support ticket created successfully.", "ticket": ticket}
+
+
+@app.get("/api/support-ticket-replies")
+def get_support_ticket_replies(email: str = Query(..., min_length=3)) -> dict[str, Any]:
+    normalized_email = email.strip().lower()
+    replies = [
+        {
+            "id": item.get("id"),
+            "message": item.get("message", ""),
+            "admin_reply": item.get("admin_reply", ""),
+            "admin_replied_at": item.get("admin_replied_at"),
+            "status": item.get("status", "open"),
+            "created_at": item.get("created_at"),
+        }
+        for item in price_model_state.admin_store.get("support_tickets", [])
+        if str(item.get("user_email", "")).strip().lower() == normalized_email
+        and str(item.get("admin_reply", "")).strip()
+    ]
+    replies.sort(key=lambda item: item.get("admin_replied_at") or item.get("created_at") or "", reverse=True)
+    return {"replies": replies}
 
 
 @app.post("/api/chat")
@@ -2022,7 +2045,16 @@ def update_support_ticket(
         if ticket is None:
             raise admin_error("Support ticket not found.", status_code=404)
 
-        ticket["status"] = payload.status
+        if payload.status is not None:
+            ticket["status"] = payload.status
+
+        if payload.admin_reply is not None:
+            reply = payload.admin_reply.strip()
+            ticket["admin_reply"] = reply
+            ticket["admin_replied_at"] = utc_now_iso() if reply else None
+            if reply:
+                ticket["status"] = "closed"
+
         persist_admin_store()
 
     return {"message": "Support ticket updated successfully.", "ticket": ticket}

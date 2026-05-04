@@ -8,6 +8,8 @@ function SupportTickets() {
   const [success, setSuccess] = useState('');
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
+  const [replyText, setReplyText] = useState('');
+  const [replyingId, setReplyingId] = useState(null);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -32,6 +34,11 @@ function SupportTickets() {
     fetchTickets();
   }, [fetchTickets]);
 
+  useEffect(() => {
+    const selectedTicket = tickets.find((ticket) => ticket.id === selectedTicketId);
+    setReplyText(selectedTicket?.admin_reply || '');
+  }, [selectedTicketId, tickets]);
+
   const updateTicketStatus = async (ticketId, status) => {
     try {
       setUpdatingId(ticketId);
@@ -49,6 +56,37 @@ function SupportTickets() {
       setError('Failed to update the message status.');
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const submitAdminReply = async () => {
+    if (!selectedTicket) return;
+
+    const adminReply = replyText.trim();
+    if (!adminReply) {
+      setError('Please write a reply before sending it to the user.');
+      return;
+    }
+
+    try {
+      setReplyingId(selectedTicket.id);
+      setError('');
+      setSuccess('');
+      const res = await api.put(`/api/admin/support-ticket/${selectedTicket.id}`, {
+        admin_reply: adminReply,
+      });
+      const updatedTicket = res.data.ticket;
+
+      setTickets((prev) =>
+        prev.map((ticket) => (ticket.id === selectedTicket.id ? updatedTicket : ticket))
+      );
+      setSuccess('Reply saved. The user can now see it in the Help Center.');
+      window.setTimeout(() => setSuccess(''), 3000);
+    } catch (replyError) {
+      console.error('Error sending admin reply:', replyError);
+      setError('Failed to save the admin reply.');
+    } finally {
+      setReplyingId(null);
     }
   };
 
@@ -156,6 +194,11 @@ function SupportTickets() {
                     </span>
                   </div>
                   <p className="text-sm text-gray-400 mt-3 line-clamp-2">{ticket.message}</p>
+                  {ticket.admin_reply && (
+                    <p className="mt-3 inline-flex rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-xs font-semibold text-emerald-300">
+                      Replied by admin
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500 mt-3">
                     {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : 'No timestamp'}
                   </p>
@@ -207,6 +250,52 @@ function SupportTickets() {
               <div className="bg-white/5 border border-white/10 rounded-xl p-4">
                 <p className="text-xs text-gray-500 uppercase tracking-wider">Message</p>
                 <p className="text-gray-300 mt-3 leading-7 whitespace-pre-wrap">{selectedTicket.message}</p>
+              </div>
+
+              {selectedTicket.admin_reply && (
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+                  <p className="text-xs text-emerald-300 uppercase tracking-wider">Current Admin Reply</p>
+                  <p className="text-emerald-50 mt-3 leading-7 whitespace-pre-wrap">{selectedTicket.admin_reply}</p>
+                  <p className="text-xs text-emerald-300/70 mt-3">
+                    {selectedTicket.admin_replied_at
+                      ? `Sent ${new Date(selectedTicket.admin_replied_at).toLocaleString()}`
+                      : 'Reply saved'}
+                  </p>
+                </div>
+              )}
+
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-blue-300 uppercase tracking-wider">Reply to user</p>
+                    <p className="text-sm text-slate-400 mt-2">
+                      This will be shown in the user Help Center as a reply from AutoValueLK admins.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-semibold text-blue-200">
+                    AutoValueLK Admin
+                  </span>
+                </div>
+                <textarea
+                  value={replyText}
+                  onChange={(event) => setReplyText(event.target.value)}
+                  rows="6"
+                  className="mt-4 w-full resize-none rounded-xl border border-white/10 bg-slate-950/50 p-4 text-sm leading-6 text-white outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-400/10"
+                  placeholder="Write a helpful reply to this user..."
+                />
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-slate-500">
+                    Sending a reply automatically marks the message as closed.
+                  </p>
+                  <button
+                    type="button"
+                    disabled={replyingId === selectedTicket.id || !replyText.trim()}
+                    onClick={submitAdminReply}
+                    className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {replyingId === selectedTicket.id ? 'Saving reply...' : 'Send admin reply'}
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-3">

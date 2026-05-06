@@ -52,7 +52,7 @@ function Login() {
     if (result.success) {
       setShowSuccess(true)
       setTimeout(() => {
-        navigate("/")
+        navigate("/dashboard")
       }, 2000)
     } else {
       setError(result.error)

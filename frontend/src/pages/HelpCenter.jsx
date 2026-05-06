@@ -30,6 +30,11 @@ const HelpCenter = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [replyEmail, setReplyEmail] = useState("");
+  const [adminReplies, setAdminReplies] = useState([]);
+  const [isLoadingReplies, setIsLoadingReplies] = useState(false);
+  const [replyLookupError, setReplyLookupError] = useState("");
+  const [hasCheckedReplies, setHasCheckedReplies] = useState(false);
 
   const categories = [
     {
@@ -189,6 +194,8 @@ const HelpCenter = () => {
       email: "",
       message: "",
     });
+    setReplyEmail(payload.user_email);
+    fetchAdminReplies(payload.user_email);
     setSubmitSuccess(t("help_center_page.success"));
     setIsSubmitting(false);
     window.setTimeout(() => {
@@ -200,6 +207,49 @@ const HelpCenter = () => {
     formData.full_name.trim() &&
     formData.email.trim() &&
     formData.message.trim();
+
+  const fetchAdminReplies = async (emailOverride = replyEmail) => {
+    const email = emailOverride.trim();
+    if (!email) {
+      setReplyLookupError("Please enter the email address you used when contacting us.");
+      return;
+    }
+
+    setIsLoadingReplies(true);
+    setReplyLookupError("");
+    setHasCheckedReplies(true);
+
+    try {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/support-ticket-replies?email=${encodeURIComponent(email)}`);
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Unable to load admin replies.");
+        }
+
+        setAdminReplies(result.replies || []);
+      } catch {
+        const { data, error } = await supabase
+          .from("support_tickets")
+          .select("id, message, admin_reply, admin_replied_at, status, created_at")
+          .eq("user_email", email)
+          .not("admin_reply", "is", null)
+          .order("admin_replied_at", { ascending: false });
+
+        if (error) {
+          throw new Error(error.message || "Unable to load admin replies.");
+        }
+
+        setAdminReplies((data || []).filter((item) => String(item.admin_reply || "").trim()));
+      }
+    } catch (error) {
+      setAdminReplies([]);
+      setReplyLookupError(error.message || "Unable to load admin replies right now.");
+    } finally {
+      setIsLoadingReplies(false);
+    }
+  };
 
   return (
     <div className="app-page-shell animate-fade-in">
@@ -394,6 +444,75 @@ const HelpCenter = () => {
               {submitError && <p className="text-rose-400 text-sm text-center">{submitError}</p>}
             </div>
           </form>
+
+          <div className="w-full max-w-2xl rounded-3xl border border-blue-400/20 bg-[#1e293b]/45 p-6 backdrop-blur-md">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="theme-text-primary text-xl font-bold">Replies from AutoValueLK Admins</h3>
+                <p className="theme-text-secondary mt-2 text-sm leading-6">
+                  Enter the same email you used in the contact form to check admin replies.
+                </p>
+              </div>
+              <span className="w-fit rounded-full border border-blue-400/25 bg-blue-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">
+                Admin reply
+              </span>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <input
+                type="email"
+                value={replyEmail}
+                onChange={(event) => setReplyEmail(event.target.value)}
+                placeholder="Your email address"
+                className="w-full rounded-xl border border-slate-700/50 bg-[#0f172a]/60 px-5 py-3 outline-none transition focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20"
+              />
+              <button
+                type="button"
+                onClick={() => fetchAdminReplies()}
+                disabled={isLoadingReplies}
+                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLoadingReplies ? "Checking..." : "Check replies"}
+              </button>
+            </div>
+
+            {replyLookupError && <p className="mt-3 text-sm text-rose-400">{replyLookupError}</p>}
+
+            <div className="mt-5 space-y-4">
+              {isLoadingReplies ? (
+                <div className="rounded-2xl border border-slate-700/60 bg-slate-900/50 p-5 text-sm text-slate-300">
+                  Loading replies from AutoValueLK admins...
+                </div>
+              ) : adminReplies.length > 0 ? (
+                adminReplies.map((reply) => (
+                  <div key={reply.id} className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-5">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-semibold uppercase tracking-[0.16em] text-emerald-200">
+                        Reply from AutoValueLK Admins
+                      </p>
+                      <span className="text-xs text-emerald-200/70">
+                        {reply.admin_replied_at
+                          ? new Date(reply.admin_replied_at).toLocaleString()
+                          : "Recently replied"}
+                      </span>
+                    </div>
+                    <div className="rounded-xl border border-slate-700/50 bg-slate-950/35 p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Your message</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-300 whitespace-pre-wrap">{reply.message}</p>
+                    </div>
+                    <div className="mt-4 rounded-xl border border-emerald-300/20 bg-slate-950/45 p-4">
+                      <p className="text-xs uppercase tracking-[0.16em] text-emerald-200">Admin reply</p>
+                      <p className="mt-2 text-sm leading-6 text-emerald-50 whitespace-pre-wrap">{reply.admin_reply}</p>
+                    </div>
+                  </div>
+                ))
+              ) : hasCheckedReplies ? (
+                <div className="rounded-2xl border border-slate-700/60 bg-slate-900/50 p-5 text-sm text-slate-300">
+                  No admin replies found for this email yet.
+                </div>
+              ) : null}
+            </div>
+          </div>
         </div>
       </div>
     </div>

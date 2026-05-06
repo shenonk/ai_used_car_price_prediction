@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Users } from 'lucide-react';
 import api from '../services/api';
 import { supabaseAdmin } from '../utils/supabaseClient';
@@ -28,6 +28,126 @@ const formatRelativeTime = (dateStr) => {
     return `${days} day${days !== 1 ? 's' : ''} ago`;
 };
 
+const getDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
+const getRecentDateKeys = (days) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return Array.from({ length: days }, (_, index) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() - (days - 1 - index));
+        return getDateKey(date);
+    });
+};
+
+const formatTrendLabel = (dateKey) => {
+    const date = new Date(`${dateKey}T00:00:00`);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+function ActivityTrendPopover({ trendData, loading, error, title, subtitle, todayLabel = 'today', chartLabel }) {
+    const trend = trendData?.trend || [];
+    const todayCount = trendData?.today?.count ?? 0;
+    const weekTotal = trend.reduce((sum, item) => sum + Number(item.count || 0), 0);
+    const maxCount = Math.max(1, ...trend.map((item) => Number(item.count || 0)));
+    const chartWidth = 380;
+    const chartHeight = 148;
+    const chartTop = 18;
+    const chartBottom = 112;
+    const chartRange = chartBottom - chartTop;
+    const points = trend.map((item, index) => {
+        const x = trend.length > 1 ? 18 + (index * (chartWidth - 36)) / (trend.length - 1) : chartWidth / 2;
+        const y = chartBottom - (Number(item.count || 0) / maxCount) * chartRange;
+        return { x, y, ...item };
+    });
+    const linePoints = points.map((point) => `${point.x},${point.y}`).join(' ');
+    const areaPoints = points.length
+        ? `${points[0].x},${chartBottom} ${linePoints} ${points[points.length - 1].x},${chartBottom}`
+        : '';
+
+    return (
+        <div className="absolute left-1/2 top-[calc(100%+0.9rem)] z-50 w-[28rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-3xl border-2 border-blue-300/45 bg-slate-950 p-5 shadow-[0_28px_80px_rgba(15,23,42,0.85)] ring-1 ring-blue-400/20 backdrop-blur-xl">
+            <div className="absolute -top-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-l-2 border-t-2 border-blue-300/45 bg-slate-950" />
+            <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">{title}</p>
+                    <p className="mt-1 text-sm text-slate-300">{subtitle}</p>
+                </div>
+                <div className="rounded-2xl border border-blue-300/25 bg-blue-400/10 px-4 py-3 text-right">
+                    <p className="text-3xl font-bold text-white">{Number(todayCount).toLocaleString()}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-200">{todayLabel}</p>
+                </div>
+            </div>
+
+            {loading ? (
+                <div className="flex h-40 items-center justify-center text-sm text-slate-300">
+                    <svg className="mr-2 h-4 w-4 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Loading trend
+                </div>
+            ) : error ? (
+                <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+                    {error}
+                </div>
+            ) : (
+                <>
+                    <div className="rounded-2xl border border-slate-700/70 bg-slate-900/70 px-3 py-4">
+                    <svg className="h-40 w-full overflow-visible" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label={chartLabel}>
+                        <defs>
+                            <linearGradient id="predictionTrendArea" x1="0" x2="0" y1="0" y2="1">
+                                <stop offset="0%" stopColor="#60a5fa" stopOpacity="0.55" />
+                                <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.08" />
+                            </linearGradient>
+                        </defs>
+                        <line x1="18" x2={chartWidth - 18} y1={chartBottom} y2={chartBottom} stroke="#334155" strokeWidth="1.5" />
+                        <line x1="18" x2={chartWidth - 18} y1={chartTop} y2={chartTop} stroke="#334155" strokeWidth="1.5" strokeDasharray="5 7" />
+                        {areaPoints && <polygon points={areaPoints} fill="url(#predictionTrendArea)" />}
+                        {points.length > 0 && <polyline points={linePoints} fill="none" stroke="#93c5fd" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />}
+                        {points.map((point) => (
+                            <g key={point.date}>
+                                <rect
+                                    x={point.x - 7}
+                                    y={point.y}
+                                    width="14"
+                                    height={Math.max(2, chartBottom - point.y)}
+                                    rx="4"
+                                    fill="rgba(96, 165, 250, 0.34)"
+                                />
+                                <circle cx={point.x} cy={point.y} r="5.5" fill="#0f172a" stroke="#bfdbfe" strokeWidth="2.5" />
+                                <text x={point.x} y={Math.max(12, point.y - 10)} textAnchor="middle" className="fill-blue-100 text-[11px] font-bold">
+                                    {Number(point.count || 0)}
+                                </text>
+                                <text x={point.x} y="140" textAnchor="middle" className="fill-slate-300 text-[10px] font-semibold">
+                                    {point.label.split(' ')[1]}
+                                </text>
+                            </g>
+                        ))}
+                    </svg>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                        <div className="rounded-2xl border border-slate-700/70 bg-slate-900/60 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">7-day total</p>
+                            <p className="mt-1 text-2xl font-bold text-white">{weekTotal.toLocaleString()}</p>
+                        </div>
+                        <div className="rounded-2xl border border-blue-300/25 bg-blue-400/10 p-3">
+                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-200">Best day</p>
+                            <p className="mt-1 text-2xl font-bold text-blue-100">{maxCount.toLocaleString()}</p>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 function Dashboard() {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -36,11 +156,23 @@ function Dashboard() {
     const [dauLoading, setDauLoading] = useState(true);
     const [recentUsers, setRecentUsers] = useState([]);
     const [usersLoading, setUsersLoading] = useState(true);
+    const [activeInsightCard, setActiveInsightCard] = useState('');
+    const [predictionTrend, setPredictionTrend] = useState(null);
+    const [predictionTrendLoading, setPredictionTrendLoading] = useState(false);
+    const [predictionTrendError, setPredictionTrendError] = useState('');
+    const [dauTrend, setDauTrend] = useState(null);
+    const [dauTrendLoading, setDauTrendLoading] = useState(false);
+    const [dauTrendError, setDauTrendError] = useState('');
+    const insightDelayRef = useRef(null);
 
     useEffect(() => {
         fetchStats();
         fetchDAU();
         fetchRecentUsers();
+    }, []);
+
+    useEffect(() => () => {
+        window.clearTimeout(insightDelayRef.current);
     }, []);
 
     const fetchDAU = async () => {
@@ -159,11 +291,110 @@ function Dashboard() {
         }
     };
 
+    const fetchPredictionTrend = async () => {
+        if (predictionTrend || predictionTrendLoading) return;
+
+        try {
+            setPredictionTrendLoading(true);
+            setPredictionTrendError('');
+            const res = await api.get('/api/admin/prediction-trends?days=7');
+            setPredictionTrend(res.data);
+        } catch {
+            setPredictionTrendError('Unable to load prediction trend right now.');
+        } finally {
+            setPredictionTrendLoading(false);
+        }
+    };
+
+    const buildDauTrendFromUsers = (users) => {
+        const dateKeys = getRecentDateKeys(7);
+        const counts = Object.fromEntries(dateKeys.map((dateKey) => [dateKey, 0]));
+
+        (users || []).forEach((user) => {
+            if (!user.last_sign_in_at) return;
+            const dateKey = getDateKey(new Date(user.last_sign_in_at));
+            if (dateKey in counts) {
+                counts[dateKey] += 1;
+            }
+        });
+
+        const trend = dateKeys.map((dateKey) => ({
+            date: dateKey,
+            label: formatTrendLabel(dateKey),
+            count: counts[dateKey],
+        }));
+
+        return {
+            days: 7,
+            today: trend[trend.length - 1],
+            trend,
+        };
+    };
+
+    const fetchDauTrend = async () => {
+        if (dauTrend || dauTrendLoading) return;
+
+        try {
+            setDauTrendLoading(true);
+            setDauTrendError('');
+
+            if (!supabaseAdmin) {
+                throw new Error('No service role key found.');
+            }
+
+            const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
+                page: 1,
+                perPage: 1000,
+            });
+
+            if (usersError) {
+                throw usersError;
+            }
+
+            setDauTrend(buildDauTrendFromUsers(data?.users || []));
+        } catch (err) {
+            console.warn('DAU trend fetch issue:', err.message);
+            const dateKeys = getRecentDateKeys(7);
+            const emptyTrend = dateKeys.map((dateKey) => ({
+                date: dateKey,
+                label: formatTrendLabel(dateKey),
+                count: 0,
+            }));
+            setDauTrend({
+                days: 7,
+                today: emptyTrend[emptyTrend.length - 1],
+                trend: emptyTrend,
+            });
+            setDauTrendError('Unable to load DAU trend right now.');
+        } finally {
+            setDauTrendLoading(false);
+        }
+    };
+
+    const scheduleInsight = (insightName) => {
+        window.clearTimeout(insightDelayRef.current);
+        insightDelayRef.current = window.setTimeout(() => {
+            setActiveInsightCard(insightName);
+            if (insightName === 'predictions') {
+                fetchPredictionTrend();
+            }
+            if (insightName === 'dau') {
+                fetchDauTrend();
+            }
+        }, 1000);
+    };
+
+    const hideInsight = () => {
+        window.clearTimeout(insightDelayRef.current);
+        setActiveInsightCard('');
+    };
+
     const statCards = stats
         ? [
             {
                 title: 'Total Predictions',
                 value: stats.total_predictions?.toLocaleString() || '-',
+                insight: 'predictions',
                 icon: (
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -185,6 +416,7 @@ function Dashboard() {
                     dauCount.toLocaleString()
                 ),
                 subtext: 'Unique logins in the last 24 hours',
+                insight: 'dau',
                 icon: <Users className="w-6 h-6" strokeWidth={1.8} />,
                 color: 'emerald',
             },
@@ -273,8 +505,13 @@ function Dashboard() {
                     return (
                         <div
                             key={i}
-                            className={`bg-gray-900/60 border ${colors.border} rounded-2xl p-5 hover:bg-gray-900/80 hover:-translate-y-1 transition-all duration-300 shadow-lg ${colors.glow}`}
+                            className={`relative ${activeInsightCard === card.insight ? 'z-50' : 'z-0'} bg-gray-900/60 border ${colors.border} rounded-2xl p-5 hover:bg-gray-900/80 hover:-translate-y-1 transition-all duration-300 shadow-lg ${colors.glow}`}
                             style={{ animationDelay: `${i * 80}ms` }}
+                            tabIndex={card.insight ? 0 : undefined}
+                            onMouseEnter={() => card.insight && scheduleInsight(card.insight)}
+                            onMouseLeave={hideInsight}
+                            onFocus={() => card.insight && scheduleInsight(card.insight)}
+                            onBlur={hideInsight}
                         >
                             <div className="flex items-start justify-between mb-4">
                                 <div className={`w-11 h-11 rounded-xl ${colors.bg} ${colors.text} flex items-center justify-center`}>
@@ -286,6 +523,27 @@ function Dashboard() {
                                 {card.value}
                             </p>
                             {card.subtext && <p className="text-slate-500 text-xs mt-1">{card.subtext}</p>}
+                            {card.insight === 'predictions' && activeInsightCard === 'predictions' && (
+                                <ActivityTrendPopover
+                                    trendData={predictionTrend}
+                                    loading={predictionTrendLoading}
+                                    error={predictionTrendError}
+                                    title="Prediction activity"
+                                    subtitle="Daily prediction trend for the last 7 days"
+                                    chartLabel="Daily prediction trend chart"
+                                />
+                            )}
+                            {card.insight === 'dau' && activeInsightCard === 'dau' && (
+                                <ActivityTrendPopover
+                                    trendData={dauTrend}
+                                    loading={dauTrendLoading}
+                                    error={dauTrendError}
+                                    title="DAU activity"
+                                    subtitle="Daily active user trend from latest sign-ins"
+                                    todayLabel="active today"
+                                    chartLabel="Daily active user trend chart"
+                                />
+                            )}
                         </div>
                     );
                 })}

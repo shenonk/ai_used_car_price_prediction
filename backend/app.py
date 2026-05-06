@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 import json
 import os
@@ -168,7 +168,8 @@ class NotificationPayload(BaseModel):
 
 
 class SupportTicketStatusPayload(BaseModel):
-    status: str = Field(..., pattern="^(open|read|closed)$")
+    status: str | None = Field(default=None, pattern="^(open|read|closed)$")
+    admin_reply: str | None = Field(default=None, max_length=4000)
 
 
 class SupportTicketCreatePayload(BaseModel):
@@ -284,6 +285,7 @@ def get_default_admin_store() -> dict[str, Any]:
             "mae": 285000,
             "last_training_date": "2026-02-28",
         },
+        "prediction_daily_counts": {},
         "loan_rate": {
             "interest_rate": 12.5,
             "min_down_payment": 20,
@@ -407,6 +409,7 @@ def ensure_admin_store_shape(store: dict[str, Any]) -> dict[str, Any]:
     merged["support_tickets"] = store.get("support_tickets", defaults["support_tickets"])
     merged["marketplace_listings"] = store.get("marketplace_listings", defaults["marketplace_listings"])
     merged["payments"] = store.get("payments", defaults["payments"])
+    merged["prediction_daily_counts"] = store.get("prediction_daily_counts", defaults["prediction_daily_counts"])
     return merged
 
 
@@ -1082,6 +1085,32 @@ def fetch_prediction_count_from_supabase() -> int | None:
     return len(rows) if isinstance(rows, list) else None
 
 
+def fetch_prediction_daily_counts_from_supabase(start_date_key: str) -> dict[str, int]:
+    start_iso = f"{start_date_key}T00:00:00Z"
+    try:
+        rows = make_supabase_rest_request(
+            f"/rest/v1/predictions?select=created_at&created_at=gte.{quote(start_iso, safe='')}",
+            method="GET",
+            headers={
+                "Range-Unit": "items",
+                "Range": "0-9999",
+            },
+        )
+    except Exception as error:
+        log_warning(f"Unable to load prediction trend from Supabase: {error}")
+        return {}
+
+    counts: dict[str, int] = {}
+    for row in rows if isinstance(rows, list) else []:
+        timestamp = parse_record_timestamp(row.get("created_at"))
+        if timestamp is None:
+            continue
+        date_key = timestamp.date().isoformat()
+        counts[date_key] = counts.get(date_key, 0) + 1
+
+    return counts
+
+
 def get_stored_prediction_count(stats: dict[str, Any]) -> int:
     try:
         value = int(stats.get("total_predictions") or 0)
@@ -1103,7 +1132,62 @@ def record_prediction_metric() -> None:
     with price_model_state.admin_lock:
         stats = price_model_state.admin_store.setdefault("stats", {})
         stats["total_predictions"] = get_stored_prediction_count(stats) + 1
+        today_key = datetime.now(timezone.utc).date().isoformat()
+        daily_counts = price_model_state.admin_store.setdefault("prediction_daily_counts", {})
+        try:
+            current_day_count = int(daily_counts.get(today_key) or 0)
+        except (TypeError, ValueError):
+            current_day_count = 0
+        daily_counts[today_key] = current_day_count + 1
         persist_admin_store()
+
+
+def get_recent_prediction_date_keys(days: int) -> list[str]:
+    today = datetime.now(timezone.utc).date()
+    return [
+        (today - timedelta(days=offset)).isoformat()
+        for offset in range(days - 1, -1, -1)
+    ]
+
+
+def get_prediction_daily_trend(days: int) -> list[dict[str, Any]]:
+    date_keys = get_recent_prediction_date_keys(days)
+    local_counts = price_model_state.admin_store.get("prediction_daily_counts", {})
+    supabase_counts = fetch_prediction_daily_counts_from_supabase(date_keys[0])
+    merged_counts: dict[str, int] = {}
+
+    for date_key in date_keys:
+        try:
+            local_count = int(local_counts.get(date_key) or 0)
+        except (TypeError, ValueError):
+            local_count = 0
+        merged_counts[date_key] = max(local_count, supabase_counts.get(date_key, 0))
+
+    should_persist_counts = False
+    for date_key in date_keys:
+        try:
+            stored_count = int((local_counts or {}).get(date_key) or 0)
+        except (TypeError, ValueError):
+            stored_count = 0
+        if merged_counts[date_key] > stored_count:
+            should_persist_counts = True
+            break
+
+    if should_persist_counts:
+        with price_model_state.admin_lock:
+            stored_daily_counts = price_model_state.admin_store.setdefault("prediction_daily_counts", {})
+            for date_key, count in merged_counts.items():
+                stored_daily_counts[date_key] = count
+            persist_admin_store()
+
+    return [
+        {
+            "date": date_key,
+            "label": datetime.fromisoformat(date_key).strftime("%b %d"),
+            "count": merged_counts[date_key],
+        }
+        for date_key in date_keys
+    ]
 
 
 def hydrate_admin_store_from_supabase() -> None:
@@ -1567,12 +1651,34 @@ def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]
             "user_email": payload.user_email.strip(),
             "message": payload.message.strip(),
             "status": payload.status,
+            "admin_reply": "",
+            "admin_replied_at": None,
             "created_at": utc_now_iso(),
         }
         tickets.append(ticket)
         persist_admin_store()
 
     return {"message": "Support ticket created successfully.", "ticket": ticket}
+
+
+@app.get("/api/support-ticket-replies")
+def get_support_ticket_replies(email: str = Query(..., min_length=3)) -> dict[str, Any]:
+    normalized_email = email.strip().lower()
+    replies = [
+        {
+            "id": item.get("id"),
+            "message": item.get("message", ""),
+            "admin_reply": item.get("admin_reply", ""),
+            "admin_replied_at": item.get("admin_replied_at"),
+            "status": item.get("status", "open"),
+            "created_at": item.get("created_at"),
+        }
+        for item in price_model_state.admin_store.get("support_tickets", [])
+        if str(item.get("user_email", "")).strip().lower() == normalized_email
+        and str(item.get("admin_reply", "")).strip()
+    ]
+    replies.sort(key=lambda item: item.get("admin_replied_at") or item.get("created_at") or "", reverse=True)
+    return {"replies": replies}
 
 
 @app.post("/api/chat")
@@ -1816,6 +1922,20 @@ def get_admin_stats(_token: str = Depends(require_admin)) -> dict[str, Any]:
     return stats
 
 
+@app.get("/api/admin/prediction-trends")
+def get_admin_prediction_trends(
+    days: int = Query(default=7, ge=1, le=30),
+    _token: str = Depends(require_admin),
+) -> dict[str, Any]:
+    trend = get_prediction_daily_trend(days)
+    today = trend[-1] if trend else {"date": datetime.now(timezone.utc).date().isoformat(), "label": "Today", "count": 0}
+    return {
+        "days": days,
+        "today": today,
+        "trend": trend,
+    }
+
+
 @app.get("/api/admin/loan-rate")
 def get_loan_rate(_token: str = Depends(require_admin)) -> dict[str, Any]:
     return price_model_state.admin_store["loan_rate"]
@@ -1925,7 +2045,16 @@ def update_support_ticket(
         if ticket is None:
             raise admin_error("Support ticket not found.", status_code=404)
 
-        ticket["status"] = payload.status
+        if payload.status is not None:
+            ticket["status"] = payload.status
+
+        if payload.admin_reply is not None:
+            reply = payload.admin_reply.strip()
+            ticket["admin_reply"] = reply
+            ticket["admin_replied_at"] = utc_now_iso() if reply else None
+            if reply:
+                ticket["status"] = "closed"
+
         persist_admin_store()
 
     return {"message": "Support ticket updated successfully.", "ticket": ticket}

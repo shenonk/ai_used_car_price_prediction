@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Marketplace from "./pages/Marketplace";
 import MySubmittedAds from "./pages/MySubmittedAds";
@@ -17,6 +18,7 @@ import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import VehicleFinancingOptions from "./pages/VehicleFinancingOptions";
 import HelpCenter from "./pages/HelpCenter";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 function App() {
   return (
@@ -28,17 +30,68 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/" element={<Home />} />
 
         {/* MAIN LAYOUT WRAP */}
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Dashboard />} />
+        <Route element={<MainLayout />}>
+          <Route
+            path="dashboard"
+            element={
+              <ProtectedRoute
+                authMessage="Please log in to access this page."
+                authSubMessage="Dashboard, saved activity, and account insights are available only for logged-in users."
+              >
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route path="marketplace" element={<Marketplace />} />
-          <Route path="marketplace/my-ads" element={<MySubmittedAds />} />
+          <Route
+            path="marketplace/my-ads"
+            element={
+              <ProtectedRoute
+                authMessage="Please log in to access this page."
+                authSubMessage="Your listing status and seller activity are available only in your account."
+              >
+                <MySubmittedAds />
+              </ProtectedRoute>
+            }
+          />
           <Route path="price-check" element={<PriceCheck />} />
           <Route path="results" element={<Results />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="notifications" element={<Notifications />} />
-          <Route path="settings" element={<Settings />} />
+          <Route
+            path="analytics"
+            element={
+              <ProtectedRoute
+                authMessage="Please log in to access this page."
+                authSubMessage="Saved prediction trends and deeper account analytics are available only for logged-in users."
+              >
+                <Analytics />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="notifications"
+            element={
+              <ProtectedRoute
+                authMessage="Please log in to access this page."
+                authSubMessage="Personal notifications and alert activity are available only for logged-in users."
+              >
+                <Notifications />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
+              <ProtectedRoute
+                authMessage="Please log in to access this page."
+                authSubMessage="Profile, password, alerts, and notification settings are available only for logged-in users."
+              >
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
           <Route path="financing" element={<VehicleFinancingOptions />} />
           <Route path="help" element={<HelpCenter />} />
         </Route>

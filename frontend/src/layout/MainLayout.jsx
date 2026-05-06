@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X, LogIn, LogOut, Lock } from "lucide-react";
+import { Home, LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X, LogIn, LogOut } from "lucide-react";
 import { isLoggedIn, logout, getCurrentUser } from "../utils/auth";
 import logo from "../assets/logo/autovaluelk-logo.png";
 import { useTranslation } from "react-i18next";
@@ -55,7 +55,7 @@ const MainLayout = () => {
       label: t("dashboard"),
       icon: <LayoutDashboard className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Sign in to open your dashboard.",
+      authMessage: "Please log in to access this page.",
       authSubMessage: "Dashboard, saved activity, and account insights are available only for logged-in users.",
     },
     {
@@ -83,7 +83,7 @@ const MainLayout = () => {
       label: t("analytics"),
       icon: <BarChart3 className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Sign in to view analytics.",
+      authMessage: "Please log in to access this page.",
       authSubMessage: "Saved prediction trends and deeper account analytics are available only for logged-in users.",
     },
     {
@@ -91,7 +91,7 @@ const MainLayout = () => {
       label: t("notifications"),
       icon: <Bell className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Sign in to view notifications.",
+      authMessage: "Please log in to access this page.",
       authSubMessage: "Personal notifications and alert activity are available only for logged-in users.",
     },
     {
@@ -99,7 +99,7 @@ const MainLayout = () => {
       label: t("settings"),
       icon: <Settings className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Sign in to open settings.",
+      authMessage: "Please log in to access this page.",
       authSubMessage: "Profile, password, alerts, and notification settings are available only for logged-in users.",
     },
     {
@@ -186,11 +186,6 @@ const MainLayout = () => {
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="flex-1 font-medium">{item.label}</span>
-              {item.requiresAuth && !loggedIn && (
-                <span className="theme-text-muted" aria-hidden="true">
-                  <Lock className="h-4 w-4" />
-                </span>
-              )}
               <span className="nav-chevron" aria-hidden="true">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6l6 6-6 6" />

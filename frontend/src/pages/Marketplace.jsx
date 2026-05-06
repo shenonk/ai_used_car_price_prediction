@@ -360,7 +360,7 @@ function Marketplace() {
     if (!isAuthenticated) {
       event.preventDefault();
       redirectToLogin(
-        "Sign in to view your submitted ads.",
+        "Please log in to access this page.",
         "Your listing status and seller activity are available only in your account."
       );
     }
@@ -373,7 +373,7 @@ function Marketplace() {
 
     if (!session?.access_token) {
       redirectToLogin(
-        "Sign in to publish a marketplace ad.",
+        "Please log in to access this page.",
         "Creating, managing, and boosting vehicle listings is available only for logged-in users."
       );
       return;

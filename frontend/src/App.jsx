@@ -38,7 +38,7 @@ function App() {
             path="dashboard"
             element={
               <ProtectedRoute
-                authMessage="Sign in to open your dashboard."
+                authMessage="Please log in to access this page."
                 authSubMessage="Dashboard, saved activity, and account insights are available only for logged-in users."
               >
                 <Dashboard />
@@ -50,7 +50,7 @@ function App() {
             path="marketplace/my-ads"
             element={
               <ProtectedRoute
-                authMessage="Sign in to view your submitted ads."
+                authMessage="Please log in to access this page."
                 authSubMessage="Your listing status and seller activity are available only in your account."
               >
                 <MySubmittedAds />
@@ -63,7 +63,7 @@ function App() {
             path="analytics"
             element={
               <ProtectedRoute
-                authMessage="Sign in to view analytics."
+                authMessage="Please log in to access this page."
                 authSubMessage="Saved prediction trends and deeper account analytics are available only for logged-in users."
               >
                 <Analytics />
@@ -74,7 +74,7 @@ function App() {
             path="notifications"
             element={
               <ProtectedRoute
-                authMessage="Sign in to view notifications."
+                authMessage="Please log in to access this page."
                 authSubMessage="Personal notifications and alert activity are available only for logged-in users."
               >
                 <Notifications />
@@ -85,7 +85,7 @@ function App() {
             path="settings"
             element={
               <ProtectedRoute
-                authMessage="Sign in to open settings."
+                authMessage="Please log in to access this page."
                 authSubMessage="Profile, password, alerts, and notification settings are available only for logged-in users."
               >
                 <Settings />

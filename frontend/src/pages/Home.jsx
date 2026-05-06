@@ -9,6 +9,7 @@ import {
   Gauge,
   HandCoins,
   LineChart,
+  ShieldCheck,
   ShoppingBag,
   SlidersHorizontal,
   Sparkles,
@@ -86,6 +87,24 @@ const proofPoints = [
   "Machine learning based vehicle valuation workflow",
   "Data preprocessing and label normalization for cleaner inputs",
   "Decision support across prediction, marketplace, analytics, and financing",
+];
+
+const aboutCards = [
+  {
+    title: "Purpose-built valuation",
+    description: "AutoValueLK helps users estimate vehicle prices and make better selling, buying, and financing decisions.",
+    icon: Gauge,
+  },
+  {
+    title: "AI and analytics support",
+    description: "The platform combines prediction workflows, trend views, and result interpretation for clearer market understanding.",
+    icon: LineChart,
+  },
+  {
+    title: "Sri Lankan market focus",
+    description: "Features are shaped around local vehicle brands, marketplace behavior, and practical user workflows in Sri Lanka.",
+    icon: ShieldCheck,
+  },
 ];
 
 function Home() {
@@ -259,6 +278,37 @@ function Home() {
               </article>
             );
           })}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8" aria-labelledby="about-title">
+        <div className="grid gap-8 rounded-[2rem] border border-slate-800 bg-slate-950/45 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.22)] sm:p-8 lg:grid-cols-[0.9fr_1.1fr] lg:p-10">
+          <div className="home-reveal">
+            <p className="text-sm font-bold uppercase text-cyan-300">About AutoValueLK</p>
+            <h2 id="about-title" className="mt-3 text-3xl font-bold text-white sm:text-4xl">
+              A smarter decision layer for Sri Lankan vehicle pricing.
+            </h2>
+            <p className="mt-5 text-sm leading-7 text-slate-400">
+              AutoValueLK is an AI-powered vehicle valuation and marketplace platform designed to support Sri Lankan users with price prediction, market analytics, listing workflows, and financing insight in one connected experience.
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            {aboutCards.map((item) => {
+              const Icon = item.icon;
+              return (
+                <article key={item.title} className="home-feature-card flex gap-4 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-400/10 text-blue-200">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-7 text-slate-400">{item.description}</p>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </section>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X, LogIn, LogOut } from "lucide-react";
+import { Home, LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X, LogIn, LogOut } from "lucide-react";
 import { isLoggedIn, logout, getCurrentUser } from "../utils/auth";
 import logo from "../assets/logo/autovaluelk-logo.png";
 import { useTranslation } from "react-i18next";
@@ -47,6 +47,11 @@ const MainLayout = () => {
   const navItems = [
     {
       path: "/",
+      label: "Home",
+      icon: <Home className="w-5 h-5" />,
+    },
+    {
+      path: "/dashboard",
       label: t("dashboard"),
       icon: <LayoutDashboard className="w-5 h-5" />,
     },

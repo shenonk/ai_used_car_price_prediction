@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Marketplace from "./pages/Marketplace";
 import MySubmittedAds from "./pages/MySubmittedAds";
@@ -28,10 +29,11 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/" element={<Home />} />
 
         {/* MAIN LAYOUT WRAP */}
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Dashboard />} />
+        <Route element={<MainLayout />}>
+          <Route path="dashboard" element={<Dashboard />} />
           <Route path="marketplace" element={<Marketplace />} />
           <Route path="marketplace/my-ads" element={<MySubmittedAds />} />
           <Route path="price-check" element={<PriceCheck />} />

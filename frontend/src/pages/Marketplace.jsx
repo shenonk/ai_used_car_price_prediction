@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
-import bumpedSticker from "../assets/marketplace-stickers/bumped.png";
+import bumpedSticker from "../assets/marketplace-stickers/bumpup.png";
 import spotlightSticker from "../assets/marketplace-stickers/spotlight.png";
 import urgentSticker from "../assets/marketplace-stickers/urgent.png";
 
@@ -675,6 +675,8 @@ function Marketplace() {
     [lightboxImage, selectedCarImages]
   );
 
+  const getCardBoostSticker = (car) => getBoostSticker(car);
+
   const showPreviousLightboxImage = () => {
     if (selectedCarImages.length <= 1) return;
     const currentIndex = lightboxIndex >= 0 ? lightboxIndex : 0;
@@ -1017,12 +1019,14 @@ function Marketplace() {
                       <p className="marketplace-price text-right text-sm font-bold text-cyan-300">
                         {formatCurrency(car.price, locale)}
                       </p>
-                      {getBoostSticker(car) && (
-                        <img
-                          src={getBoostSticker(car).src}
-                          alt={getBoostSticker(car).alt}
-                          className="marketplace-boost-sticker h-12 w-auto object-contain"
-                        />
+                      {getCardBoostSticker(car) && (
+                        <div className="marketplace-boost-sticker-wrap">
+                          <img
+                            src={getCardBoostSticker(car).src}
+                            alt={getCardBoostSticker(car).alt}
+                            className="marketplace-boost-sticker h-[4.75rem] w-auto max-w-[11rem] object-contain object-right"
+                          />
+                        </div>
                       )}
                     </div>
                   </div>

@@ -1202,7 +1202,7 @@ html[data-theme="light"] .marketplace-page .marketplace-boost-card__icon {
 }
 
 html[data-theme="light"] .marketplace-page .marketplace-boost-sticker {
-  filter: drop-shadow(0 10px 16px rgba(15, 23, 42, 0.08));
+  filter: drop-shadow(0 12px 18px rgba(15, 23, 42, 0.1));
 }
 
 html[data-theme="light"] .marketplace-page .marketplace-listing-card:hover {
@@ -1395,9 +1395,81 @@ html[data-theme="light"] .marketplace-page .marketplace-panel .bg-cyan-500\/10 {
     0 20px 40px rgba(30, 64, 175, 0.24);
 }
 
+.marketplace-boost-sticker-wrap {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  min-height: 5.25rem;
+  padding-right: 0.125rem;
+  transition: transform 180ms ease, filter 180ms ease;
+  cursor: default;
+}
+
+.marketplace-boost-sticker-wrap::after {
+  content: "";
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.3rem;
+  width: 72%;
+  height: 1rem;
+  border-radius: 999px;
+  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.38) 0%, rgba(15, 23, 42, 0.18) 48%, rgba(15, 23, 42, 0) 78%);
+  filter: blur(8px);
+  pointer-events: none;
+  z-index: 0;
+  transition: transform 180ms ease, opacity 180ms ease, filter 180ms ease;
+}
+
 .marketplace-boost-sticker {
   pointer-events: none;
-  filter: drop-shadow(0 12px 18px rgba(2, 6, 23, 0.2));
+  position: relative;
+  z-index: 1;
+  transform-origin: center right;
+  transition: transform 180ms ease, filter 180ms ease;
+  filter:
+    drop-shadow(0 6px 8px rgba(15, 23, 42, 0.18))
+    drop-shadow(0 18px 22px rgba(2, 6, 23, 0.18));
+}
+
+.marketplace-listing-card:hover .marketplace-boost-sticker-wrap,
+.marketplace-listing-card:focus-within .marketplace-boost-sticker-wrap {
+  transform: translateY(-1px);
+}
+
+.marketplace-listing-card:hover .marketplace-boost-sticker-wrap::after,
+.marketplace-listing-card:focus-within .marketplace-boost-sticker-wrap::after {
+  opacity: 0.95;
+  transform: scale(1.08);
+  filter: blur(10px);
+}
+
+.marketplace-listing-card:hover .marketplace-boost-sticker,
+.marketplace-listing-card:focus-within .marketplace-boost-sticker {
+  transform: scale(1.12);
+  filter:
+    drop-shadow(0 10px 12px rgba(15, 23, 42, 0.2))
+    drop-shadow(0 22px 28px rgba(2, 6, 23, 0.22));
+}
+
+.marketplace-boost-sticker-wrap:hover,
+.marketplace-boost-sticker-wrap:focus-within {
+  transform: translateY(-2px);
+}
+
+.marketplace-boost-sticker-wrap:hover::after,
+.marketplace-boost-sticker-wrap:focus-within::after {
+  opacity: 1;
+  transform: scale(1.14);
+  filter: blur(11px);
+}
+
+.marketplace-boost-sticker-wrap:hover .marketplace-boost-sticker,
+.marketplace-boost-sticker-wrap:focus-within .marketplace-boost-sticker {
+  transform: scale(1.2);
+  filter:
+    drop-shadow(0 12px 14px rgba(15, 23, 42, 0.22))
+    drop-shadow(0 26px 32px rgba(2, 6, 23, 0.24));
 }
 
 .marketplace-primary-button {

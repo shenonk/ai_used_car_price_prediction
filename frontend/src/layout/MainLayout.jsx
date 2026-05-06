@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X, LogIn, LogOut } from "lucide-react";
+import { Home, LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X, LogIn, LogOut, Lock } from "lucide-react";
 import { isLoggedIn, logout, getCurrentUser } from "../utils/auth";
 import logo from "../assets/logo/autovaluelk-logo.png";
 import { useTranslation } from "react-i18next";
@@ -54,6 +54,9 @@ const MainLayout = () => {
       path: "/dashboard",
       label: t("dashboard"),
       icon: <LayoutDashboard className="w-5 h-5" />,
+      requiresAuth: true,
+      authMessage: "Sign in to open your dashboard.",
+      authSubMessage: "Dashboard, saved activity, and account insights are available only for logged-in users.",
     },
     {
       path: "/marketplace",
@@ -79,16 +82,25 @@ const MainLayout = () => {
       path: "/analytics",
       label: t("analytics"),
       icon: <BarChart3 className="w-5 h-5" />,
+      requiresAuth: true,
+      authMessage: "Sign in to view analytics.",
+      authSubMessage: "Saved prediction trends and deeper account analytics are available only for logged-in users.",
     },
     {
       path: "/notifications",
       label: t("notifications"),
       icon: <Bell className="w-5 h-5" />,
+      requiresAuth: true,
+      authMessage: "Sign in to view notifications.",
+      authSubMessage: "Personal notifications and alert activity are available only for logged-in users.",
     },
     {
       path: "/settings",
       label: t("settings"),
       icon: <Settings className="w-5 h-5" />,
+      requiresAuth: true,
+      authMessage: "Sign in to open settings.",
+      authSubMessage: "Profile, password, alerts, and notification settings are available only for logged-in users.",
     },
     {
       path: "/help",
@@ -109,6 +121,22 @@ const MainLayout = () => {
     } else {
       navigate("/login");
     }
+  };
+
+  const handleNavClick = (event, item) => {
+    setIsMobileMenuOpen(false);
+
+    if (!item.requiresAuth || loggedIn) {
+      return;
+    }
+
+    event.preventDefault();
+    navigate("/login", {
+      state: {
+        authMessage: item.authMessage || "Please sign in to continue.",
+        authSubMessage: item.authSubMessage || "This feature is available only for logged-in users.",
+      },
+    });
   };
 
   return (
@@ -154,10 +182,15 @@ const MainLayout = () => {
               key={item.path}
               to={item.path}
               className={`nav-link ${isActive(item.path) ? "active" : ""}`}
-              onClick={() => setIsMobileMenuOpen(false)}
+              onClick={(event) => handleNavClick(event, item)}
             >
               <span className="nav-icon">{item.icon}</span>
               <span className="flex-1 font-medium">{item.label}</span>
+              {item.requiresAuth && !loggedIn && (
+                <span className="theme-text-muted" aria-hidden="true">
+                  <Lock className="h-4 w-4" />
+                </span>
+              )}
               <span className="nav-chevron" aria-hidden="true">
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6l6 6-6 6" />

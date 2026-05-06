@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { loadStripe } from "@stripe/stripe-js";
 import {
@@ -194,8 +194,10 @@ const getListingPriority = (listing) => {
 
 function Marketplace() {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const locale = getLocale(i18n.resolvedLanguage);
   const [cars, setCars] = useState([]);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [filters, setFilters] = useState({
     brand: ALL_BRANDS,
     model: ALL_MODELS,
@@ -310,6 +312,75 @@ function Marketplace() {
     setIsSpotlight(false);
     setIsBumped(false);
     setIsPublishModalOpen(false);
+  };
+
+  useEffect(() => {
+    let isActive = true;
+
+    const syncAuthState = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (isActive) {
+        setIsAuthenticated(Boolean(session?.access_token));
+      }
+    };
+
+    syncAuthState();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (isActive) {
+        setIsAuthenticated(Boolean(session?.access_token));
+      }
+    });
+
+    return () => {
+      isActive = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const redirectToLogin = (authMessage, authSubMessage) => {
+    navigate("/login", {
+      state: {
+        authMessage,
+        authSubMessage,
+      },
+    });
+  };
+
+  const handleProtectedMarketplaceNavigation = (event) => {
+    if (submitState.saving) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      event.preventDefault();
+      redirectToLogin(
+        "Sign in to view your submitted ads.",
+        "Your listing status and seller activity are available only in your account."
+      );
+    }
+  };
+
+  const openPublishModal = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      redirectToLogin(
+        "Sign in to publish a marketplace ad.",
+        "Creating, managing, and boosting vehicle listings is available only for logged-in users."
+      );
+      return;
+    }
+
+    setSubmitState((current) => ({ ...current, error: "", success: "" }));
+    setIsPublishModalOpen(true);
   };
 
   const createListing = async (boostOverrides) => {
@@ -770,6 +841,7 @@ function Marketplace() {
             <div className="flex flex-col gap-2 sm:flex-row">
               <Link
                 to="/marketplace/my-ads"
+                onClick={handleProtectedMarketplaceNavigation}
                 className="inline-flex items-center justify-center rounded-xl border border-slate-700/70 bg-slate-900/80 px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500/80 hover:text-white"
               >
                 {t("marketplace.my_ads.title")}
@@ -777,10 +849,7 @@ function Marketplace() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setSubmitState((current) => ({ ...current, error: "", success: "" }));
-                  setIsPublishModalOpen(true);
-                }}
+                onClick={openPublishModal}
                 className="marketplace-primary-button marketplace-primary-cta group inline-flex items-center justify-center gap-2.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5"
                 style={{
                   background: "linear-gradient(135deg, #1d4ed8 0%, #0284c7 55%, #0f766e 100%)",

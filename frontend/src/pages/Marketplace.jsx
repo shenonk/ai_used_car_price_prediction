@@ -10,6 +10,7 @@ import {
   Gauge,
   Search,
   ShieldCheck,
+  ShoppingBag,
   Sparkles,
   Star,
   X,
@@ -779,14 +780,25 @@ function Marketplace() {
   }, []);
 
   return (
-    <div className="marketplace-page theme-app-bg min-h-screen px-6 py-8 md:px-8">
-      <section className="marketplace-panel card relative mb-4 overflow-hidden animate-fade-in">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.16),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(34,211,238,0.12),_transparent_28%)]" />
-        <div className="relative p-4 md:p-5">
-          <form onSubmit={handleSearchSubmit}>
-            <div className="marketplace-search-shell flex flex-col gap-3 rounded-[28px] border border-slate-700/70 bg-slate-950/60 p-3 shadow-[0_24px_60px_rgba(2,6,23,0.28)] backdrop-blur-xl md:flex-row md:items-center">
-              <div className="marketplace-search-input-group flex min-w-0 flex-1 items-center gap-3 rounded-[22px] border border-slate-800/80 bg-slate-900/80 px-4 py-3.5 transition duration-300">
-                <div className="marketplace-search-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] text-cyan-100">
+    <div className="marketplace-page app-page-shell">
+      <div className="mb-5 animate-fade-in">
+        <div className="dashboard-page-eyebrow mb-4">
+          <ShoppingBag className="h-3.5 w-3.5 text-blue-300" />
+          {t("marketplace.inventory.title")}
+        </div>
+        <h1 className="text-3xl md:text-[2.6rem] font-bold tracking-tight text-white">
+          {t("marketplace.inventory.title")}
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+          {t("marketplace.inventory.description")}
+        </p>
+      </div>
+
+      <section className="mb-4 animate-fade-in">
+        <form onSubmit={handleSearchSubmit}>
+          <div className="marketplace-search-shell flex flex-col gap-2.5 rounded-[24px] border border-slate-700/70 bg-slate-950/70 p-2.5 shadow-[0_18px_42px_rgba(2,6,23,0.2)] backdrop-blur-xl md:flex-row md:items-center">
+              <div className="marketplace-search-input-group flex min-w-0 flex-1 items-center gap-3 rounded-[20px] border border-slate-800/80 bg-slate-900/85 px-4 py-3 transition duration-300">
+                <div className="marketplace-search-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] text-cyan-100">
                   <Search className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -808,7 +820,7 @@ function Marketplace() {
                   <button
                     type="button"
                     onClick={handleSearchReset}
-                    className="marketplace-search-clear inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border border-slate-700/70 bg-slate-900/80 text-slate-300 transition"
+                    className="marketplace-search-clear inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border border-slate-700/70 bg-slate-900/80 text-slate-300 transition"
                     aria-label={t("marketplace.search.clear", { defaultValue: "Clear search" })}
                   >
                     <X className="h-4 w-4" />
@@ -818,19 +830,18 @@ function Marketplace() {
 
               <button
                 type="submit"
-                className="marketplace-search-submit marketplace-primary-button inline-flex items-center justify-center gap-2 rounded-[22px] border px-6 py-4 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 md:min-w-[182px]"
+                className="marketplace-search-submit marketplace-primary-button inline-flex items-center justify-center gap-2 rounded-[20px] border px-5 py-3.5 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 md:min-w-[172px]"
               >
                 <Search className="h-4 w-4" />
                 {t("marketplace.search.submit", { defaultValue: "Search ads" })}
               </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </section>
 
       {!appliedSearch && (
-      <section className="marketplace-panel card mt-4 animate-fade-in animate-delay-200 overflow-hidden">
-        <div className="relative p-3.5 md:p-4">
+      <section className="marketplace-panel card mt-3 animate-fade-in animate-delay-200 overflow-hidden">
+        <div className="relative p-3.5">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.14),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.12),_transparent_28%)]" />
           <div className="relative flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-lg">
@@ -889,20 +900,7 @@ function Marketplace() {
       </section>
       )}
 
-      <section className="marketplace-panel card mt-4 p-4 md:p-5 animate-fade-in animate-delay-100">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-white">{t("marketplace.inventory.title")}</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              {t("marketplace.inventory.description")}
-            </p>
-          </div>
-          <div className="hidden items-center gap-2 rounded-full border border-slate-700/60 bg-slate-900/70 px-4 py-2 text-sm text-slate-300 md:flex">
-            <Sparkles className="h-4 w-4 text-cyan-300" />
-            {t("marketplace.inventory.synced")}
-          </div>
-        </div>
-
+      <section className="marketplace-panel card mt-3 p-4 animate-fade-in animate-delay-100">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <FilterSelect
             label={t("marketplace.labels.brand")}
@@ -937,8 +935,8 @@ function Marketplace() {
         )}
       </section>
 
-      <section className="mt-5 animate-fade-in animate-delay-200">
-        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+      <section className="mt-4 animate-fade-in animate-delay-200">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-2xl font-semibold text-white">{t("marketplace.listings.title")}</h2>
             <p className="mt-1 text-sm text-slate-400">

@@ -211,6 +211,11 @@ function Marketplace() {
   const [form, setForm] = useState(initialForm);
   const [selectedImages, setSelectedImages] = useState([]);
   const [submitState, setSubmitState] = useState({ saving: false, error: "", success: "" });
+  const [descriptionState, setDescriptionState] = useState({
+    generating: false,
+    error: "",
+    source: "",
+  });
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isUrgent, setIsUrgent] = useState(false);
   const [isSpotlight, setIsSpotlight] = useState(false);
@@ -309,6 +314,7 @@ function Marketplace() {
   const resetPublishFlow = () => {
     setForm(initialForm);
     setSelectedImages([]);
+    setDescriptionState({ generating: false, error: "", source: "" });
     setIsUrgent(false);
     setIsSpotlight(false);
     setIsBumped(false);
@@ -571,6 +577,79 @@ function Marketplace() {
       ...current,
       [key]: value,
     }));
+
+    if (key === "vehicle_description" && descriptionState.error) {
+      setDescriptionState((current) => ({
+        ...current,
+        error: "",
+      }));
+    }
+  };
+
+  const handleGenerateDescription = async () => {
+    const brand = form.brand.trim();
+    const model = form.model.trim();
+
+    if (!brand || !model) {
+      setDescriptionState({
+        generating: false,
+        error: "Enter the brand and model first, then generate a description.",
+        source: "",
+      });
+      return;
+    }
+
+    setDescriptionState((current) => ({
+      ...current,
+      generating: true,
+      error: "",
+    }));
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Please log in before generating a marketplace description.");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/marketplace/generate-description`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          brand,
+          model,
+          year: form.year ? Number(form.year) : null,
+          mileage: form.mileage ? Number(form.mileage) : null,
+          fuel_type: form.fuel_type || null,
+          transmission: form.transmission || null,
+          condition: form.condition || null,
+          vehicle_location: form.vehicle_location.trim() || null,
+        }),
+      });
+
+      const result = await parseApiResponse(response, "Unable to generate a vehicle description right now.");
+
+      setForm((current) => ({
+        ...current,
+        vehicle_description: result.description || current.vehicle_description,
+      }));
+      setDescriptionState({
+        generating: false,
+        error: "",
+        source: result.model || "",
+      });
+    } catch (error) {
+      setDescriptionState({
+        generating: false,
+        error: error.message || "Unable to generate a vehicle description right now.",
+        source: "",
+      });
+    }
   };
 
   const handleSearchSubmit = (event) => {
@@ -1442,12 +1521,67 @@ function Marketplace() {
                   onChange={(value) => handleInputChange("vehicle_location", value)}
                   placeholder="Maharagama, Colombo"
                 />
-                <TextareaField
-                  label={t("marketplace.labels.vehicle_description")}
-                  value={form.vehicle_description}
-                  onChange={(value) => handleInputChange("vehicle_description", value)}
-                  placeholder={t("marketplace.placeholders.vehicle_description")}
-                />
+                <div className="marketplace-field block">
+                  <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <span className="block text-sm font-medium text-slate-300">
+                        {t("marketplace.labels.vehicle_description")}
+                      </span>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Write your own description, or generate one from the vehicle details.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={handleGenerateDescription}
+                        disabled={descriptionState.generating || submitState.saving}
+                        className="inline-flex items-center gap-2 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100 transition hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {descriptionState.generating ? (
+                          <>
+                            <svg className="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                            </svg>
+                            Generating
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3.5 w-3.5" />
+                            {form.vehicle_description.trim() ? "Regenerate" : "Generate with AI"}
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm((current) => ({ ...current, vehicle_description: "" }));
+                          setDescriptionState((current) => ({ ...current, error: "", source: "" }));
+                        }}
+                        disabled={descriptionState.generating || submitState.saving || !form.vehicle_description.trim()}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-900/80 px-3.5 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-300 transition hover:border-slate-500/80 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Write manually
+                      </button>
+                    </div>
+                  </div>
+                  <TextareaField
+                    label=""
+                    value={form.vehicle_description}
+                    onChange={(value) => handleInputChange("vehicle_description", value)}
+                    placeholder={t("marketplace.placeholders.vehicle_description")}
+                    hideLabel
+                  />
+                  {descriptionState.error && (
+                    <p className="mt-2 text-sm text-rose-300">{descriptionState.error}</p>
+                  )}
+                  {descriptionState.source && !descriptionState.error && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Description ready. You can edit it before publishing.
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -1605,10 +1739,10 @@ function InputField({ label, value, onChange, placeholder, type = "text" }) {
   );
 }
 
-function TextareaField({ label, value, onChange, placeholder }) {
+function TextareaField({ label, value, onChange, placeholder, hideLabel = false }) {
   return (
     <label className="marketplace-field block">
-      <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
+      {!hideLabel && <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>}
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}

@@ -204,6 +204,17 @@ class StripeVerifyPayload(BaseModel):
     session_id: str = Field(..., min_length=1)
 
 
+class MarketplaceDescriptionRequest(BaseModel):
+    brand: str = Field(..., min_length=1)
+    model: str = Field(..., min_length=1)
+    year: int | None = Field(default=None, ge=1900, le=2100)
+    mileage: int | None = Field(default=None, ge=0)
+    fuel_type: str | None = Field(default=None, min_length=1)
+    transmission: str | None = Field(default=None, min_length=1)
+    condition: str | None = Field(default=None, min_length=1)
+    vehicle_location: str | None = Field(default=None, min_length=1)
+
+
 def normalize_input(data: dict[str, Any]) -> dict[str, Any]:
     return {
         **data,
@@ -832,6 +843,121 @@ def extract_gemini_response_text(payload: dict[str, Any]) -> str:
                 chunks.append(text.strip())
 
     return "\n".join(chunks).strip()
+
+
+def format_marketplace_description_field(value: object) -> str:
+    return str(value or "").strip()
+
+
+def build_marketplace_description_prompt(payload: MarketplaceDescriptionRequest) -> str:
+    details = [
+        f"Brand: {format_marketplace_description_field(payload.brand)}",
+        f"Model: {format_marketplace_description_field(payload.model)}",
+        f"Year: {payload.year if payload.year else 'Not provided'}",
+        f"Mileage (km): {payload.mileage if payload.mileage is not None else 'Not provided'}",
+        f"Fuel type: {format_marketplace_description_field(payload.fuel_type) or 'Not provided'}",
+        f"Transmission: {format_marketplace_description_field(payload.transmission) or 'Not provided'}",
+        f"Condition: {format_marketplace_description_field(payload.condition) or 'Not provided'}",
+        f"Location: {format_marketplace_description_field(payload.vehicle_location) or 'Not provided'}",
+    ]
+
+    return (
+        "Write a rich, polished vehicle marketplace description for AutoValueLK in Sri Lanka.\n"
+        "Blend a general model overview with the exact listing details provided below.\n"
+        "If the model is well known, you may include accurate general knowledge about its design, segment, engine family, "
+        "driving character, practicality, or commonly known features.\n"
+        "Clearly separate general model knowledge from seller-specific listing facts.\n"
+        "Use the provided listing details exactly for year, mileage, fuel type, transmission, condition, and location.\n"
+        "Do not invent unsupported seller-specific claims such as accident-free, single owner, full service history, "
+        "original paint, mint condition, doctor used, lady used, brand-new options, or added features unless they were explicitly provided.\n"
+        "Do not mention AI, generated text, markdown, bullet points, emojis, or placeholders.\n"
+        "Write 120 to 220 words in 1 or 2 smooth paragraphs, in natural English, suitable for a real marketplace ad.\n"
+        "Make it sound premium, informative, and trustworthy rather than generic.\n"
+        "End with a concise seller-oriented closing line inviting interested buyers to contact for more details or viewing.\n\n"
+        + "\n".join(details)
+    )
+
+
+def build_local_marketplace_description(payload: MarketplaceDescriptionRequest) -> str:
+    title = " ".join(
+        part for part in [
+            str(payload.year).strip() if payload.year else "",
+            format_marketplace_description_field(payload.brand),
+            format_marketplace_description_field(payload.model),
+        ]
+        if part
+    ).strip()
+    vehicle_name = title or "This vehicle"
+
+    sentences = [f"{vehicle_name} is available for sale through AutoValueLK marketplace."]
+
+    spec_bits = []
+    if format_marketplace_description_field(payload.condition):
+        spec_bits.append(f"in {format_marketplace_description_field(payload.condition).lower()} condition")
+    if format_marketplace_description_field(payload.fuel_type):
+        spec_bits.append(f"with a {format_marketplace_description_field(payload.fuel_type).lower()} setup")
+    if format_marketplace_description_field(payload.transmission):
+        spec_bits.append(f"and {format_marketplace_description_field(payload.transmission).lower()} transmission")
+    if payload.mileage is not None:
+        spec_bits.append(f"showing {int(payload.mileage):,} km")
+
+    if spec_bits:
+        sentences.append(f"It is listed {' '.join(spec_bits)}.")
+
+    if format_marketplace_description_field(payload.vehicle_location):
+        sentences.append(
+            f"The vehicle is located in {format_marketplace_description_field(payload.vehicle_location)} for viewing arrangements."
+        )
+
+    sentences.append("Please contact the seller for more details and availability.")
+    return " ".join(sentences)
+
+
+def request_gemini_marketplace_description(payload: MarketplaceDescriptionRequest) -> tuple[str, str]:
+    fallback = build_local_marketplace_description(payload)
+    api_key = get_gemini_api_key()
+    if not api_key:
+        return fallback, "local-fallback"
+
+    request_payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": build_marketplace_description_prompt(payload)}],
+            }
+        ],
+        "generationConfig": {
+            "maxOutputTokens": 520,
+            "temperature": 0.72,
+        },
+    }
+    model_name = get_gemini_model()
+    model = quote(model_name, safe="")
+    request = UrlRequest(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={quote(api_key, safe='')}",
+        method="POST",
+        data=json.dumps(request_payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+        },
+    )
+
+    try:
+        with urlopen(request, timeout=30) as response:
+            response_payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        raw_error = error.read().decode("utf-8", errors="replace")
+        log_warning(f"Gemini marketplace description request failed: {error.code} {raw_error[:300]}")
+        return fallback, "local-fallback"
+    except (URLError, TimeoutError) as error:
+        log_warning(f"Gemini marketplace description request failed: {error}")
+        return fallback, "local-fallback"
+
+    reply = extract_gemini_response_text(response_payload)
+    if not reply:
+        return fallback, "local-fallback"
+
+    return reply, model_name
 
 
 def build_chatbot_contents(payload: ChatRequest) -> list[dict[str, Any]]:
@@ -1762,6 +1888,21 @@ async def create_marketplace_listing(
 
     sync_marketplace_listing_to_supabase(listing)
     return {"message": "Marketplace listing created successfully.", "listing": listing}
+
+
+@app.post("/api/marketplace/generate-description")
+def generate_marketplace_description(
+    payload: MarketplaceDescriptionRequest,
+    requester: dict[str, Any] = Depends(get_requester_identity),
+) -> dict[str, Any]:
+    if not requester["is_authenticated"]:
+        raise admin_error("Please sign in before generating a marketplace description.", status_code=401)
+
+    description, model_name = request_gemini_marketplace_description(payload)
+    return {
+        "description": description,
+        "model": model_name,
+    }
 
 
 @app.get("/api/marketplace/my-listings")

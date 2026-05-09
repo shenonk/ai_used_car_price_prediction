@@ -435,14 +435,29 @@ def persist_admin_store() -> None:
 def load_admin_store() -> None:
     if not ADMIN_STORE_PERSIST_ENABLED:
         price_model_state.admin_store = ensure_admin_store_shape(get_default_admin_store())
+        price_model_state.admin_store["payments"] = normalize_payment_records(
+            price_model_state.admin_store.get("payments", []),
+            price_model_state.admin_store.get("marketplace_listings", []),
+        )
         return
 
     if ADMIN_DATA_PATH.exists():
         with ADMIN_DATA_PATH.open("r", encoding="utf-8") as file:
             loaded_store = json.load(file)
         price_model_state.admin_store = ensure_admin_store_shape(loaded_store)
+        normalized_payments = normalize_payment_records(
+            price_model_state.admin_store.get("payments", []),
+            price_model_state.admin_store.get("marketplace_listings", []),
+        )
+        if normalized_payments != price_model_state.admin_store.get("payments", []):
+            price_model_state.admin_store["payments"] = normalized_payments
+            persist_admin_store()
     else:
         price_model_state.admin_store = get_default_admin_store()
+        price_model_state.admin_store["payments"] = normalize_payment_records(
+            price_model_state.admin_store.get("payments", []),
+            price_model_state.admin_store.get("marketplace_listings", []),
+        )
         persist_admin_store()
 
 
@@ -1045,6 +1060,171 @@ def merge_records_by_id(*collections: list[dict[str, Any]]) -> list[dict[str, An
     )
 
 
+def format_legacy_payment_boost_option(payment: dict[str, Any]) -> tuple[str, list[str]]:
+    boost_types = payment.get("boost_types")
+    if isinstance(boost_types, list):
+        normalized = [str(item or "").strip().lower() for item in boost_types if str(item or "").strip()]
+    else:
+        normalized = []
+
+    if not normalized:
+        raw_label = str(payment.get("boost_option") or "").strip().lower()
+        alias_map = {
+            "urgent": "urgent",
+            "spotlight": "spotlight",
+            "bump": "bump",
+            "bump up": "bump",
+        }
+        if raw_label in alias_map:
+            normalized = [alias_map[raw_label]]
+
+    if not normalized:
+        if payment.get("is_urgent"):
+            normalized.append("urgent")
+        if payment.get("is_spotlight"):
+            normalized.append("spotlight")
+        if payment.get("is_bumped"):
+            normalized.append("bump")
+
+    labels = {
+        "urgent": "Urgent",
+        "spotlight": "Spotlight",
+        "bump": "Bump Up",
+    }
+    unique_normalized: list[str] = []
+    for item in normalized:
+        if item not in labels or item in unique_normalized:
+            continue
+        unique_normalized.append(item)
+
+    formatted_label = ", ".join(labels[item] for item in unique_normalized)
+    return formatted_label, unique_normalized
+
+
+def find_listing_for_payment(payment: dict[str, Any], listings: list[dict[str, Any]]) -> dict[str, Any] | None:
+    listing_id = str(payment.get("listing_id") or payment.get("ad_reference") or "").strip()
+    if listing_id:
+        exact_match = next((item for item in listings if str(item.get("id") or "").strip() == listing_id), None)
+        if exact_match is not None:
+            return exact_match
+
+    user_id = str(payment.get("user_id") or "").strip()
+    brand = str(payment.get("vehicle_brand") or "").strip().lower()
+    model = str(payment.get("vehicle_model") or "").strip().lower()
+    ad_title = str(payment.get("ad_title") or "").strip().lower()
+    candidates = listings
+
+    if user_id:
+        user_matches = [item for item in listings if str(item.get("user_id") or "").strip() == user_id]
+        if user_matches:
+            candidates = user_matches
+
+    if brand or model or ad_title:
+        scored_candidates: list[tuple[int, dict[str, Any]]] = []
+        for item in candidates:
+            score = 0
+            item_brand = str(item.get("brand") or "").strip().lower()
+            item_model = str(item.get("model") or "").strip().lower()
+            item_title = " ".join(
+                [
+                    str(item.get("brand") or "").strip(),
+                    str(item.get("model") or "").strip(),
+                    str(item.get("year") or "").strip(),
+                ]
+            ).strip().lower()
+            if brand and item_brand == brand:
+                score += 2
+            if model and item_model == model:
+                score += 2
+            if ad_title and item_title == ad_title:
+                score += 3
+            if score:
+                scored_candidates.append((score, item))
+
+        if scored_candidates:
+            scored_candidates.sort(
+                key=lambda pair: (pair[0], get_record_timestamp(pair[1])),
+                reverse=True,
+            )
+            return scored_candidates[0][1]
+
+    return sorted(candidates, key=get_record_timestamp, reverse=True)[0] if candidates else None
+
+
+def normalize_payment_record(payment: dict[str, Any], listings: list[dict[str, Any]]) -> dict[str, Any]:
+    listing = find_listing_for_payment(payment, listings)
+    boost_option, boost_types = format_legacy_payment_boost_option(payment)
+    legacy_last4 = str(payment.get("card_last4") or "").strip()
+    payment_method = str(payment.get("payment_method") or "").strip()
+    if not payment_method and legacy_last4:
+        payment_method = f"Card ending {legacy_last4}"
+
+    normalized_status = str(payment.get("payment_status") or "").strip().lower()
+    if normalized_status == "paid":
+        normalized_status = "confirmed"
+    elif normalized_status not in {"confirmed", "pending", "failed"}:
+        normalized_status = "pending" if str(payment.get("stripe_status") or "").strip().lower() in {"processing", "requires_action"} else "confirmed"
+
+    amount_value = payment.get("amount")
+    if amount_value in (None, "", 0, 0.0):
+        amount_value = payment.get("amount_lkr") or 0
+
+    currency = str(payment.get("currency") or "LKR").strip().upper() or "LKR"
+    ad_title = str(payment.get("ad_title") or "").strip()
+    if not ad_title and listing is not None:
+        ad_title = " ".join(
+            [
+                str(listing.get("brand") or "").strip(),
+                str(listing.get("model") or "").strip(),
+                str(listing.get("year") or "").strip(),
+            ]
+        ).strip()
+    if not ad_title:
+        ad_title = " ".join(
+            [
+                str(payment.get("vehicle_brand") or "").strip(),
+                str(payment.get("vehicle_model") or "").strip(),
+            ]
+        ).strip()
+
+    confirmed_at = payment.get("confirmed_at")
+    if not confirmed_at and normalized_status == "confirmed":
+        confirmed_at = payment.get("updated_at") or payment.get("created_at")
+
+    normalized = dict(payment)
+    normalized.update(
+        {
+            "listing_id": str(payment.get("listing_id") or (listing or {}).get("id") or "").strip() or None,
+            "user_id": str(payment.get("user_id") or (listing or {}).get("user_id") or "").strip() or None,
+            "payer_name": str(payment.get("payer_name") or (listing or {}).get("seller_name") or "").strip(),
+            "login_name": str(payment.get("login_name") or (listing or {}).get("username") or "").strip(),
+            "phone_number": str(payment.get("phone_number") or (listing or {}).get("phone_number") or "").strip(),
+            "account_email": str(
+                payment.get("account_email")
+                or (listing or {}).get("account_email")
+                or (listing or {}).get("logged_in_account")
+                or ""
+            ).strip(),
+            "ad_title": ad_title,
+            "boost_option": boost_option,
+            "boost_types": boost_types,
+            "amount": round(float(amount_value or 0), 2),
+            "currency": currency,
+            "payment_status": normalized_status,
+            "stripe_status": str(payment.get("stripe_status") or normalized_status or "").strip(),
+            "payment_method": payment_method,
+            "confirmed_at": confirmed_at,
+            "ad_reference": str(payment.get("ad_reference") or (listing or {}).get("id") or "").strip(),
+            "notes": str(payment.get("notes") or "Ad boost activated after Stripe confirmation.").strip(),
+        }
+    )
+    return normalized
+
+
+def normalize_payment_records(payments: list[dict[str, Any]], listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [normalize_payment_record(item, listings) for item in payments or []]
+
+
 def sync_marketplace_listing_to_supabase(listing: dict[str, Any]) -> None:
     payload = {key: value for key, value in listing.items() if key in MARKETPLACE_LISTING_SYNC_FIELDS}
     try:
@@ -1333,14 +1513,16 @@ def hydrate_admin_store_from_supabase() -> None:
         return
 
     with price_model_state.admin_lock:
-        price_model_state.admin_store["marketplace_listings"] = merge_records_by_id(
+        merged_listings = merge_records_by_id(
             price_model_state.admin_store.get("marketplace_listings", []),
             supabase_listings,
         )
-        price_model_state.admin_store["payments"] = merge_records_by_id(
+        merged_payments = merge_records_by_id(
             price_model_state.admin_store.get("payments", []),
             supabase_payments,
         )
+        price_model_state.admin_store["marketplace_listings"] = merged_listings
+        price_model_state.admin_store["payments"] = normalize_payment_records(merged_payments, merged_listings)
         persist_admin_store()
 
 
@@ -2277,13 +2459,18 @@ def delete_marketplace_listing(listing_id: str, _token: str = Depends(require_ad
 @app.get("/api/admin/payments")
 def get_payments(_token: str = Depends(require_admin)) -> dict[str, Any]:
     local_payments = price_model_state.admin_store["payments"]
+    local_listings = price_model_state.admin_store["marketplace_listings"]
     try:
         supabase_payments = fetch_marketplace_payments_from_supabase()
     except Exception as error:
         log_warning(f"Unable to load admin payments from Supabase: {error}")
         supabase_payments = []
 
-    payments = merge_records_by_id(local_payments, supabase_payments)
+    payments = normalize_payment_records(merge_records_by_id(local_payments, supabase_payments), local_listings)
+    with price_model_state.admin_lock:
+        if payments != price_model_state.admin_store.get("payments", []):
+            price_model_state.admin_store["payments"] = payments
+            persist_admin_store()
     return {"payments": payments}
 
 

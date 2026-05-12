@@ -215,6 +215,12 @@ class MarketplaceDescriptionRequest(BaseModel):
     vehicle_location: str | None = Field(default=None, min_length=1)
 
 
+class AdminFinancingOptionUpdateRequest(BaseModel):
+    status: str | None = Field(default=None, pattern="^(Active|Inactive)$")
+    fixed_rate: float | None = Field(default=None, ge=0)
+    floating_rate: float | None = Field(default=None, ge=0)
+
+
 def normalize_input(data: dict[str, Any]) -> dict[str, Any]:
     return {
         **data,
@@ -635,6 +641,156 @@ def make_supabase_rest_request(
         return None
 
     return json.loads(raw)
+
+
+def make_supabase_auth_admin_request(path: str) -> Any:
+    supabase_url = get_supabase_base_url()
+    supabase_key = get_supabase_api_key()
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("Supabase admin API is not configured.")
+
+    request = UrlRequest(
+        f"{supabase_url}{path}",
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+        },
+    )
+
+    with urlopen(request) as response:
+        raw = response.read().decode("utf-8")
+
+    if not raw:
+        return None
+
+    return json.loads(raw)
+
+
+def fetch_supabase_admin_users(page: int = 1, per_page: int = 1000) -> list[dict[str, Any]]:
+    payload = make_supabase_auth_admin_request(
+        f"/auth/v1/admin/users?page={page}&per_page={per_page}"
+    )
+    users = payload.get("users") if isinstance(payload, dict) else []
+    return users if isinstance(users, list) else []
+
+
+def build_recent_admin_users(limit: int = 15) -> list[dict[str, Any]]:
+    users = fetch_supabase_admin_users(page=1, per_page=max(limit, 1000))
+    sorted_users = sorted(
+        users,
+        key=lambda item: parse_record_timestamp(item.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    return sorted_users[:limit]
+
+
+def get_recent_date_keys(days: int) -> list[str]:
+    today = datetime.now(timezone.utc).date()
+    return [
+        (today - timedelta(days=offset)).isoformat()
+        for offset in range(days - 1, -1, -1)
+    ]
+
+
+def build_admin_dau_snapshot(days: int = 7) -> dict[str, Any]:
+    users = fetch_supabase_admin_users(page=1, per_page=1000)
+    now = datetime.now(timezone.utc)
+    last_24_hours = now - timedelta(hours=24)
+    date_keys = get_recent_date_keys(days)
+    counts = {date_key: 0 for date_key in date_keys}
+    active_today = 0
+
+    for user in users:
+        last_sign_in = parse_record_timestamp(user.get("last_sign_in_at"))
+        if last_sign_in is None:
+            continue
+        if last_sign_in >= last_24_hours:
+            active_today += 1
+        date_key = last_sign_in.date().isoformat()
+        if date_key in counts:
+            counts[date_key] += 1
+
+    trend = [
+        {
+            "date": date_key,
+            "label": datetime.fromisoformat(date_key).strftime("%b %d"),
+            "count": counts[date_key],
+        }
+        for date_key in date_keys
+    ]
+
+    return {
+        "count": active_today,
+        "days": days,
+        "today": trend[-1] if trend else {"date": now.date().isoformat(), "label": "Today", "count": 0},
+        "trend": trend,
+    }
+
+
+def fetch_financing_options_from_supabase() -> list[dict[str, Any]]:
+    rows = make_supabase_rest_request(
+        "/rest/v1/financing_options?select=*&order=created_at.desc",
+        method="GET",
+    )
+    return rows if isinstance(rows, list) else []
+
+
+def create_public_storage_url(bucket_name: str, object_path: str) -> str:
+    supabase_url = get_supabase_base_url()
+    return f"{supabase_url}/storage/v1/object/public/{bucket_name}/{object_path}"
+
+
+def upload_file_to_supabase_storage(bucket_name: str, object_path: str, content: bytes, content_type: str) -> str:
+    supabase_url = get_supabase_base_url()
+    supabase_key = get_supabase_api_key()
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("Supabase storage is not configured.")
+
+    upload_url = f"{supabase_url}/storage/v1/object/{bucket_name}/{quote(object_path, safe='/')}"
+    request = UrlRequest(
+        upload_url,
+        data=content,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": content_type or "application/octet-stream",
+            "x-upsert": "false",
+        },
+    )
+
+    with urlopen(request):
+        pass
+
+    return create_public_storage_url(bucket_name, object_path)
+
+
+def delete_file_from_supabase_storage(public_url: str, bucket_name: str) -> None:
+    supabase_url = get_supabase_base_url()
+    supabase_key = get_supabase_api_key()
+    if not supabase_url or not supabase_key or not public_url:
+        return
+
+    public_prefix = f"{supabase_url}/storage/v1/object/public/{bucket_name}/"
+    if public_prefix not in public_url:
+        return
+
+    object_path = unquote(public_url.split(public_prefix, 1)[-1].strip())
+    if not object_path:
+        return
+
+    request = UrlRequest(
+        f"{supabase_url}/storage/v1/object/{bucket_name}/{quote(object_path, safe='/')}",
+        method="DELETE",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+        },
+    )
+
+    with urlopen(request):
+        pass
 
 
 def get_gemini_api_key() -> str:
@@ -2472,6 +2628,139 @@ def get_payments(_token: str = Depends(require_admin)) -> dict[str, Any]:
             price_model_state.admin_store["payments"] = payments
             persist_admin_store()
     return {"payments": payments}
+
+
+@app.get("/api/admin/users/recent")
+def get_recent_admin_users(
+    limit: int = Query(default=15, ge=1, le=100),
+    _token: str = Depends(require_admin),
+) -> dict[str, Any]:
+    users = build_recent_admin_users(limit=limit)
+    return {"users": users}
+
+
+@app.get("/api/admin/dau")
+def get_admin_dau(_token: str = Depends(require_admin)) -> dict[str, Any]:
+    snapshot = build_admin_dau_snapshot(days=7)
+    return {"count": snapshot["count"]}
+
+
+@app.get("/api/admin/dau-trends")
+def get_admin_dau_trends(
+    days: int = Query(default=7, ge=1, le=30),
+    _token: str = Depends(require_admin),
+) -> dict[str, Any]:
+    return build_admin_dau_snapshot(days=days)
+
+
+@app.get("/api/admin/financing-options")
+def get_admin_financing_options(_token: str = Depends(require_admin)) -> dict[str, Any]:
+    try:
+        facilities = fetch_financing_options_from_supabase()
+    except Exception as error:
+        raise admin_error(f"Unable to load financing options: {error}", status_code=502) from error
+    return {"facilities": facilities}
+
+
+@app.post("/api/admin/financing-options")
+def create_admin_financing_option(
+    name: str = Form(...),
+    type: str = Form(...),
+    fixed_rate: float = Form(default=0),
+    floating_rate: float = Form(default=0),
+    max_ltv: float = Form(default=0),
+    logo_file: UploadFile | None = File(default=None),
+    _token: str = Depends(require_admin),
+) -> dict[str, Any]:
+    logo_url = f"https://ui-avatars.com/api/?name={quote(name, safe='')}&background=random&color=fff"
+
+    if logo_file is not None:
+        file_ext = Path(logo_file.filename or "logo.png").suffix or ".png"
+        object_path = f"{uuid4().hex}{file_ext.lower()}"
+        logo_url = upload_file_to_supabase_storage(
+            "bank_logos",
+            object_path,
+            logo_file.file.read(),
+            logo_file.content_type or "application/octet-stream",
+        )
+
+    payload = {
+        "name": name.strip(),
+        "type": type.strip(),
+        "fixed_rate": round(float(fixed_rate or 0), 2),
+        "floating_rate": round(float(floating_rate or 0), 2),
+        "max_ltv": round(float(max_ltv or 0), 2),
+        "logo_url": logo_url,
+        "status": "Active",
+    }
+
+    try:
+        created = make_supabase_rest_request(
+            "/rest/v1/financing_options",
+            method="POST",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Prefer": "return=representation",
+            },
+        )
+    except Exception as error:
+        raise admin_error(f"Unable to create financing option: {error}", status_code=502) from error
+
+    facility = created[0] if isinstance(created, list) and created else payload
+    return {"facility": facility}
+
+
+@app.put("/api/admin/financing-options/{facility_id}")
+def update_admin_financing_option(
+    facility_id: str,
+    payload: AdminFinancingOptionUpdateRequest,
+    _token: str = Depends(require_admin),
+) -> dict[str, Any]:
+    update_payload = {
+        key: value
+        for key, value in payload.model_dump().items()
+        if value is not None
+    }
+    if not update_payload:
+        raise admin_error("No financing fields were provided to update.", status_code=422)
+
+    try:
+        updated = make_supabase_rest_request(
+            f"/rest/v1/financing_options?id=eq.{quote(facility_id)}",
+            method="PATCH",
+            data=json.dumps(update_payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Prefer": "return=representation",
+            },
+        )
+    except Exception as error:
+        raise admin_error(f"Unable to update financing option: {error}", status_code=502) from error
+
+    facility = updated[0] if isinstance(updated, list) and updated else None
+    return {"facility": facility}
+
+
+@app.delete("/api/admin/financing-options/{facility_id}")
+def delete_admin_financing_option(facility_id: str, _token: str = Depends(require_admin)) -> dict[str, str]:
+    try:
+        existing = make_supabase_rest_request(
+            f"/rest/v1/financing_options?select=id,logo_url&id=eq.{quote(facility_id)}",
+            method="GET",
+        )
+        facility = existing[0] if isinstance(existing, list) and existing else None
+        make_supabase_rest_request(
+            f"/rest/v1/financing_options?id=eq.{quote(facility_id)}",
+            method="DELETE",
+            headers={"Prefer": "return=minimal"},
+        )
+        if isinstance(facility, dict):
+            delete_file_from_supabase_storage(str(facility.get("logo_url") or ""), "bank_logos")
+    except Exception as error:
+        raise admin_error(f"Unable to delete financing option: {error}", status_code=502) from error
+
+    return {"message": "Financing option deleted successfully."}
 
 
 def get_prediction_warning(features: dict[str, Any], predicted_price: float) -> str | None:

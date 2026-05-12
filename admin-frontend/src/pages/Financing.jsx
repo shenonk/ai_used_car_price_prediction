@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabaseAdmin as supabase } from '../utils/supabaseClient';
+import api from '../services/api';
 
 export default function Financing() {
   const [facilities, setFacilities] = useState([]);
@@ -24,13 +24,8 @@ export default function Financing() {
   const fetchFacilities = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('financing_options')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setFacilities(data || []);
+      const { data } = await api.get('/api/admin/financing-options');
+      setFacilities(data?.facilities || []);
     } catch (error) {
       console.error('Error fetching facilities:', error);
       alert('Failed to load facilities.');
@@ -42,12 +37,7 @@ export default function Financing() {
   const toggleStatus = async (id, currentStatus) => {
     try {
       const newStatus = currentStatus === 'Active' ? 'Inactive' : 'Active';
-      const { error } = await supabase
-        .from('financing_options')
-        .update({ status: newStatus })
-        .eq('id', id);
-
-      if (error) throw error;
+      await api.put(`/api/admin/financing-options/${id}`, { status: newStatus });
       setFacilities(facilities.map(f => 
         f.id === id ? { ...f, status: newStatus } : f
       ));
@@ -67,12 +57,7 @@ export default function Financing() {
     try {
       const dbField = field === 'fixedRate' ? 'fixed_rate' : 'floating_rate';
       const numericValue = parseFloat(value) || 0;
-      const { error } = await supabase
-        .from('financing_options')
-        .update({ [dbField]: numericValue })
-        .eq('id', id);
-
-      if (error) throw error;
+      await api.put(`/api/admin/financing-options/${id}`, { [dbField]: numericValue });
     } catch (error) {
       console.error(`Error updating ${field}:`, error);
       alert('Failed to update rate. Reverting to original value.');
@@ -84,26 +69,7 @@ export default function Financing() {
     if (!window.confirm('Are you sure you want to delete this facility?')) return;
     
     try {
-      // 1. Delete record
-      const { error: dbError } = await supabase
-        .from('financing_options')
-        .delete()
-        .eq('id', id);
-
-      if (dbError) throw dbError;
-
-      // 2. If it was uploaded rather than UI Avatar, try to delete the file
-      if (logoUrl && logoUrl.includes('bank_logos')) {
-        const filePath = logoUrl.split('/').pop();
-        if (filePath) {
-          const { error: storageError } = await supabase
-            .storage
-            .from('bank_logos')
-            .remove([filePath]);
-          if (storageError) console.error("Error deleting logo: ", storageError);
-        }
-      }
-
+      await api.delete(`/api/admin/financing-options/${id}`);
       setFacilities(facilities.filter(f => f.id !== id));
     } catch (error) {
       console.error('Error deleting facility:', error);
@@ -126,42 +92,23 @@ export default function Financing() {
     
     try {
       setIsSubmitting(true);
-      let logo_url = `https://ui-avatars.com/api/?name=${encodeURIComponent(newFacility.name)}&background=random&color=fff`;
-
+      const formData = new FormData();
+      formData.append('name', newFacility.name);
+      formData.append('type', newFacility.type);
+      formData.append('fixed_rate', String(parseFloat(newFacility.fixedRate) || 0));
+      formData.append('floating_rate', String(parseFloat(newFacility.floatingRate) || 0));
+      formData.append('max_ltv', String(parseFloat(newFacility.maxLtv) || 0));
       if (newFacility.logoFile) {
-        const fileExt = newFacility.logoFile.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('bank_logos')
-          .upload(filePath, newFacility.logoFile);
-
-        if (uploadError) throw uploadError;
-
-        const { data: publicUrlData } = supabase.storage
-          .from('bank_logos')
-          .getPublicUrl(filePath);
-
-        logo_url = publicUrlData.publicUrl;
+        formData.append('logo_file', newFacility.logoFile);
       }
 
-      const { data, error } = await supabase
-        .from('financing_options')
-        .insert([{
-          name: newFacility.name,
-          type: newFacility.type,
-          fixed_rate: parseFloat(newFacility.fixedRate) || 0,
-          floating_rate: parseFloat(newFacility.floatingRate) || 0,
-          max_ltv: parseFloat(newFacility.maxLtv) || 0,
-          logo_url: logo_url,
-          status: 'Active'
-        }])
-        .select();
+      const { data } = await api.post('/api/admin/financing-options', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
-      if (error) throw error;
-
-      setFacilities([data[0], ...facilities]);
+      setFacilities([data.facility, ...facilities]);
       setIsModalOpen(false);
       setNewFacility({
         name: '',

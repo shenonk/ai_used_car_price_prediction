@@ -246,7 +246,7 @@ function VehicleFinancingOptions() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0f172a] p-8">
+        <div className="app-page-shell">
             <AppModal
                 isOpen={Boolean(dialog)}
                 tone="warning"
@@ -279,9 +279,9 @@ function VehicleFinancingOptions() {
           1️⃣ VEHICLE PRICE SUMMARY CARD
           ========================================= */}
             <div
-                className="relative overflow-hidden rounded-2xl p-8 mb-8 animate-fade-in"
+                className="dashboard-page-hero relative overflow-hidden mb-8 animate-fade-in"
                 style={{
-                    background: "linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #06b6d4 100%)",
+                    background: "linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.1), rgba(6,182,212,0.08)), linear-gradient(135deg, rgba(15,23,42,0.97), rgba(15,23,42,0.9))",
                 }}
             >
                 <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
@@ -301,16 +301,16 @@ function VehicleFinancingOptions() {
                     {!vehicle && <p className="text-white/80 text-sm mb-6">Explore loan and leasing options for your vehicle</p>}
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div className="bg-white/20 backdrop-blur-sm rounded-xl p-5">
-                            <p className="text-white/70 text-xs mb-1 uppercase tracking-wide font-medium">Predicted Price</p>
+                        <div className="bg-white/8 backdrop-blur-sm rounded-2xl p-5 border border-white/10">
+                            <p className="text-slate-300 text-xs mb-2 uppercase tracking-wider font-semibold">Predicted Price</p>
                             <h2 className="text-3xl font-bold text-white">LKR {formattedPrice}</h2>
                         </div>
-                        <div className="bg-white/20 backdrop-blur-sm rounded-xl p-5">
-                            <p className="text-white/70 text-xs mb-1 uppercase tracking-wide font-medium">Down Payment ({downPaymentPercent}%)</p>
+                        <div className="bg-white/8 backdrop-blur-sm rounded-2xl p-5 border border-white/10">
+                            <p className="text-slate-300 text-xs mb-2 uppercase tracking-wider font-semibold">Down Payment ({downPaymentPercent}%)</p>
                             <h2 className="text-3xl font-bold text-white">LKR {downPayment.toLocaleString("en-LK")}</h2>
                         </div>
-                        <div className="bg-white/20 backdrop-blur-sm rounded-xl p-5">
-                            <p className="text-white/70 text-xs mb-1 uppercase tracking-wide font-medium">Loan Amount</p>
+                        <div className="bg-white/8 backdrop-blur-sm rounded-2xl p-5 border border-white/10">
+                            <p className="text-slate-300 text-xs mb-2 uppercase tracking-wider font-semibold">Loan Amount</p>
                             <h2 className="text-3xl font-bold text-white">LKR {loanAmount.toLocaleString("en-LK")}</h2>
                         </div>
                     </div>
@@ -320,7 +320,7 @@ function VehicleFinancingOptions() {
             {/* =========================================
           2️⃣ FINANCING TYPE SELECTOR
           ========================================= */}
-            <div className="card p-6 mb-6 animate-fade-in animate-delay-100">
+            <div className="dashboard-page-panel mb-6 animate-fade-in animate-delay-100">
                 <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                     <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
@@ -330,9 +330,9 @@ function VehicleFinancingOptions() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <button
                         onClick={() => { setFinancingType("loan"); setSelectedInstitution(null); }}
-                        className={`p-5 rounded-xl border-2 transition-all duration-300 text-left ${financingType === "loan"
+                        className={`p-5 rounded-2xl border-2 transition-all duration-300 text-left backdrop-blur-sm ${financingType === "loan"
                                 ? "border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10"
-                                : "border-slate-700 bg-slate-800/30 hover:border-slate-600"
+                                : "border-slate-700/50 bg-slate-800/20 hover:border-slate-600 hover:-translate-y-1"
                             }`}
                     >
                         <div className="flex items-center gap-3 mb-2">
@@ -358,9 +358,9 @@ function VehicleFinancingOptions() {
                     </button>
                     <button
                         onClick={() => { setFinancingType("leasing"); setSelectedInstitution(null); }}
-                        className={`p-5 rounded-xl border-2 transition-all duration-300 text-left ${financingType === "leasing"
+                        className={`p-5 rounded-2xl border-2 transition-all duration-300 text-left backdrop-blur-sm ${financingType === "leasing"
                                 ? "border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/10"
-                                : "border-slate-700 bg-slate-800/30 hover:border-slate-600"
+                                : "border-slate-700/50 bg-slate-800/20 hover:border-slate-600 hover:-translate-y-1"
                             }`}
                     >
                         <div className="flex items-center gap-3 mb-2">
@@ -386,9 +386,9 @@ function VehicleFinancingOptions() {
                     </button>
                     <button
                         onClick={() => { setFinancingType("draft"); setSelectedInstitution(null); }}
-                        className={`p-5 rounded-xl border-2 transition-all duration-300 text-left ${financingType === "draft"
+                        className={`p-5 rounded-2xl border-2 transition-all duration-300 text-left backdrop-blur-sm ${financingType === "draft"
                                 ? "border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10"
-                                : "border-slate-700 bg-slate-800/30 hover:border-slate-600"
+                                : "border-slate-700/50 bg-slate-800/20 hover:border-slate-600 hover:-translate-y-1"
                             }`}
                     >
                         <div className="flex items-center gap-3 mb-2">
@@ -418,7 +418,7 @@ function VehicleFinancingOptions() {
             {/* =========================================
           3️⃣ FINANCIAL INSTITUTION SELECTION
           ========================================= */}
-            <div className="card p-6 mb-6 animate-fade-in animate-delay-200 min-h-[300px]">
+            <div className="dashboard-page-panel mb-6 animate-fade-in animate-delay-200 min-h-[300px]">
                 <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                     <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -448,9 +448,9 @@ function VehicleFinancingOptions() {
                                 <button
                                     key={inst.id}
                                     onClick={() => { setSelectedInstitution(inst); setTenure(Math.min(tenure, inst.maxTenure)); }}
-                                    className={`p-5 rounded-xl border-2 transition-all duration-300 text-left ${colors.hover} ${isSelected
+                                    className={`p-5 rounded-2xl border-2 transition-all duration-300 text-left backdrop-blur-sm ${colors.hover} ${isSelected
                                             ? `${colors.border} ${colors.bg} shadow-lg`
-                                            : "border-slate-700/50 bg-slate-800/30 hover:bg-slate-800/50"
+                                            : "border-slate-700/50 bg-slate-800/20 hover:bg-slate-800/40 hover:-translate-y-1"
                                         }`}
                                 >
                                     <div className="flex items-center gap-3 mb-3">
@@ -500,7 +500,7 @@ function VehicleFinancingOptions() {
           4️⃣ LOAN / LEASING CALCULATION PANEL
           ========================================= */}
             {selectedInstitution && (
-                <div className="card p-6 mb-6 animate-fade-in">
+                <div className="dashboard-page-panel mb-6 animate-fade-in">
                     <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                         <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -579,7 +579,7 @@ function VehicleFinancingOptions() {
                             { label: "Monthly Installment", value: `LKR ${emi.toLocaleString("en-LK")}`, icon: "💰", color: "text-purple-400" },
                             { label: "Total Payable", value: `LKR ${totalPayable.toLocaleString("en-LK")}`, icon: "🧾", color: "text-rose-400" },
                         ].map((item, i) => (
-                            <div key={i} className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 hover:border-slate-600/50 transition-all duration-300">
+                            <div key={i} className="bg-slate-800/40 border border-slate-700/40 rounded-2xl p-4 hover:border-slate-600/50 hover:-translate-y-1 transition-all duration-300 backdrop-blur-sm">
                                 <div className="text-xl mb-2">{item.icon}</div>
                                 <p className="text-xs text-slate-500 uppercase tracking-wide font-medium mb-1">{item.label}</p>
                                 <p className={`text-sm font-bold ${item.color}`}>{item.value}</p>
@@ -588,7 +588,7 @@ function VehicleFinancingOptions() {
                     </div>
 
                     {/* Total Interest */}
-                    <div className="mt-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-between">
+                    <div className="mt-6 p-4 rounded-2xl bg-blue-500/8 border border-blue-500/15 flex items-center justify-between backdrop-blur-sm">
                         <div className="flex items-center gap-2">
                             <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -609,7 +609,7 @@ function VehicleFinancingOptions() {
             {/* =========================================
           5️⃣ FINANCING COMPARISON TABLE
           ========================================= */}
-            <div className="card p-6 animate-fade-in animate-delay-300">
+            <div className="dashboard-page-panel animate-fade-in animate-delay-300">
                 <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                     <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -701,7 +701,7 @@ function VehicleFinancingOptions() {
             <div className="flex flex-col sm:flex-row gap-4 mt-8 animate-fade-in animate-delay-400">
                 <button
                     onClick={() => navigate("/results", { state: { vehicle, predictedPrice } })}
-                    className="flex-1 btn-secondary flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-semibold transition-all duration-300"
+                    className="flex-1 btn-secondary flex items-center justify-center gap-2 py-4 px-6 rounded-2xl font-semibold transition-all duration-300 backdrop-blur-sm"
                 >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -712,7 +712,7 @@ function VehicleFinancingOptions() {
                 <button
                     onClick={handleDownloadPDF}
                     disabled={downloading || institutions.length === 0}
-                    className="flex-1 btn-primary flex items-center justify-center gap-2 py-4 px-6 rounded-xl font-semibold transition-all duration-300 disabled:opacity-70 shadow-lg shadow-blue-500/20"
+                    className="flex-1 btn-primary flex items-center justify-center gap-2 py-4 px-6 rounded-2xl font-bold transition-all duration-300 disabled:opacity-70 shadow-lg shadow-blue-500/15"
                 >
                     {downloading ? (
                         <>

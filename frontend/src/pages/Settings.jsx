@@ -290,7 +290,7 @@ function Settings() {
           </div>
         </div>
       )}
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full">
         <div className="dashboard-page-hero mb-10">
           <div className="dashboard-page-eyebrow mb-4">{t("settings")}</div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-2">{t("settings")}</h1>

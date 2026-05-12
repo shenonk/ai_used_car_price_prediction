@@ -29,7 +29,6 @@ services:
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
-        VITE_SUPABASE_SERVICE_ROLE_KEY: ${VITE_SUPABASE_SERVICE_ROLE_KEY}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL}
     ports:
       - "3001:80"
@@ -47,7 +46,7 @@ services:
     env_file:
       - .env.docker
     volumes:
-      - ./backend/data:/app/data
+      - backend-admin-data:/app/data
     networks:
       - autovalue-network
     restart: unless-stopped
@@ -56,4 +55,7 @@ services:
 networks:
   autovalue-network:
     driver: bridge
+
+volumes:
+  backend-admin-data:
 

@@ -1,13 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { loadStripe } from "@stripe/stripe-js";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
   ArrowUp,
   CalendarRange,
   ChevronDown,
   Fuel,
   Gauge,
+  MapPin,
+  Move,
+  RotateCcw,
   Search,
   ShieldCheck,
   ShoppingBag,
@@ -15,6 +21,8 @@ import {
   Star,
   X,
   Zap,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
@@ -32,8 +40,216 @@ const stripePromise = STRIPE_PUBLISHABLE_KEY ? loadStripe(STRIPE_PUBLISHABLE_KEY
 const ALL_BRANDS = "__all_brands__";
 const ALL_MODELS = "__all_models__";
 const ALL_FUEL_TYPES = "__all_fuel_types__";
+const ALL_LOCATION_REGIONS = "__all_location_regions__";
+const ALL_LOCATION_CITIES = "__all_location_cities__";
 
 const priceRangeValues = ["all", "under_3m", "3m_6m", "6m_10m", "above_10m"];
+
+const sriLankaLocationRegions = [
+  {
+    key: "colombo",
+    label: "Colombo",
+    province: "Western Province",
+    center: [6.9271, 79.8612],
+    cities: ["Colombo", "Dehiwala-Mount Lavinia", "Moratuwa", "Sri Jayawardenepura Kotte", "Malabe", "Maharagama", "Nugegoda", "Padukka", "Avissawella"],
+  },
+  {
+    key: "gampaha",
+    label: "Gampaha",
+    province: "Western Province",
+    center: [7.084, 80.0098],
+    cities: ["Gampaha", "Negombo", "Kelaniya", "Wattala", "Ja-Ela", "Minuwangoda", "Kadawatha", "Ragama", "Kiribathgoda"],
+  },
+  {
+    key: "kalutara",
+    label: "Kalutara",
+    province: "Western Province",
+    center: [6.5854, 79.9607],
+    cities: ["Kalutara", "Panadura", "Horana", "Beruwala", "Alutgama", "Matugama", "Bandaragama"],
+  },
+  {
+    key: "kandy",
+    label: "Kandy",
+    province: "Central Province",
+    center: [7.2906, 80.6337],
+    cities: ["Kandy", "Gampola", "Nawalapitiya", "Peradeniya", "Akurana", "Kadugannawa", "Kundasale"],
+  },
+  {
+    key: "matale",
+    label: "Matale",
+    province: "Central Province",
+    center: [7.4675, 80.6234],
+    cities: ["Matale", "Dambulla", "Sigiriya", "Pallepola", "Galewela", "Rattota"],
+  },
+  {
+    key: "nuwara_eliya",
+    label: "Nuwara Eliya",
+    province: "Central Province",
+    center: [6.9497, 80.7891],
+    cities: ["Nuwara Eliya", "Hatton", "Talawakele", "Lindula", "Ginigathena", "Walapane"],
+  },
+  {
+    key: "galle",
+    label: "Galle",
+    province: "Southern Province",
+    center: [6.0535, 80.221],
+    cities: ["Galle", "Hikkaduwa", "Ambalangoda", "Baddegama", "Bentota", "Karapitiya", "Elpitiya"],
+  },
+  {
+    key: "matara",
+    label: "Matara",
+    province: "Southern Province",
+    center: [5.9549, 80.555],
+    cities: ["Matara", "Weligama", "Akuressa", "Deniyaya", "Dikwella", "Kekanadurra"],
+  },
+  {
+    key: "hambantota",
+    label: "Hambantota",
+    province: "Southern Province",
+    center: [6.1241, 81.1185],
+    cities: ["Hambantota", "Tangalle", "Beliatta", "Ambalantota", "Tissamaharama"],
+  },
+  {
+    key: "jaffna",
+    label: "Jaffna",
+    province: "Northern Province",
+    center: [9.6615, 80.0255],
+    cities: ["Jaffna", "Chavakachcheri", "Point Pedro", "Valvettithurai", "Nallur"],
+  },
+  {
+    key: "kilinochchi",
+    label: "Kilinochchi",
+    province: "Northern Province",
+    center: [9.3803, 80.377],
+    cities: ["Kilinochchi", "Pallai", "Pooneryn"],
+  },
+  {
+    key: "mannar",
+    label: "Mannar",
+    province: "Northern Province",
+    center: [8.981, 79.9044],
+    cities: ["Mannar", "Nanattan", "Madhu"],
+  },
+  {
+    key: "vavuniya",
+    label: "Vavuniya",
+    province: "Northern Province",
+    center: [8.7514, 80.4971],
+    cities: ["Vavuniya", "Cheddikulam", "Nedunkeni"],
+  },
+  {
+    key: "mullaitivu",
+    label: "Mullaitivu",
+    province: "Northern Province",
+    center: [9.2671, 80.8142],
+    cities: ["Mullaitivu", "Puthukkudiyiruppu", "Oddusuddan"],
+  },
+  {
+    key: "trincomalee",
+    label: "Trincomalee",
+    province: "Eastern Province",
+    center: [8.5874, 81.2152],
+    cities: ["Trincomalee", "Kinniya", "Muttur", "Kantale"],
+  },
+  {
+    key: "batticaloa",
+    label: "Batticaloa",
+    province: "Eastern Province",
+    center: [7.7102, 81.6924],
+    cities: ["Batticaloa", "Kattankudy", "Eravur", "Valaichchenai"],
+  },
+  {
+    key: "ampara",
+    label: "Ampara",
+    province: "Eastern Province",
+    center: [7.3018, 81.6747],
+    cities: ["Ampara", "Akkaraipattu", "Kalmunai", "Sainthamaruthu", "Pottuvil"],
+  },
+  {
+    key: "kurunegala",
+    label: "Kurunegala",
+    province: "North Western Province",
+    center: [7.4863, 80.3647],
+    cities: ["Kurunegala", "Kuliyapitiya", "Narammala", "Polgahawela", "Wariyapola", "Pannala", "Giriulla"],
+  },
+  {
+    key: "puttalam",
+    label: "Puttalam",
+    province: "North Western Province",
+    center: [8.0362, 79.8283],
+    cities: ["Puttalam", "Chilaw", "Wennappuwa", "Marawila", "Dankotuwa", "Anamaduwa"],
+  },
+  {
+    key: "anuradhapura",
+    label: "Anuradhapura",
+    province: "North Central Province",
+    center: [8.3114, 80.4037],
+    cities: ["Anuradhapura", "Kekirawa", "Tambuttegama", "Medawachchiya", "Mihintale"],
+  },
+  {
+    key: "polonnaruwa",
+    label: "Polonnaruwa",
+    province: "North Central Province",
+    center: [7.9403, 81.0188],
+    cities: ["Polonnaruwa", "Kaduruwela", "Medirigiriya", "Hingurakgoda"],
+  },
+  {
+    key: "badulla",
+    label: "Badulla",
+    province: "Uva Province",
+    center: [6.9934, 81.055],
+    cities: ["Badulla", "Bandarawela", "Haputale", "Welimada", "Mahiyanganaya", "Diyatalawa"],
+  },
+  {
+    key: "moneragala",
+    label: "Moneragala",
+    province: "Uva Province",
+    center: [6.8728, 81.3507],
+    cities: ["Moneragala", "Wellawaya", "Buttala", "Kataragama", "Bibile"],
+  },
+  {
+    key: "ratnapura",
+    label: "Ratnapura",
+    province: "Sabaragamuwa Province",
+    center: [6.6828, 80.3992],
+    cities: ["Ratnapura", "Balangoda", "Pelmadulla", "Embilipitiya", "Kuruwita"],
+  },
+  {
+    key: "kegalle",
+    label: "Kegalle",
+    province: "Sabaragamuwa Province",
+    center: [7.2513, 80.3464],
+    cities: ["Kegalle", "Mawanella", "Warakapola", "Rambukkana", "Ruwanwella"],
+  },
+];
+
+const sriLankaMapBounds = {
+  north: 10.05,
+  south: 5.75,
+  east: 82.1,
+  west: 79.45,
+};
+
+const getCityMapPosition = (region, city) => {
+  if (!region?.center || !city || city === ALL_LOCATION_CITIES) {
+    return null;
+  }
+
+  const cityIndex = Math.max(region.cities.indexOf(city), 0);
+  const angle = cityIndex * 1.618;
+  const radius = 0.035 + (cityIndex % 4) * 0.018;
+
+  return [
+    region.center[0] + Math.sin(angle) * radius,
+    region.center[1] + Math.cos(angle) * radius,
+  ];
+};
+
+const normalizeLocationToken = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/ district$/i, "");
 
 const initialForm = {
   brand: "",
@@ -204,11 +420,17 @@ function Marketplace() {
     model: ALL_MODELS,
     priceRange: "all",
     fuelType: ALL_FUEL_TYPES,
+    locationRegion: ALL_LOCATION_REGIONS,
+    locationCity: ALL_LOCATION_CITIES,
   });
   const [searchInput, setSearchInput] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [loadError, setLoadError] = useState("");
   const [form, setForm] = useState(initialForm);
+  const [publishLocation, setPublishLocation] = useState({
+    district: "",
+    city: "",
+  });
   const [selectedImages, setSelectedImages] = useState([]);
   const [submitState, setSubmitState] = useState({ saving: false, error: "", success: "" });
   const [descriptionState, setDescriptionState] = useState({
@@ -216,6 +438,7 @@ function Marketplace() {
     error: "",
     source: "",
   });
+  const [isLocationPickerOpen, setIsLocationPickerOpen] = useState(false);
   const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
   const [isUrgent, setIsUrgent] = useState(false);
   const [isSpotlight, setIsSpotlight] = useState(false);
@@ -223,6 +446,10 @@ function Marketplace() {
   const [selectedCar, setSelectedCar] = useState(null);
   const [selectedCarImage, setSelectedCarImage] = useState("");
   const [lightboxImage, setLightboxImage] = useState("");
+  const [lightboxZoom, setLightboxZoom] = useState(1);
+  const [lightboxPan, setLightboxPan] = useState({ x: 0, y: 0 });
+  const [isLightboxPanning, setIsLightboxPanning] = useState(false);
+  const lightboxPanStartRef = useRef({ pointerX: 0, pointerY: 0, panX: 0, panY: 0 });
 
   const priceRanges = useMemo(
     () =>
@@ -261,12 +488,23 @@ function Marketplace() {
     [t]
   );
 
+  const toggleBoostSelection = useCallback((boostKey) => {
+    const isSelected =
+      (boostKey === "urgent" && isUrgent) ||
+      (boostKey === "spotlight" && isSpotlight) ||
+      (boostKey === "bumped" && isBumped);
+
+    setIsUrgent(!isSelected && boostKey === "urgent");
+    setIsSpotlight(!isSelected && boostKey === "spotlight");
+    setIsBumped(!isSelected && boostKey === "bumped");
+  }, [isBumped, isSpotlight, isUrgent]);
+
   const boostOptions = useMemo(
     () => [
       {
         key: "urgent",
         selected: isUrgent,
-        toggle: () => setIsUrgent((current) => !current),
+        toggle: () => toggleBoostSelection("urgent"),
         icon: Zap,
         title: t("marketplace.boost.urgent.title", { defaultValue: "Urgent Ad" }),
         description: t("marketplace.boost.urgent.description", { defaultValue: "Sell 2x faster with urgent visibility." }),
@@ -276,7 +514,7 @@ function Marketplace() {
       {
         key: "spotlight",
         selected: isSpotlight,
-        toggle: () => setIsSpotlight((current) => !current),
+        toggle: () => toggleBoostSelection("spotlight"),
         icon: Star,
         title: t("marketplace.boost.spotlight.title", { defaultValue: "Spotlight" }),
         description: t("marketplace.boost.spotlight.description", { defaultValue: "Stay featured in the premium spotlight area." }),
@@ -286,7 +524,7 @@ function Marketplace() {
       {
         key: "bumped",
         selected: isBumped,
-        toggle: () => setIsBumped((current) => !current),
+        toggle: () => toggleBoostSelection("bumped"),
         icon: ArrowUp,
         title: t("marketplace.boost.bumped.title", { defaultValue: "Bump Up" }),
         description: t("marketplace.boost.bumped.description", { defaultValue: "Push your listing higher in recent results." }),
@@ -294,7 +532,7 @@ function Marketplace() {
         accentClassName: "marketplace-boost-card-bumped",
       },
     ],
-    [isBumped, isSpotlight, isUrgent, t]
+    [isBumped, isSpotlight, isUrgent, t, toggleBoostSelection]
   );
 
   const totalBoostPrice = useMemo(
@@ -313,6 +551,7 @@ function Marketplace() {
 
   const resetPublishFlow = () => {
     setForm(initialForm);
+    setPublishLocation({ district: "", city: "" });
     setSelectedImages([]);
     setDescriptionState({ generating: false, error: "", source: "" });
     setIsUrgent(false);
@@ -392,7 +631,12 @@ function Marketplace() {
 
   const createListing = async (boostOverrides) => {
     const formData = new FormData();
-    Object.entries(form).forEach(([key, value]) => formData.append(key, value));
+    Object.entries(form).forEach(([key, value]) => {
+      if (key !== "vehicle_location") {
+        formData.append(key, value);
+      }
+    });
+    formData.append("vehicle_location", publishVehicleLocation);
     formData.append("is_urgent", String(boostOverrides?.is_urgent ?? isUrgent));
     formData.append("is_spotlight", String(boostOverrides?.is_spotlight ?? isSpotlight));
     formData.append("is_bumped", String(boostOverrides?.is_bumped ?? isBumped));
@@ -540,10 +784,80 @@ function Marketplace() {
     [approvedCars, t, translatedFuelLabels]
   );
 
+  const locationRegionOptions = useMemo(
+    () => [
+      {
+        value: ALL_LOCATION_REGIONS,
+        label: t("marketplace.filters.all_locations", { defaultValue: "All Sri Lanka" }),
+      },
+      ...sriLankaLocationRegions.map((region) => ({
+        value: region.key,
+        label: `${region.label} (${region.province})`,
+      })),
+    ],
+    [t]
+  );
+
+  const selectedLocationRegion = useMemo(
+    () => sriLankaLocationRegions.find((region) => region.key === filters.locationRegion) || null,
+    [filters.locationRegion]
+  );
+
+  const locationCityOptions = useMemo(
+    () => [
+      {
+        value: ALL_LOCATION_CITIES,
+        label: selectedLocationRegion
+          ? t("marketplace.filters.all_region_cities", {
+              defaultValue: `Everywhere in ${selectedLocationRegion.label} District`,
+            })
+          : t("marketplace.filters.all_cities", { defaultValue: "All cities" }),
+      },
+      ...(selectedLocationRegion?.cities || []).map((city) => ({
+        value: city,
+        label: city,
+      })),
+    ],
+    [selectedLocationRegion, t]
+  );
+
+  const publishSelectedDistrict = useMemo(
+    () => sriLankaLocationRegions.find((region) => region.key === publishLocation.district) || null,
+    [publishLocation.district]
+  );
+
+  const publishDistrictOptions = useMemo(
+    () => [
+      { value: "", label: "Choose district" },
+      ...sriLankaLocationRegions.map((region) => ({
+        value: region.key,
+        label: `${region.label} (${region.province})`,
+      })),
+    ],
+    []
+  );
+
+  const publishCityOptions = useMemo(
+    () => [
+      { value: "", label: publishSelectedDistrict ? "Choose city" : "Choose district first" },
+      ...(publishSelectedDistrict?.cities || []).map((city) => ({
+        value: city,
+        label: city,
+      })),
+    ],
+    [publishSelectedDistrict]
+  );
+
+  const publishVehicleLocation = useMemo(() => {
+    if (!publishSelectedDistrict || !publishLocation.city) return "";
+    return `${publishLocation.city}, ${publishSelectedDistrict.label}`;
+  }, [publishLocation.city, publishSelectedDistrict]);
+
   const filteredCars = useMemo(() => {
     return approvedCars.filter((car) => {
       const normalizedSearch = appliedSearch.trim().toLowerCase();
       const vehicleName = [car.brand, car.model].filter(Boolean).join(" ").toLowerCase();
+      const normalizedVehicleLocation = String(car.vehicle_location || "").trim().toLowerCase();
       const matchesSearch = !normalizedSearch || vehicleName.includes(normalizedSearch);
       const matchesBrand =
         filters.brand === ALL_BRANDS || car.brand === filters.brand;
@@ -560,15 +874,37 @@ function Marketplace() {
         (filters.priceRange === "6m_10m" && price > 6000000 && price <= 10000000) ||
         (filters.priceRange === "above_10m" && price > 10000000);
 
-      return matchesSearch && matchesBrand && matchesModel && matchesFuel && matchesPriceRange;
+      const matchesLocationRegion =
+        filters.locationRegion === ALL_LOCATION_REGIONS ||
+        [
+          selectedLocationRegion?.label,
+          ...(selectedLocationRegion?.cities || []),
+        ]
+          .filter(Boolean)
+          .some((locationTerm) => normalizedVehicleLocation.includes(locationTerm.toLowerCase()));
+
+      const matchesLocationCity =
+        filters.locationCity === ALL_LOCATION_CITIES ||
+        normalizedVehicleLocation.includes(String(filters.locationCity).toLowerCase());
+
+      return (
+        matchesSearch &&
+        matchesBrand &&
+        matchesModel &&
+        matchesFuel &&
+        matchesPriceRange &&
+        matchesLocationRegion &&
+        matchesLocationCity
+      );
     });
-  }, [appliedSearch, approvedCars, filters]);
+  }, [appliedSearch, approvedCars, filters, selectedLocationRegion]);
 
   const handleFilterChange = (key, value) => {
     setFilters((current) => ({
       ...current,
       [key]: value,
       ...(key === "brand" ? { model: ALL_MODELS } : {}),
+      ...(key === "locationRegion" ? { locationCity: ALL_LOCATION_CITIES } : {}),
     }));
   };
 
@@ -628,7 +964,7 @@ function Marketplace() {
           fuel_type: form.fuel_type || null,
           transmission: form.transmission || null,
           condition: form.condition || null,
-          vehicle_location: form.vehicle_location.trim() || null,
+          vehicle_location: publishVehicleLocation || null,
         }),
       });
 
@@ -683,6 +1019,10 @@ function Marketplace() {
     setSubmitState({ saving: true, error: "", success: "" });
 
     try {
+      if (!publishVehicleLocation) {
+        throw new Error("Choose the vehicle district and city before submitting the ad.");
+      }
+
       await createListing();
       setSubmitState({
         saving: false,
@@ -702,6 +1042,24 @@ function Marketplace() {
 
   const handlePublishFormSubmit = async (event) => {
     event.preventDefault();
+
+    if (!publishVehicleLocation) {
+      setSubmitState({
+        saving: false,
+        error: "Choose the vehicle district and city before submitting the ad.",
+        success: "",
+      });
+      return;
+    }
+
+    if (!publishVehicleLocation) {
+      setDescriptionState({
+        generating: false,
+        error: "Choose the vehicle district and city first, then generate a description.",
+        source: "",
+      });
+      return;
+    }
 
     if (hasPremiumSelection) {
       setSubmitState({ saving: true, error: "", success: "" });
@@ -757,6 +1115,50 @@ function Marketplace() {
 
   const getCardBoostSticker = (car) => getBoostSticker(car);
 
+  const openLightbox = (imageUrl) => {
+    if (!imageUrl) return;
+    setLightboxImage(imageUrl);
+  };
+
+  const closeLightbox = () => {
+    setLightboxImage("");
+    setIsLightboxPanning(false);
+  };
+
+  const resetLightboxView = () => {
+    setLightboxZoom(1);
+    setLightboxPan({ x: 0, y: 0 });
+  };
+
+  const zoomLightboxIn = () => {
+    setLightboxZoom((zoom) => Math.min(Number((zoom + 0.5).toFixed(2)), 4));
+  };
+
+  const zoomLightboxOut = () => {
+    setLightboxZoom((zoom) => {
+      const nextZoom = Math.max(Number((zoom - 0.5).toFixed(2)), 1);
+      if (nextZoom === 1) {
+        setLightboxPan({ x: 0, y: 0 });
+      }
+      return nextZoom;
+    });
+  };
+
+  const handleLightboxWheel = (event) => {
+    event.preventDefault();
+    if (event.deltaY < 0) {
+      zoomLightboxIn();
+      return;
+    }
+    zoomLightboxOut();
+  };
+
+  const handleLightboxImageClick = () => {
+    if (lightboxZoom === 1) {
+      setLightboxZoom(2);
+    }
+  };
+
   const showPreviousLightboxImage = () => {
     if (selectedCarImages.length <= 1) return;
     const currentIndex = lightboxIndex >= 0 ? lightboxIndex : 0;
@@ -773,12 +1175,46 @@ function Marketplace() {
     setSelectedCarImage(selectedCarImages[nextIndex]);
   };
 
+  const handleLightboxPointerDown = (event) => {
+    if (lightboxZoom <= 1) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    lightboxPanStartRef.current = {
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      panX: lightboxPan.x,
+      panY: lightboxPan.y,
+    };
+    setIsLightboxPanning(true);
+  };
+
+  const handleLightboxPointerMove = (event) => {
+    if (!isLightboxPanning || lightboxZoom <= 1) return;
+    const start = lightboxPanStartRef.current;
+    setLightboxPan({
+      x: start.panX + event.clientX - start.pointerX,
+      y: start.panY + event.clientY - start.pointerY,
+    });
+  };
+
+  const stopLightboxPanning = (event) => {
+    if (event?.currentTarget?.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setIsLightboxPanning(false);
+  };
+
+  useEffect(() => {
+    resetLightboxView();
+    setIsLightboxPanning(false);
+  }, [lightboxImage]);
+
   useEffect(() => {
     if (!lightboxImage) return undefined;
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
-        setLightboxImage("");
+        closeLightbox();
         return;
       }
 
@@ -790,6 +1226,21 @@ function Marketplace() {
       if (event.key === "ArrowRight") {
         event.preventDefault();
         showNextLightboxImage();
+      }
+
+      if (event.key === "+" || event.key === "=") {
+        event.preventDefault();
+        zoomLightboxIn();
+      }
+
+      if (event.key === "-") {
+        event.preventDefault();
+        zoomLightboxOut();
+      }
+
+      if (event.key === "0") {
+        event.preventDefault();
+        resetLightboxView();
       }
     };
 
@@ -860,15 +1311,15 @@ function Marketplace() {
 
   return (
     <div className="marketplace-page app-page-shell">
-      <div className="mb-5 animate-fade-in">
+      <div className="dashboard-page-hero mb-5 animate-fade-in">
         <div className="dashboard-page-eyebrow mb-4">
           <ShoppingBag className="h-3.5 w-3.5 text-blue-300" />
           {t("marketplace.inventory.title")}
         </div>
-        <h1 className="text-3xl md:text-[2.6rem] font-bold tracking-tight text-white">
+        <h1 className="text-3xl md:text-[2.6rem] font-bold tracking-tight" style={{ background: 'linear-gradient(135deg, #ffffff, #93c5fd, #67e8f9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
           {t("marketplace.inventory.title")}
         </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+        <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">
           {t("marketplace.inventory.description")}
         </p>
       </div>
@@ -979,8 +1430,8 @@ function Marketplace() {
       </section>
       )}
 
-      <section className="marketplace-panel card mt-3 p-4 animate-fade-in animate-delay-100">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="dashboard-page-panel mt-3 animate-fade-in animate-delay-100">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <FilterSelect
             label={t("marketplace.labels.brand")}
             value={filters.brand}
@@ -1005,6 +1456,17 @@ function Marketplace() {
             options={fuelOptions}
             onChange={(value) => handleFilterChange("fuelType", value)}
           />
+          <LocationPickerButton
+            label={t("marketplace.labels.location", { defaultValue: "Location" })}
+            value={
+              selectedLocationRegion
+                ? filters.locationCity === ALL_LOCATION_CITIES
+                  ? `${selectedLocationRegion.label} District`
+                  : `${filters.locationCity}, ${selectedLocationRegion.label}`
+                : t("marketplace.filters.all_locations", { defaultValue: "All Sri Lanka" })
+            }
+            onClick={() => setIsLocationPickerOpen(true)}
+          />
         </div>
 
         {loadError && (
@@ -1017,7 +1479,7 @@ function Marketplace() {
       <section className="mt-4 animate-fade-in animate-delay-200">
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-white">{t("marketplace.listings.title")}</h2>
+            <h2 className="text-2xl font-bold text-white">{t("marketplace.listings.title")}</h2>
             <p className="mt-1 text-sm text-slate-400">
               {t("marketplace.listings.description")}
             </p>
@@ -1156,8 +1618,8 @@ function Marketplace() {
         )}
       </section>
 
-      {selectedCar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {selectedCar && createPortal(
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm"
             onClick={() => setSelectedCar(null)}
@@ -1169,7 +1631,7 @@ function Marketplace() {
                 {selectedCarImage ? (
                   <button
                     type="button"
-                    onClick={() => setLightboxImage(selectedCarImage)}
+                    onClick={() => openLightbox(selectedCarImage)}
                     className="block h-full w-full"
                   >
                     <img
@@ -1227,7 +1689,7 @@ function Marketplace() {
                         type="button"
                         onClick={() => {
                           setSelectedCarImage(imageUrl);
-                          setLightboxImage(imageUrl);
+                          openLightbox(imageUrl);
                         }}
                         className={`h-20 w-24 shrink-0 overflow-hidden rounded-2xl border transition ${
                           selectedCarImage === imageUrl
@@ -1342,19 +1804,20 @@ function Marketplace() {
               </div>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {lightboxImage && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/95 p-4">
+      {lightboxImage && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/95 p-3 sm:p-5">
           <button
             type="button"
-            onClick={() => setLightboxImage("")}
+            onClick={closeLightbox}
             className="absolute inset-0 cursor-default"
             aria-label={t("marketplace.lightbox.close_full_view")}
           />
 
-          <div className="relative z-10 flex h-full w-full max-w-7xl items-center justify-center">
+          <div className="relative z-10 flex h-full w-full items-center justify-center overflow-hidden">
             {selectedCarImages.length > 1 && (
               <button
                 type="button"
@@ -1368,11 +1831,38 @@ function Marketplace() {
               </button>
             )}
 
-            <img
-              src={lightboxImage}
-              alt={t("marketplace.lightbox.full_vehicle_view")}
-              className="max-h-full max-w-full object-contain"
-            />
+            <div
+              className="flex h-full w-full items-center justify-center overflow-hidden rounded-[24px]"
+              onWheel={handleLightboxWheel}
+            >
+              <div
+                onPointerDown={handleLightboxPointerDown}
+                onPointerMove={handleLightboxPointerMove}
+                onPointerUp={stopLightboxPanning}
+                onPointerCancel={stopLightboxPanning}
+                onClick={handleLightboxImageClick}
+                onDoubleClick={lightboxZoom > 1 ? resetLightboxView : zoomLightboxIn}
+                className={`flex max-h-[92vh] max-w-[96vw] select-none items-center justify-center transition-transform duration-150 ${
+                  lightboxZoom > 1
+                    ? isLightboxPanning
+                      ? "cursor-grabbing"
+                      : "cursor-grab"
+                    : "cursor-zoom-in"
+                }`}
+                style={{
+                  transform: `translate3d(${lightboxPan.x}px, ${lightboxPan.y}px, 0) scale(${lightboxZoom})`,
+                  transformOrigin: "center",
+                  touchAction: lightboxZoom > 1 ? "none" : "auto",
+                }}
+              >
+                <img
+                  src={lightboxImage}
+                  alt={t("marketplace.lightbox.full_vehicle_view")}
+                  draggable={false}
+                  className="max-h-[92vh] max-w-[96vw] select-none object-contain"
+                />
+              </div>
+            </div>
 
             {selectedCarImages.length > 1 && (
               <button
@@ -1387,27 +1877,152 @@ function Marketplace() {
               </button>
             )}
 
+            <div className="absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-slate-700/70 bg-slate-900/90 px-3 py-2 text-slate-200 shadow-xl shadow-slate-950/40 backdrop-blur md:top-4">
+              <button
+                type="button"
+                onClick={zoomLightboxOut}
+                disabled={lightboxZoom <= 1}
+                className="rounded-full p-2 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Zoom out"
+                title="Zoom out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <span className="min-w-12 text-center text-xs font-semibold tabular-nums">
+                {Math.round(lightboxZoom * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={zoomLightboxIn}
+                disabled={lightboxZoom >= 4}
+                className="rounded-full p-2 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                aria-label="Zoom in"
+                title="Zoom in"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+              <span className="mx-1 h-5 w-px bg-slate-700" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={resetLightboxView}
+                className="rounded-full p-2 transition hover:bg-white/10"
+                aria-label="Reset zoom"
+                title="Reset zoom"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </button>
+              <span
+                className={`hidden items-center gap-1 rounded-full px-2 py-1 text-xs md:inline-flex ${
+                  lightboxZoom > 1 ? "bg-cyan-500/15 text-cyan-100" : "text-slate-500"
+                }`}
+                title={lightboxZoom > 1 ? "Drag the image to move it" : "Zoom in to move the image"}
+              >
+                <Move className="h-3.5 w-3.5" />
+                Move
+              </span>
+            </div>
+
             {selectedCarImages.length > 1 && (
               <div className="absolute bottom-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-full border border-slate-700/70 bg-slate-900/85 px-4 py-2 text-xs text-slate-200">
                 <span>
                   {lightboxIndex + 1} / {selectedCarImages.length}
                 </span>
-                <span className="text-slate-500">{t("marketplace.lightbox.keyboard_hint")}</span>
+                <span className="text-slate-500">{t("marketplace.lightbox.keyboard_hint")} • + / - zoom</span>
               </div>
             )}
 
             <button
               type="button"
-              onClick={() => setLightboxImage("")}
-              className="absolute right-0 top-0 rounded-full border border-slate-700/70 bg-slate-900/90 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-slate-500/80 hover:text-white"
+              onClick={closeLightbox}
+              className="absolute right-2 top-3 rounded-full border border-slate-700/70 bg-slate-900/90 p-3 text-slate-200 transition hover:border-slate-500/80 hover:text-white md:right-4 md:top-4"
+              aria-label={t("marketplace.common.close")}
             >
-              {t("marketplace.common.close")}
+              <X className="h-5 w-5" />
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {isPublishModalOpen && (
+      {isLocationPickerOpen && createPortal(
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-950/85 backdrop-blur-sm"
+            onClick={() => setIsLocationPickerOpen(false)}
+          />
+          <section
+            className="marketplace-location-modal relative z-10 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-[30px] border border-slate-700/60 bg-[linear-gradient(135deg,rgba(15,23,42,0.98),rgba(15,23,42,0.94),rgba(30,41,59,0.96))] p-5 shadow-2xl shadow-slate-950/50 md:p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex flex-col gap-4 border-b border-slate-800/80 pb-5 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/80">
+                  {t("marketplace.location_filter.eyebrow", { defaultValue: "Location filter" })}
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">
+                  {t("marketplace.location_filter.modal_title", { defaultValue: "Choose a Sri Lanka area" })}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                  {t("marketplace.location_filter.modal_description", {
+                    defaultValue: "Choose a district first, then narrow the results to a city inside that district.",
+                  })}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLocationPickerOpen(false)}
+                className="rounded-full border border-slate-700/70 bg-slate-900/80 px-4 py-2 text-sm font-medium text-slate-300 transition hover:border-slate-500/80 hover:text-white"
+              >
+                {t("marketplace.common.close")}
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.1fr)]">
+              <div className="space-y-4">
+                <FilterSelect
+                  label={t("marketplace.labels.location_area", { defaultValue: "District" })}
+                  value={filters.locationRegion}
+                  options={locationRegionOptions}
+                  onChange={(value) => handleFilterChange("locationRegion", value)}
+                />
+                <FilterSelect
+                  label={t("marketplace.labels.location_city", { defaultValue: "City" })}
+                  value={filters.locationCity}
+                  options={locationCityOptions}
+                  onChange={(value) => handleFilterChange("locationCity", value)}
+                />
+
+                <div className="rounded-[24px] border border-slate-800/80 bg-slate-900/70 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    {t("marketplace.location_filter.current", { defaultValue: "Current selection" })}
+                  </p>
+                  <p className="mt-2 text-base font-semibold text-white">
+                    {selectedLocationRegion
+                      ? filters.locationCity === ALL_LOCATION_CITIES
+                        ? `${selectedLocationRegion.label} District`
+                        : `${filters.locationCity}, ${selectedLocationRegion.label}`
+                      : t("marketplace.filters.all_locations", { defaultValue: "All Sri Lanka" })}
+                  </p>
+                  {selectedLocationRegion && (
+                    <p className="mt-1 text-sm text-slate-400">{selectedLocationRegion.province}</p>
+                  )}
+                </div>
+              </div>
+
+              <DistrictCityPicker
+                regions={sriLankaLocationRegions}
+                selectedRegionKey={filters.locationRegion}
+                selectedCity={filters.locationCity}
+                onSelectDistrict={(value) => handleFilterChange("locationRegion", value)}
+                onSelectCity={(value) => handleFilterChange("locationCity", value)}
+              />
+            </div>
+          </section>
+        </div>,
+        document.body
+      )}
+
+      {isPublishModalOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
@@ -1515,12 +2130,67 @@ function Marketplace() {
               </div>
 
               <div className="grid gap-4">
-                <InputField
-                  label={t("marketplace.labels.vehicle_location")}
-                  value={form.vehicle_location}
-                  onChange={(value) => handleInputChange("vehicle_location", value)}
-                  placeholder="Maharagama, Colombo"
-                />
+                <div className="rounded-[24px] border border-slate-800/80 bg-slate-950/45 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-200">{t("marketplace.labels.vehicle_location")}</h3>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
+                        Choose the district first, then select the city where buyers can view the vehicle.
+                      </p>
+                    </div>
+                    {publishVehicleLocation && (
+                      <span className="rounded-full border border-cyan-300/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-100">
+                        {publishVehicleLocation}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <SelectField
+                      label={t("marketplace.labels.location_area", { defaultValue: "District" })}
+                      value={publishLocation.district}
+                      options={publishDistrictOptions}
+                      onChange={(value) =>
+                        setPublishLocation({
+                          district: value,
+                          city: "",
+                        })
+                      }
+                    />
+                    <SelectField
+                      label={t("marketplace.labels.location_city", { defaultValue: "City" })}
+                      value={publishLocation.city}
+                      options={publishCityOptions}
+                      onChange={(value) =>
+                        setPublishLocation((current) => ({
+                          ...current,
+                          city: value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-4">
+                    <DistrictCityPicker
+                      regions={sriLankaLocationRegions}
+                      selectedRegionKey={publishLocation.district || ALL_LOCATION_REGIONS}
+                      selectedCity={publishLocation.city || ALL_LOCATION_CITIES}
+                      allowAll={false}
+                      onSelectDistrict={(value) =>
+                        setPublishLocation({
+                          district: value === ALL_LOCATION_REGIONS ? "" : value,
+                          city: "",
+                        })
+                      }
+                      onSelectCity={(value) =>
+                        setPublishLocation((current) => ({
+                          ...current,
+                          city: value === ALL_LOCATION_CITIES ? "" : value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
                 <div className="marketplace-field block">
                   <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
@@ -1690,10 +2360,230 @@ function Marketplace() {
               </div>
             </form>
           </section>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>
+  );
+}
+
+function DistrictCityPicker({
+  regions,
+  selectedRegionKey,
+  selectedCity,
+  onSelectDistrict,
+  onSelectCity,
+  allowAll = true,
+}) {
+  const selectedRegion = regions.find((region) => region.key === selectedRegionKey) || null;
+  const mapContainerRef = useRef(null);
+  const mapRef = useRef(null);
+  const districtLayerRef = useRef(null);
+  const cityMarkerRef = useRef(null);
+
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return undefined;
+
+    const bounds = L.latLngBounds(
+      [sriLankaMapBounds.south, sriLankaMapBounds.west],
+      [sriLankaMapBounds.north, sriLankaMapBounds.east]
+    );
+    const map = L.map(mapContainerRef.current, {
+      center: [7.8731, 80.7718],
+      zoom: 7,
+      minZoom: 7,
+      maxZoom: 10,
+      maxBounds: bounds,
+      maxBoundsViscosity: 0.85,
+      zoomControl: true,
+      attributionControl: true,
+    });
+
+    mapRef.current = map;
+    map.fitBounds(bounds, { padding: [18, 18] });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 10,
+    }).addTo(map);
+
+    const districtLayer = L.layerGroup().addTo(map);
+    districtLayerRef.current = districtLayer;
+
+    regions.forEach((region) => {
+      const marker = L.circleMarker(region.center, {
+        radius: 7,
+        weight: 2,
+        color: "#e0f2fe",
+        fillColor: "#0f172a",
+        fillOpacity: 0.95,
+      }).addTo(districtLayer);
+
+      marker.bindTooltip(region.label, {
+        direction: "top",
+        offset: [0, -8],
+        opacity: 0.95,
+      });
+      marker.on("click", () => onSelectDistrict(region.key));
+    });
+
+    map.on("click", (event) => {
+      const clicked = event.latlng;
+      const nearestRegion = regions.reduce((nearest, region) => {
+        const distance = clicked.distanceTo(L.latLng(region.center));
+        return !nearest || distance < nearest.distance ? { region, distance } : nearest;
+      }, null);
+
+      if (nearestRegion?.region) {
+        onSelectDistrict(nearestRegion.region.key);
+      }
+    });
+
+    return () => {
+      cityMarkerRef.current?.remove();
+      cityMarkerRef.current = null;
+      map.remove();
+      mapRef.current = null;
+      districtLayerRef.current = null;
+    };
+  }, [onSelectDistrict, regions]);
+
+  useEffect(() => {
+    if (!districtLayerRef.current) return;
+
+    districtLayerRef.current.eachLayer((layer) => {
+      const matchingRegion = regions.find((region) => {
+        const layerLatLng = layer.getLatLng?.();
+        return layerLatLng && layerLatLng.lat === region.center[0] && layerLatLng.lng === region.center[1];
+      });
+
+      if (!matchingRegion || !layer.setStyle) return;
+
+      const isSelected = matchingRegion.key === selectedRegionKey;
+      layer.setStyle({
+        radius: isSelected ? 10 : 7,
+        fillColor: isSelected ? "#06b6d4" : "#0f172a",
+        color: isSelected ? "#ffffff" : "#e0f2fe",
+      });
+
+      if (isSelected) {
+        layer.bringToFront?.();
+      }
+    });
+  }, [regions, selectedRegionKey]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    cityMarkerRef.current?.remove();
+    cityMarkerRef.current = null;
+
+    if (!selectedRegion) return;
+
+    const cityPosition = getCityMapPosition(selectedRegion, selectedCity);
+    if (!cityPosition) return;
+
+    cityMarkerRef.current = L.circleMarker(cityPosition, {
+      radius: 11,
+      weight: 3,
+      color: "#ffffff",
+      fillColor: "#0ea5e9",
+      fillOpacity: 1,
+      pane: "markerPane",
+    })
+      .bindTooltip(selectedCity, {
+        permanent: true,
+        direction: "top",
+        offset: [0, -12],
+        className: "marketplace-city-map-tooltip",
+      })
+      .addTo(mapRef.current);
+
+    cityMarkerRef.current.bringToFront?.();
+
+    mapRef.current.panTo(cityPosition, { animate: true });
+  }, [selectedCity, selectedRegion]);
+
+  return (
+    <section className="marketplace-district-picker rounded-[24px] border border-slate-800/80 bg-slate-950/55 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Districts and cities</p>
+          <h3 className="mt-1 text-base font-semibold text-white">Pick a district on the map, then choose a city</h3>
+        </div>
+        {allowAll && (
+          <button
+            type="button"
+            onClick={() => onSelectDistrict(ALL_LOCATION_REGIONS)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+              selectedRegionKey === ALL_LOCATION_REGIONS
+                ? "border-cyan-300/40 bg-cyan-500/15 text-cyan-100"
+                : "border-slate-700/70 bg-slate-900/80 text-slate-300 hover:border-slate-500/80 hover:text-white"
+            }`}
+          >
+            All Sri Lanka
+          </button>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(16rem,1fr)_minmax(16rem,0.82fr)]">
+        <div className="marketplace-map-shell overflow-hidden rounded-[22px] border border-slate-800/80 bg-slate-900/75">
+          <div ref={mapContainerRef} className="h-[28rem] w-full" />
+        </div>
+
+        <div className="rounded-[22px] border border-slate-800/80 bg-slate-900/70 p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            {selectedRegion ? `${selectedRegion.label} cities` : "Cities"}
+          </p>
+          <div className="mt-3 grid max-h-[24rem] gap-2 overflow-y-auto pr-1">
+            <button
+              type="button"
+              onClick={() => onSelectCity(ALL_LOCATION_CITIES)}
+              disabled={!selectedRegion || !allowAll}
+              className={`rounded-2xl border px-3 py-2 text-left text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                selectedCity === ALL_LOCATION_CITIES
+                  ? "border-cyan-300/40 bg-cyan-500/15 text-cyan-100"
+                  : "border-slate-800/80 bg-slate-950/50 text-slate-300 hover:border-slate-600/90 hover:text-white"
+              }`}
+            >
+              {selectedRegion ? `Everywhere in ${selectedRegion.label} District` : "Choose a district first"}
+            </button>
+
+            {(selectedRegion?.cities || []).map((city) => (
+              <button
+                key={city}
+                type="button"
+                onClick={() => onSelectCity(city)}
+                className={`rounded-2xl border px-3 py-2 text-left text-sm transition ${
+                  selectedCity === city
+                    ? "border-cyan-300/40 bg-cyan-500/15 text-cyan-100"
+                    : "border-slate-800/80 bg-slate-950/50 text-slate-300 hover:border-slate-600/90 hover:text-white"
+                }`}
+              >
+                {city}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function LocationPickerButton({ label, value, onClick }) {
+  return (
+    <label className="marketplace-field block">
+      <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
+      <button
+        type="button"
+        onClick={onClick}
+        className="marketplace-location-trigger flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 text-left text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
+      >
+        <span className="truncate">{value}</span>
+        <MapPin className="h-4 w-4 shrink-0 text-slate-500" />
+      </button>
+    </label>
   );
 }
 

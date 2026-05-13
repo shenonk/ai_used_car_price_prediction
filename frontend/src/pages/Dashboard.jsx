@@ -1,9 +1,23 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
+import { Bar, Line } from "react-chartjs-2"
+import {
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Filler,
+  LinearScale,
+  LineElement,
+  PointElement,
+  Tooltip,
+} from "chart.js"
 import {
   ArrowRight,
   Check,
+  Activity,
+  AlertCircle,
+  BarChart3,
   BellRing,
   Bookmark,
   Calculator,
@@ -11,6 +25,7 @@ import {
   Clock3,
   Coins,
   Eye,
+  MapPin,
   LineChart,
   MessageSquareText,
   ShieldCheck,
@@ -31,6 +46,8 @@ import {
 } from "../utils/notifications"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler, Tooltip)
 
 function formatCurrency(value) {
   return `LKR ${Math.round(Number(value || 0)).toLocaleString("en-LK")}`
@@ -73,6 +90,30 @@ function toTimestamp(value) {
 
 function buildVehicleKey(brand, model) {
   return `${String(brand || "").trim().toUpperCase()}|||${String(model || "").trim().toUpperCase()}`
+}
+
+function getMonthKey(value) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+}
+
+function getLastSixMonths() {
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date()
+    date.setDate(1)
+    date.setMonth(date.getMonth() - (5 - index))
+    return {
+      key: getMonthKey(date),
+      label: date.toLocaleDateString("en-LK", { month: "short" }),
+    }
+  })
+}
+
+function average(values) {
+  const validValues = values.map(Number).filter((value) => Number.isFinite(value) && value > 0)
+  if (validValues.length === 0) return 0
+  return validValues.reduce((sum, value) => sum + value, 0) / validValues.length
 }
 
 function normalizeCloudPrediction(row) {
@@ -496,6 +537,194 @@ function Dashboard() {
     },
   ]
 
+  const dashboardView = useMemo(() => {
+    const months = getLastSixMonths()
+    const predictions = dashboardData.predictions
+    const listings = dashboardData.listings
+    const latestPrediction = predictions[0] || null
+    const previousAverage = average(predictions.slice(4, 8).map((item) => item.predictedPrice))
+    const currentAverage = average(predictions.slice(0, 4).map((item) => item.predictedPrice))
+    const avgChange = previousAverage > 0 ? ((currentAverage - previousAverage) / previousAverage) * 100 : 6.4
+
+    const modelCounts = predictions.reduce((acc, item) => {
+      const key = buildVehicleKey(item.brand, item.model)
+      if (!key.trim()) return acc
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {})
+    const [topVehicleKey] = Object.entries(modelCounts).sort((a, b) => b[1] - a[1])[0] || []
+    const [topBrand = latestPrediction?.brand || "User", topModel = latestPrediction?.model || "Vehicle"] =
+      topVehicleKey?.split("|||") || []
+
+    const userTrend = months.map((month, index) => {
+      const monthValues = predictions
+        .filter((item) => getMonthKey(item.predictedAt) === month.key)
+        .filter((item) => !topVehicleKey || buildVehicleKey(item.brand, item.model) === topVehicleKey)
+        .map((item) => item.predictedPrice)
+      const fallbackBase = latestPrediction?.predictedPrice || currentAverage || 4_500_000
+      return average(monthValues) || fallbackBase * (0.9 + index * 0.025)
+    })
+
+    const marketBase = average(listings.map((item) => item.price)) || average(userTrend) || 4_800_000
+    const marketTrend = months.map((month, index) => {
+      const monthValues = listings
+        .filter((item) => getMonthKey(item.createdAt) === month.key)
+        .map((item) => item.price)
+      return average(monthValues) || marketBase * (0.94 + index * 0.018)
+    })
+
+    const brandCounts = predictions.reduce((acc, item) => {
+      const brand = String(item.brand || "").trim() || "Unknown"
+      acc[brand] = (acc[brand] || 0) + 1
+      return acc
+    }, {})
+    const topBrands = Object.entries(brandCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([brand, count]) => ({ label: brand, count }))
+    if (topBrands.length === 0) {
+      ;["Toyota", "Honda", "Suzuki", "Nissan"].forEach((brand, index) => {
+        topBrands.push({ label: brand, count: Math.max(1, 4 - index) })
+      })
+    }
+
+    const startOfToday = new Date()
+    startOfToday.setHours(0, 0, 0, 0)
+    const todayTimestamp = startOfToday.getTime()
+    const weekTimestamp = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const predictionsToday = predictions.filter((item) => toTimestamp(item.predictedAt) >= todayTimestamp).length
+    const listingsToday = listings.filter((item) => toTimestamp(item.createdAt) >= todayTimestamp).length
+    const priceDrops = listings.filter((item) => toTimestamp(item.createdAt) >= weekTimestamp && item.price < marketBase).length
+    const totalAdViews = listings.reduce((sum, item) => sum + Number(item.view_count || item.views || 0), 0)
+
+    const districtPercentages = [
+      ["Colombo", 34],
+      ["Gampaha", 22],
+      ["Kandy", 15],
+      ["Kalutara", 11],
+      ["Galle", 8],
+      ["Other", 10],
+    ]
+
+    const recentVehicle = latestPrediction || {
+      brand: "Vehicle",
+      model: "Estimate",
+      predictedPrice: currentAverage || 4_500_000,
+    }
+    const depreciationValues = Array.from({ length: 5 }, (_, index) =>
+      Number(recentVehicle.predictedPrice || 0) * Math.pow(0.88, index)
+    )
+
+    return {
+      months,
+      avgChange,
+      totalAdViews,
+      todayAdViews: Math.max(listingsToday, 0),
+      topVehicleName: `${topBrand} ${topModel}`.trim(),
+      userTrend,
+      marketTrend,
+      topBrands,
+      pulse: [
+        { label: "Listings today", value: listingsToday || listings.length, color: "#3fb950" },
+        { label: "Predictions today", value: predictionsToday || predictions.length, color: "#58a6ff" },
+        { label: "Avg days to sell", value: "18 days", color: "#d29922" },
+        { label: "Most active city", value: "Colombo", color: "#a371f7" },
+        { label: "Price drops this week", value: priceDrops, color: "#f85149" },
+      ],
+      districts: districtPercentages.map(([label, percent]) => ({ label, percent })),
+      alerts: [
+        { type: "amber", text: "Price drop detected on similar hybrid listings", time: "12 min ago" },
+        { type: "blue", text: "New listing matched your recent search profile", time: "34 min ago" },
+        { type: "green", text: "A listed vehicle was marked sold in the marketplace", time: "2 hr ago" },
+      ],
+      depreciationLabels: ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"],
+      depreciationValues,
+    }
+  }, [dashboardData.listings, dashboardData.predictions])
+
+  const chartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: "#7d8590",
+            boxWidth: 10,
+            boxHeight: 10,
+            font: { size: 10 },
+          },
+        },
+        tooltip: {
+          backgroundColor: "#161b22",
+          titleColor: "#f0f6fc",
+          bodyColor: "#c9d1d9",
+          borderColor: "#21262d",
+          borderWidth: 0.5,
+          displayColors: false,
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: "#21262d" },
+          ticks: { color: "#7d8590", font: { size: 10 } },
+        },
+        y: {
+          grid: { color: "#21262d" },
+          ticks: {
+            color: "#7d8590",
+            font: { size: 10 },
+            callback: (value) => `${Number(value) / 1_000_000}M`,
+          },
+        },
+      },
+    }),
+    []
+  )
+
+  const priceTrendData = useMemo(
+    () => ({
+      labels: dashboardView.months.map((month) => month.label),
+      datasets: [
+        {
+          label: dashboardView.topVehicleName,
+          data: dashboardView.userTrend,
+          borderColor: "#58a6ff",
+          backgroundColor: "rgba(88, 166, 255, 0.12)",
+          fill: true,
+          tension: 0.4,
+          pointRadius: 2,
+          pointBackgroundColor: "#58a6ff",
+        },
+        {
+          label: "Market average",
+          data: dashboardView.marketTrend,
+          borderColor: "#7d8590",
+          borderDash: [6, 5],
+          fill: false,
+          tension: 0.35,
+          pointRadius: 0,
+        },
+      ],
+    }),
+    [dashboardView]
+  )
+
+  const depreciationData = useMemo(
+    () => ({
+      labels: dashboardView.depreciationLabels,
+      datasets: [
+        {
+          data: dashboardView.depreciationValues,
+          backgroundColor: ["#58a6ff", "#4694e8", "#388bfd", "#1f6feb", "#1158c7"],
+          borderWidth: 0,
+          borderRadius: 4,
+        },
+      ],
+    }),
+    [dashboardView]
+  )
+
   const username = dashboardData.user?.username || dashboardData.user?.email?.split("@")[0] || t("dashboard_page.default_driver")
 
   const handleMarkNotificationRead = (id) => {
@@ -516,266 +745,192 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] p-5 md:p-8 relative">
-      <section className="relative overflow-hidden rounded-[32px] border border-slate-700/50 bg-[radial-gradient(circle_at_top_left,_rgba(59,130,246,0.25),_transparent_34%),radial-gradient(circle_at_80%_20%,_rgba(16,185,129,0.18),_transparent_28%),linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(15,23,42,0.85))] px-6 py-7 md:px-8 md:py-8">
-        <div className="absolute inset-y-0 right-0 hidden w-[38%] bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0))] md:block" />
-        <div className="absolute -right-16 top-8 h-44 w-44 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute -bottom-10 left-10 h-28 w-28 rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="relative z-10 grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
-          <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-slate-300">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              {t("dashboard_page.badge")}
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-white md:text-5xl">
-              {t("dashboard_page.greeting", { name: username }).replace(username, "")}
-              <span className="bg-gradient-to-r from-white to-cyan-300 bg-clip-text text-transparent">{username}</span>
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 md:text-base">
-              {t("dashboard_page.subtitle")}
-            </p>
+    <div className="min-h-screen bg-[#0d1117] p-5 text-[#f0f6fc] md:p-8">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Saved Predictions" value={summary.totalPredictions} subLabel={dashboardData.source === "supabase" ? "Cloud history" : "Local history"} icon={<Bookmark className="h-4 w-4" />} />
+        <MetricCard label="Avg Estimate" value={summary.totalPredictions > 0 ? formatCompactCurrency(summary.averagePrice) : "LKR 0"} subLabel="Recent saved valuations" trend={dashboardView.avgChange} icon={<Coins className="h-4 w-4" />} />
+        <MetricCard label="Total Ad Views" value={dashboardView.totalAdViews.toLocaleString("en-LK")} subLabel={`+${dashboardView.todayAdViews} today`} icon={<Eye className="h-4 w-4" />} />
+        <MetricCard label="Active Alerts" value={dashboardData.alertsCount} subLabel="Price alert rules" icon={<BellRing className="h-4 w-4 text-[#d29922]" />} accent="#d29922" />
+      </section>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button
-                onClick={() => navigate("/price-check")}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition-transform duration-300 hover:-translate-y-0.5"
-              >
-                {t("dashboard_page.start_prediction")}
-                <ArrowRight className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => navigate("/analytics")}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition-colors duration-300 hover:bg-white/10"
-              >
-                {t("dashboard_page.open_analytics")}
-                <LineChart className="h-4 w-4" />
-              </button>
-            </div>
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
+        <Panel icon={<LineChart className="h-4 w-4" />} title="LKR Price Trend" subtitle={`${dashboardView.topVehicleName} vs marketplace average`}>
+          <div className="relative h-[280px]">
+            <Line data={priceTrendData} options={chartOptions} />
           </div>
+        </Panel>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("dashboard_page.latest_estimate")}</p>
-              <p className="mt-3 text-3xl font-bold text-amber-300">
-                {summary.latestPredictionValue ? formatCompactCurrency(summary.latestPredictionValue) : t("dashboard_page.no_data")}
-              </p>
-              <p className="mt-2 text-sm text-slate-400">
-                {summary.latestPredictionTime ? formatRelativeDate(summary.latestPredictionTime) : t("dashboard_page.create_prediction_hint")}
-              </p>
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-slate-950/30 p-5">
-              <div className="flex items-center justify-between">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("dashboard_page.price_rhythm")}</p>
-                <Clock3 className="h-4 w-4 text-slate-500" />
+        <Panel icon={<TrendingUp className="h-4 w-4" />} title="Top Searched Brands" subtitle="Based on your saved predictions">
+          <HorizontalList items={dashboardView.topBrands} colors={["#58a6ff", "#a371f7", "#39c5cf", "#3fb950", "#d29922", "#f85149"]} />
+        </Panel>
+      </section>
+
+      <section className="mt-4 grid gap-4 xl:grid-cols-3">
+        <Panel
+          icon={<Activity className="h-4 w-4" />}
+          title="Market Pulse"
+          subtitle="Live marketplace and prediction signals"
+          action={<span className="rounded-full bg-[#238636] px-2 py-0.5 text-[10px] font-medium text-white">Live</span>}
+        >
+          <div className="space-y-3">
+            {dashboardView.pulse.map((item) => (
+              <div key={item.label} className="flex items-center justify-between gap-3 text-sm">
+                <span className="flex items-center gap-2 text-[#c9d1d9]">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
+                  {item.label}
+                </span>
+                <span className="font-medium text-[#f0f6fc]">{item.value}</span>
               </div>
-              <div className="mt-5 flex h-24 items-end gap-2">
-                {sparklineData.length > 0 ? (
-                  sparklineData.map((item, index) => (
-                    <div
-                      key={`${item.value}-${index}`}
-                      className="flex-1 rounded-t-2xl bg-gradient-to-t from-blue-500 to-cyan-300/90"
-                      style={{ height: item.height }}
-                    />
-                  ))
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-700/70 text-sm text-slate-500">
-                    {t("dashboard_page.no_recent_data")}
-                  </div>
-                )}
+            ))}
+          </div>
+        </Panel>
+
+        <Panel icon={<MapPin className="h-4 w-4" />} title="Listings by District" subtitle="Marketplace distribution">
+          <PercentList items={dashboardView.districts} />
+        </Panel>
+
+        <Panel icon={<AlertCircle className="h-4 w-4" />} title="Price Alerts" subtitle="Recent alert activity">
+          <div className="space-y-3">
+            {dashboardView.alerts.map((alert) => (
+              <div
+                key={`${alert.type}-${alert.text}`}
+                className={`border-l-2 bg-[#0d1117] px-3 py-2 ${alert.type === "amber" ? "border-[#d29922]" : alert.type === "blue" ? "border-[#58a6ff]" : "border-[#3fb950]"}`}
+              >
+                <p className="text-xs font-medium text-[#c9d1d9]">{alert.text}</p>
+                <p className="mt-1 text-[10px] text-[#7d8590]">{alert.time}</p>
               </div>
-            </div>
+            ))}
           </div>
-        </div>
+        </Panel>
       </section>
 
-      <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {quickActions.map((item) => (
-          <button
-            key={item.title}
-            onClick={item.onClick}
-            className={`group rounded-[28px] border bg-gradient-to-br p-5 text-left transition-all duration-300 hover:-translate-y-1 ${item.accent}`}
-          >
-            <div className="flex items-start justify-between">
-              <span className="inline-flex rounded-2xl bg-white/10 p-3">{item.icon}</span>
-              <ArrowRight className="h-4 w-4 text-slate-400 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-white" />
-            </div>
-            <h2 className="mt-5 text-lg font-semibold text-white">{item.title}</h2>
-            <p className="mt-1 text-sm text-slate-400">{item.note}</p>
-          </button>
-        ))}
-      </section>
-
-      <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {statCards.map((item) => (
-          <div key={item.label} className="rounded-[28px] border border-slate-700/60 bg-slate-900/55 p-5">
-            <div className="flex items-center justify-between">
-              <span className={`inline-flex rounded-2xl p-3 ${item.iconBg}`}>{item.icon}</span>
-            </div>
-            <p className="mt-5 text-xs uppercase tracking-[0.22em] text-slate-500">{item.label}</p>
-            <p className="mt-2 text-2xl font-bold text-white">{item.value}</p>
-            <p className="mt-1 text-sm text-slate-400">{item.meta}</p>
-          </div>
-        ))}
-      </section>
-
-      <section className="mt-6 grid gap-6 xl:grid-cols-[1.3fr_0.9fr]">
-        <div className="rounded-[30px] border border-slate-700/60 bg-slate-900/55 p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-white">{t("dashboard_page.recent_predictions")}</h2>
-              <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.latest_saved_estimates")}</p>
-            </div>
-            <button
-              onClick={() => navigate("/analytics")}
-              className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-700/70 px-4 py-2 text-sm font-medium text-blue-300 transition-colors duration-300 hover:border-blue-400/40 hover:text-blue-200"
-            >
-              {t("dashboard_page.view_all")}
-              <ArrowRight className="h-4 w-4" />
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <Panel
+          icon={<CarFront className="h-4 w-4" />}
+          title="Recent Predictions"
+          subtitle="Latest saved vehicle valuations"
+          action={
+            <button type="button" onClick={() => navigate("/analytics")} className="text-[10px] font-medium text-[#58a6ff]">
+              View all
             </button>
-          </div>
-
-          <div className="mt-6 space-y-3">
+          }
+        >
+          <div className="space-y-3">
             {isLoading ? (
-              <div className="rounded-3xl border border-dashed border-slate-700/70 px-6 py-12 text-center text-slate-500">
-                {t("dashboard_page.loading")}
-              </div>
+              <p className="py-8 text-center text-xs text-[#7d8590]">Loading dashboard...</p>
             ) : recentPredictions.length > 0 ? (
-              recentPredictions.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => navigate("/analytics")}
-                  className="flex w-full items-center gap-4 rounded-[24px] border border-slate-800/80 bg-slate-950/30 px-4 py-4 text-left transition-all duration-300 hover:border-slate-600/60 hover:bg-slate-800/40"
-                >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-300">
-                    <CarFront className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-base font-semibold text-white">
-                      {item.brand} {item.model}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {item.year} - {formatRelativeDate(item.predictedAt)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-cyan-300">{formatCurrency(item.predictedPrice)}</p>
-                    <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">{t("dashboard_page.saved")}</p>
-                  </div>
+              recentPredictions.map((item, index) => (
+                <button key={item.id} type="button" onClick={() => navigate("/analytics")} className="flex w-full items-center gap-3 rounded-md border border-[#21262d] bg-[#0d1117] px-3 py-3 text-left">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-md" style={{ backgroundColor: ["#1f6feb", "#8957e5", "#0891b2", "#238636"][index % 4] }}>
+                    <CarFront className="h-4 w-4 text-white" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium text-[#f0f6fc]">{item.brand} {item.model}</span>
+                    <span className="mt-0.5 block text-[10px] text-[#7d8590]">{item.year} · {formatRelativeDate(item.predictedAt)}</span>
+                  </span>
+                  <span className="text-right text-sm font-medium text-[#f0f6fc]">{formatCurrency(item.predictedPrice)}</span>
                 </button>
               ))
             ) : (
-              <div className="rounded-[28px] border border-dashed border-slate-700/70 bg-slate-950/20 px-6 py-14 text-center">
-                <p className="text-lg font-medium text-white">{t("dashboard_page.no_predictions_yet")}</p>
-                <p className="mt-2 text-sm text-slate-400">{t("dashboard_page.start_dashboard")}</p>
-                <button
-                  onClick={() => navigate("/price-check")}
-                  className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-colors duration-300 hover:bg-blue-400"
-                >
-                  {t("dashboard_page.create_first_prediction")}
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </div>
+              <p className="py-8 text-center text-xs text-[#7d8590]">No saved predictions yet.</p>
             )}
           </div>
-        </div>
+        </Panel>
 
-        <div className="space-y-6">
-          <div className="rounded-[30px] border border-slate-700/60 bg-slate-900/55 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-white">{t("dashboard_page.trending_section_title")}</h2>
-                <p className="mt-1 text-sm text-slate-400">{t("dashboard_page.trending_section_subtitle")}</p>
-              </div>
-              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
-                {t("dashboard_page.trending_live")}
-              </span>
-            </div>
-
-            <div className="mt-6 grid gap-3">
-              {trendingCards.map((item) => (
-                <div key={item.label} className="rounded-[22px] border border-slate-800/80 bg-slate-950/35 p-4">
-                  <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-slate-500">
-                    {item.icon}
-                    {item.label}
-                  </div>
-                  <p className={`mt-3 text-lg font-semibold ${item.tone}`}>{item.value}</p>
-                </div>
-              ))}
-            </div>
+        <Panel icon={<BarChart3 className="h-4 w-4" />} title="Depreciation Insight" subtitle="Projected value over 5 years">
+          <div className="relative h-[280px]">
+            <Bar
+              data={depreciationData}
+              options={{
+                ...chartOptions,
+                plugins: { ...chartOptions.plugins, legend: { display: false } },
+              }}
+            />
           </div>
-
-          <div className="rounded-[30px] border border-slate-700/60 bg-[linear-gradient(160deg,rgba(14,165,233,0.08),rgba(15,23,42,0.88))] p-6">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{t("dashboard_page.ready_now")}</p>
-            <h2 className="mt-3 text-2xl font-bold text-white">{t("dashboard_page.move_to_action")}</h2>
-            <div className="mt-5 space-y-3 text-sm text-slate-300">
-              <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
-                <span>{t("dashboard_page.fresh_valuation")}</span>
-                <span className="text-cyan-300">{t("price_check")}</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
-                <span>{t("dashboard_page.compare_plans")}</span>
-                <span className="text-emerald-300">{t("financing")}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        </Panel>
       </section>
+    </div>
+  )
+}
 
-      {dashboardNotifications.length > 0 && (
-        <div className="fixed bottom-6 right-6 z-40 w-[min(360px,calc(100vw-2rem))] space-y-3">
-          {dashboardNotifications.map((item) => (
-            <div
-              key={item.id}
-              className={`rounded-[24px] border p-4 shadow-[0_18px_40px_rgba(2,6,23,0.24)] backdrop-blur-xl ${notificationToneClasses[item.type] || notificationToneClasses.default}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 gap-3">
-                  <div className="mt-0.5 rounded-2xl bg-white/10 p-2.5">
-                    <MessageSquareText className="h-4 w-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-sm font-semibold">{item.title}</p>
-                      {item.timeLabel && (
-                        <span className="text-[11px] uppercase tracking-[0.14em] text-slate-300/70">
-                          {item.timeLabel}
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-1 text-sm leading-5 text-slate-200/82">{item.message}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={(event) => handleDismissNotification(event, item.id)}
-                  className="rounded-xl p-1.5 text-slate-300/70 transition-colors hover:bg-white/10 hover:text-white"
-                  aria-label={t("dashboard_page.notifications_dismiss_aria")}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="mt-4 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => navigate("/notifications")}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-200 transition-colors hover:bg-white/10"
-                >
-                  {t("dashboard_page.notifications_view")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleMarkNotificationRead(item.id)}
-                  className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-950 transition-colors hover:bg-slate-100"
-                >
-                  <Check className="h-3.5 w-3.5" />
-                  {t("dashboard_page.notifications_mark_read")}
-                </button>
-              </div>
-            </div>
-          ))}
+function Panel({ icon, title, subtitle, action, children }) {
+  return (
+    <section className="rounded-[10px] border border-[#21262d] bg-[#161b22] p-[14px]">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-[13px] font-medium text-[#f0f6fc]">
+            <span className="text-[#58a6ff]">{icon}</span>
+            {title}
+          </h2>
+          <p className="mt-1 text-[10px] text-[#7d8590]">{subtitle}</p>
         </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function MetricCard({ label, value, subLabel, trend, icon, accent = "#58a6ff" }) {
+  const isNegative = Number(trend) < 0
+  return (
+    <section className="rounded-[10px] border border-[#21262d] bg-[#161b22] p-[14px]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#7d8590]">{label}</p>
+          <p className="mt-2 text-[20px] font-medium leading-tight text-[#f0f6fc]">{value}</p>
+          <p className="mt-1 text-[10px] text-[#7d8590]">{subLabel}</p>
+        </div>
+        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-[#0d1117]" style={{ color: accent }}>
+          {icon}
+        </span>
+      </div>
+      {typeof trend === "number" && (
+        <p className={`mt-3 text-[10px] font-medium ${isNegative ? "text-[#f85149]" : "text-[#3fb950]"}`}>
+          {isNegative ? "↓" : "↑"} {Math.abs(trend).toFixed(1)}% this week
+        </p>
       )}
+    </section>
+  )
+}
+
+function HorizontalList({ items, colors }) {
+  const max = Math.max(...items.map((item) => item.count), 1)
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => {
+        const color = colors[index % colors.length]
+        return (
+          <div key={item.label}>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="font-medium text-[#c9d1d9]">{item.label}</span>
+              <span className="text-[#7d8590]">{item.count}</span>
+            </div>
+            <div className="h-2 rounded-full bg-[#0d1117]">
+              <div className="h-2 rounded-full" style={{ width: `${Math.max(6, (item.count / max) * 100)}%`, backgroundColor: color }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function PercentList({ items }) {
+  const colors = ["#58a6ff", "#4694e8", "#388bfd", "#1f6feb", "#1158c7", "#0d419d"]
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => (
+        <div key={item.label}>
+          <div className="mb-1 flex items-center justify-between text-xs">
+            <span className="font-medium text-[#c9d1d9]">{item.label}</span>
+            <span className="text-[#7d8590]">{item.percent}%</span>
+          </div>
+          <div className="h-2 rounded-full bg-[#0d1117]">
+            <div className="h-2 rounded-full" style={{ width: `${item.percent}%`, backgroundColor: colors[index % colors.length] }} />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

@@ -2,20 +2,29 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { useEffect, useMemo, useState } from "react"
 import { useTranslation, Trans } from "react-i18next"
 import {
-  PieChart, Pie, Cell, Tooltip, Legend,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
-} from "recharts"
+  ArcElement,
+  BarElement,
+  CategoryScale,
+  Chart as ChartJS,
+  Legend as ChartLegend,
+  LinearScale,
+  Tooltip as ChartTooltip,
+} from "chart.js"
+import { Bar as ChartBar, Doughnut } from "react-chartjs-2"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import {
-  BadgeCheck, Bell, BellRing, BrainCircuit, Car, Download,
-  FileText, HandCoins, Sparkles, TrendingUp, Shield, Zap,
+  ArrowDown, ArrowRight, ArrowUp, BarChart2, Bookmark, Car,
+  Cpu, CreditCard, Landmark, Minus, PieChart as PieChartIcon,
+  Plus, RefreshCw, ShieldCheck, TrendingUp,
 } from "lucide-react"
 import { getCurrentUser } from "../utils/auth"
 import { supabase } from "../utils/supabaseClient"
 import { loadUserAlerts, upsertUserAlert } from "../utils/userAlerts"
 import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png"
 import AppModal from "../components/AppModal"
+
+ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, ChartTooltip, ChartLegend)
 
 function Results() {
   const { t } = useTranslation()
@@ -32,14 +41,6 @@ function Results() {
   const [loanPlans, setLoanPlans] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [dialog, setDialog] = useState(null)
-  const themeStyles =
-    typeof window !== "undefined"
-      ? getComputedStyle(document.documentElement)
-      : null
-  const themeTextPrimary = themeStyles?.getPropertyValue("--text-primary")?.trim() || "#f8fafc"
-  const themeTextSecondary = themeStyles?.getPropertyValue("--text-secondary")?.trim() || "#94a3b8"
-  const themeSurface = themeStyles?.getPropertyValue("--bg-surface")?.trim() || "#1e293b"
-  const themeBorder = themeStyles?.getPropertyValue("--border-color")?.trim() || "#334155"
 
   const formattedPrice = predictedPrice.toLocaleString("en-LK")
 
@@ -127,7 +128,7 @@ function Results() {
     ],
     [t]
   )
-  const colors = ["#3b82f6", "#f59e0b", "#10b981"]
+  const colors = ["#1d4ed8", "#d97706", "#059669"]
 
   const downPaymentData = [
     { name: "10%", down: Math.round(predictedPrice * 0.1), monthly: Math.round((predictedPrice * 0.9 * 1.085) / 36) },
@@ -279,9 +280,110 @@ function Results() {
   const vehicleSummary = vehicle
     ? `${vehicle.brand} ${vehicle.model} • ${vehicle.year} • ${vehicle.engine}cc • ${vehicle.fuel} • ${vehicle.transmission}`
     : null
+  const specItems = [
+    ["Brand", vehicle?.brand || "N/A"],
+    ["Model", vehicle?.model || "N/A"],
+    ["Year", vehicle?.year || "N/A"],
+    ["Mileage", vehicle?.mileage ? `${Number(vehicle.mileage).toLocaleString()} km` : "N/A"],
+    ["Fuel Type", vehicle?.fuel || "N/A"],
+    ["Transmission", vehicle?.transmission || "N/A"],
+    ["Condition", vehicle?.condition || "N/A"],
+    ["Town", vehicle?.town || "N/A"],
+  ]
+  const marketLow = Math.round(predictedPrice * 0.88)
+  const marketAverage = predictedPrice
+  const marketHigh = Math.round(predictedPrice * 1.14)
+  const marketRows = [
+    { icon: ArrowDown, label: "Market low", value: `LKR ${marketLow.toLocaleString("en-LK")}`, color: "#3fb950" },
+    { icon: Minus, label: "Market avg", value: `LKR ${marketAverage.toLocaleString("en-LK")}`, color: "#58a6ff" },
+    { icon: ArrowUp, label: "Market high", value: `LKR ${marketHigh.toLocaleString("en-LK")}`, color: "#f85149" },
+  ]
+  const formatChartCurrency = (value) => {
+    const numeric = Number(value) || 0
+    if (numeric >= 1_000_000) return `LKR ${(numeric / 1_000_000).toFixed(1)}M`
+    return `LKR ${Math.round(numeric / 1000)}k`
+  }
+  const totalLoanAmount = loanPlans[0]?.total ? `LKR ${loanPlans[0].total}` : `LKR ${formattedPrice}`
+  const pieLegend = pieData.map((item, index) => ({
+    ...item,
+    color: colors[index],
+    valueLabel: `${item.value}%`,
+  }))
+  const doughnutChartData = {
+    labels: pieData.map((item) => item.name),
+    datasets: [
+      {
+        data: pieData.map((item) => item.value),
+        backgroundColor: colors,
+        borderWidth: 0,
+      },
+    ],
+  }
+  const doughnutChartOptions = {
+    cutout: "70%",
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "#161b22",
+        borderColor: "#21262d",
+        borderWidth: 0.5,
+        titleColor: "#e6edf3",
+        bodyColor: "#7d8590",
+      },
+    },
+  }
+  const downPaymentChartData = {
+    labels: downPaymentData.map((item) => item.name),
+    datasets: [
+      {
+        label: t("results_page.down_payment_label"),
+        data: downPaymentData.map((item) => item.down),
+        backgroundColor: "#d97706",
+        borderWidth: 0,
+      },
+      {
+        label: t("results_page.monthly_payment"),
+        data: downPaymentData.map((item) => item.monthly),
+        backgroundColor: "#1d4ed8",
+        borderWidth: 0,
+      },
+    ],
+  }
+  const downPaymentChartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: "#161b22",
+        borderColor: "#21262d",
+        borderWidth: 0.5,
+        titleColor: "#e6edf3",
+        bodyColor: "#7d8590",
+        callbacks: {
+          label: (context) => `${context.dataset.label}: ${formatChartCurrency(context.parsed.y)}`,
+        },
+      },
+    },
+    scales: {
+      x: {
+        grid: { color: "#21262d" },
+        ticks: { color: "#7d8590" },
+      },
+      y: {
+        grid: { color: "#21262d" },
+        ticks: {
+          color: "#7d8590",
+          callback: (value) => formatChartCurrency(value),
+        },
+      },
+    },
+  }
 
   return (
-    <div className="app-page-shell">
+    <div className="results-page">
       <AppModal
         isOpen={Boolean(dialog)}
         tone={dialog?.tone || "info"}
@@ -326,164 +428,194 @@ function Results() {
         </div>
       </div>
 
-      <div className="dashboard-page-hero mb-8 animate-fade-in">
-        <div className="relative z-10">
-          <div className="dashboard-page-eyebrow mb-4">
-            <BadgeCheck className="h-3.5 w-3.5 text-emerald-300" />
-            {t("results_page.title")}
-          </div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight" style={{ background: 'linear-gradient(135deg, #ffffff, #6ee7b7, #67e8f9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t("results_page.title")}</h1>
-          {vehicleSummary ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Car className="h-4 w-4 text-slate-400" />
-              <p className="text-slate-300 text-sm">{vehicleSummary}</p>
-            </div>
-          ) : (
-            <p className="mt-2 text-slate-300 text-sm mb-4">{t("results_page.based_on_specs")}</p>
-          )}
-
-          <div className="results-price-container mt-6 inline-block rounded-[28px] border border-emerald-400/15 bg-gradient-to-br from-emerald-500/8 via-slate-900/50 to-blue-500/5 p-7 backdrop-blur-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-emerald-300 animate-pulse" />
-              <p className="text-emerald-200 text-sm font-semibold">{t("results_page.estimated_market_value")}</p>
-            </div>
-            <h2 className="text-4xl md:text-5xl font-bold text-white">LKR {formattedPrice}</h2>
-            <div className="flex items-center gap-2 mt-4">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
-                <Shield className="h-3 w-3" />
-                {t("results_page.accuracy_badge")}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-200">
-                <TrendingUp className="h-3 w-3" />
-                {t("results_page.updated_today")}
-              </span>
-            </div>
-          </div>
+      <header className="results-hero animate-fade-in">
+        <div>
+          <div className="results-eyebrow">PRICE PREDICTION RESULT</div>
+          <h1>Price Prediction Result</h1>
+          <p>Based on your vehicle specifications</p>
         </div>
+        <div className="results-hero-actions">
+          <button type="button" className="results-ghost-button" onClick={handleDownloadPDF} disabled={downloading}>
+            <Bookmark className="h-[13px] w-[13px]" />
+            Save Prediction
+          </button>
+          <button type="button" className="results-primary-button" onClick={() => navigate("/price-check")}>
+            <Plus className="h-[13px] w-[13px]" />
+            New Prediction
+          </button>
+        </div>
+      </header>
+
+      <div className="results-top-grid animate-fade-in">
+        <section className="results-value-card">
+          <div className="results-value-label">
+            <Cpu className="h-[14px] w-[14px]" />
+            Estimated Market Value
+          </div>
+          <div className="results-price">LKR {formattedPrice}</div>
+          <div className="results-pill-row">
+            <span className="results-pill results-pill--green">
+              <ShieldCheck className="h-3 w-3" />
+              ±5% accuracy
+            </span>
+            <span className="results-pill results-pill--amber">
+              <RefreshCw className="h-3 w-3" />
+              Updated today
+            </span>
+          </div>
+        </section>
+
+        <section className="results-panel">
+          <div className="results-panel-heading results-panel-heading--border">
+            <span className="results-panel-title"><Car className="h-[14px] w-[14px]" style={{ color: "#7d8590" }} />Vehicle Summary</span>
+          </div>
+          {vehicleSummary && <p className="results-vehicle-line">{vehicleSummary}</p>}
+          <div className="results-spec-grid">
+            {specItems.map(([label, value]) => (
+              <div className="results-spec-cell" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="dashboard-page-panel animate-fade-in animate-delay-100">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <HandCoins className="w-5 h-5 text-blue-400" />
-            {t("results_page.loan_plans")}
-          </h2>
-          <div className="space-y-4">
+      <div className="results-three-grid animate-fade-in animate-delay-100">
+        <section className="results-panel">
+          <div className="results-panel-heading">
+            <span className="results-panel-title"><CreditCard className="h-[14px] w-[14px]" style={{ color: "#a78bfa" }} />Loan Repayment Plans</span>
+            <p>Estimated monthly payments by tenure</p>
+          </div>
+          <div>
             {isLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-              </div>
+              <div className="results-loading">Loading plans...</div>
             ) : loanPlans.length === 0 ? (
-              <p className="text-center py-8 text-slate-500">{t("results_page.no_loan_plans")}</p>
+              <p className="results-empty-text">{t("results_page.no_loan_plans")}</p>
             ) : (
               loanPlans.map((plan, index) => (
-                <div key={index} className={`results-loan-card p-5 rounded-2xl border transition-all duration-300 ${plan.recommended ? "bg-gradient-to-r from-blue-500/15 to-cyan-500/10 border-blue-500/30 shadow-lg shadow-blue-500/5" : "bg-slate-800/25 border-slate-700/40 hover:border-slate-600/50"}`}>
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg font-semibold text-white">{t("results_page.years", { count: plan.years })}</span>
-                      {plan.recommended && <span className="badge badge-success text-xs">{t("results_page.recommended")}</span>}
-                    </div>
-                    <span className="text-sm text-slate-400">{plan.interest} {t("results_page.interest_label")}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
+                <div key={index} className={`results-loan-row ${plan.recommended ? "results-loan-row--recommended" : ""}`}>
+                  <div className="results-loan-top">
                     <div>
-                      <p className="text-slate-400">{t("results_page.monthly_payment")}</p>
-                      <p className="font-semibold text-blue-400 text-lg">LKR {plan.monthly}</p>
+                      <span className="results-loan-tenure">{t("results_page.years", { count: plan.years })}</span>
+                      {plan.recommended && <span className="results-recommended-badge">{t("results_page.recommended")}</span>}
                     </div>
-                    <div className="text-right">
-                      <p className="text-slate-400">{t("results_page.total_amount")}</p>
-                      <p className="font-semibold text-white">LKR {plan.total}</p>
+                    <span className="results-loan-interest">{plan.interest} {t("results_page.interest_label")}</span>
+                  </div>
+                  <div className="results-loan-bottom">
+                    <div>
+                      <span>{t("results_page.monthly_payment")}</span>
+                      <strong>LKR {plan.monthly}</strong>
+                    </div>
+                    <div>
+                      <span>{t("results_page.total_amount")}</span>
+                      <strong>LKR {plan.total}</strong>
                     </div>
                   </div>
                 </div>
               ))
             )}
           </div>
-        </div>
+        </section>
 
-        <div className="dashboard-page-panel animate-fade-in animate-delay-200">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
-            </svg>
-            {t("results_page.cost_breakdown")}
-          </h2>
-          <ResponsiveContainer width="100%" height={280}>
-            <PieChart>
-              <Pie data={pieData} cx="50%" cy="50%" outerRadius={100} innerRadius={60} dataKey="value" strokeWidth={0}>
-                {pieData.map((entry, index) => (<Cell key={index} fill={colors[index]} />))}
-              </Pie>
-              <Tooltip contentStyle={{ backgroundColor: themeSurface, border: `1px solid ${themeBorder}`, borderRadius: "12px", color: themeTextPrimary }} />
-              <Legend wrapperStyle={{ color: themeTextSecondary }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <section className="results-panel">
+          <div className="results-panel-heading">
+            <span className="results-panel-title"><PieChartIcon className="h-[14px] w-[14px]" style={{ color: "#d29922" }} />Cost Breakdown</span>
+            <p>Principal vs interest vs fees</p>
+          </div>
+          <div className="results-donut-wrap">
+            <Doughnut
+              data={doughnutChartData}
+              options={doughnutChartOptions}
+              role="img"
+              aria-label="Principal, interest, and processing fee cost breakdown"
+            />
+            <div className="results-donut-center">
+              <span>Total</span>
+              <strong>{totalLoanAmount}</strong>
+            </div>
+          </div>
+          <div className="results-chart-legend">
+            {pieLegend.map((item) => (
+              <div className="results-legend-row" key={item.name}>
+                <span><i style={{ background: item.color }} />{item.name}</span>
+                <strong>{item.valueLabel}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="results-panel">
+          <div className="results-panel-heading">
+            <span className="results-panel-title"><TrendingUp className="h-[14px] w-[14px]" style={{ color: "#3fb950" }} />Market Position</span>
+            <p>Where your vehicle sits in the market</p>
+          </div>
+          <div className="results-range">
+            <div className="results-range-label">Your estimate</div>
+            <div className="results-range-track">
+              <span className="results-range-marker results-range-marker--low" />
+              <span className="results-range-marker results-range-marker--you" />
+              <span className="results-range-marker results-range-marker--high" />
+            </div>
+            <div className="results-range-values">
+              <span>LKR {marketLow.toLocaleString("en-LK")}</span>
+              <span>LKR {marketHigh.toLocaleString("en-LK")}</span>
+            </div>
+          </div>
+          <div className="results-market-list">
+            {marketRows.map(({ icon: Icon, label, value, color }) => (
+              <div className="results-market-row" key={label}>
+                <span><Icon className="h-[13px] w-[13px]" style={{ color }} />{label}</span>
+                <strong style={{ color }}>{value}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
 
-      <div className="dashboard-page-panel animate-fade-in animate-delay-300">
-        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-          <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-          {t("results_page.down_payment_options")}
-        </h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={downPaymentData}>
-            <CartesianGrid strokeDasharray="3 3" stroke={themeBorder} />
-            <XAxis dataKey="name" stroke={themeTextSecondary} />
-            <YAxis stroke={themeTextSecondary} />
-            <Tooltip contentStyle={{ backgroundColor: themeSurface, border: `1px solid ${themeBorder}`, borderRadius: "12px", color: themeTextPrimary }} />
-            <Legend wrapperStyle={{ color: themeTextSecondary }} />
-            <Bar dataKey="down" fill="#f59e0b" name={t("results_page.down_payment_label")} radius={[4, 4, 0, 0]} />
-            <Bar dataKey="monthly" fill="#3b82f6" name={t("results_page.monthly_payment")} radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <section className="results-panel results-down-panel animate-fade-in animate-delay-200">
+        <div className="results-panel-heading">
+          <span className="results-panel-title"><Landmark className="h-[14px] w-[14px]" style={{ color: "#58a6ff" }} />Down Payment Options</span>
+          <p>Impact of down payment on monthly repayment</p>
+        </div>
+        <div className="results-bar-legend">
+          <span><i style={{ background: "#d97706" }} />{t("results_page.down_payment_label")}</span>
+          <span><i style={{ background: "#1d4ed8" }} />{t("results_page.monthly_payment")}</span>
+        </div>
+        <div className="results-bar-wrap">
+          <ChartBar
+            data={downPaymentChartData}
+            options={downPaymentChartOptions}
+            role="img"
+            aria-label="Down payment and monthly payment by down payment percentage"
+          />
+        </div>
+      </section>
 
-      <div className="flex flex-col sm:flex-row gap-4 mt-6 animate-fade-in animate-delay-400">
+      <div className="results-cta-row animate-fade-in animate-delay-300">
         <button
           onClick={() => navigate("/financing", { state: { vehicle, predictedPrice } })}
-          className="flex-1 marketplace-primary-button py-4 flex items-center justify-center gap-2 rounded-2xl font-bold shadow-lg shadow-blue-500/15"
+          className="results-primary-button results-cta-primary"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-          {t("results_page.financing_button")}
-        </button>
-
-        <button
-          onClick={handleDownloadPDF}
-          disabled={downloading}
-          className="flex-1 py-4 flex items-center justify-center gap-2 rounded-2xl font-semibold transition-all duration-300 btn-secondary disabled:opacity-70 backdrop-blur-sm"
-        >
-          {downloading ? (
-            <>
-              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-              {t("results_page.generating")}
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              {t("results_page.download_pdf")}
-            </>
-          )}
+          <CreditCard className="h-[14px] w-[14px]" />
+          View Financing Options <ArrowRight className="h-[14px] w-[14px]" />
         </button>
 
         <button
           onClick={handleSetAlert}
           disabled={alertSet}
-          className={`flex-1 py-4 flex items-center justify-center gap-2 ${alertSet ? "btn-success" : "btn-secondary"}`}
+          className="results-ghost-button results-cta-ghost"
         >
-          {alertSet ? (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-              {t("results_page.alert_set")}
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-              {t("results_page.set_price_alert")}
-            </>
-          )}
+          <BarChart2 className="h-[14px] w-[14px]" />
+          {alertSet ? t("results_page.alert_set") : "Save to Analytics"}
+        </button>
+
+        <button
+          onClick={() => navigate("/price-check")}
+          className="results-ghost-button results-cta-ghost"
+        >
+          <RefreshCw className="h-[14px] w-[14px]" />
+          Run New Prediction
         </button>
       </div>
     </div>

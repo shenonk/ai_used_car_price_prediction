@@ -7,6 +7,21 @@ import { supabase } from "../utils/supabaseClient";
 import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png";
 import AppModal from "../components/AppModal";
 import AppDropdown from "../components/AppDropdown";
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Building2,
+    Check,
+    CreditCard,
+    Download,
+    FileText,
+    Landmark,
+    Repeat,
+    Shield,
+    Table,
+    Tag,
+    Wallet,
+} from "lucide-react";
 
 // ============================================
 // COMPONENT
@@ -98,6 +113,34 @@ function VehicleFinancingOptions() {
         rose: { bg: "bg-rose-500/10", border: "border-rose-500/30", text: "text-rose-400", hover: "hover:border-rose-500/60" },
         purple: { bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-400", hover: "hover:border-purple-500/60" },
     };
+
+    const getInitials = (name) => String(name || "NA")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join("") || "NA";
+
+    const financingTypeCards = [
+        {
+            id: "loan",
+            title: "Vehicle Loan",
+            subtitle: "Bank financing with fixed EMIs",
+            icon: CreditCard,
+        },
+        {
+            id: "leasing",
+            title: "Vehicle Leasing",
+            subtitle: "Leasing company financing",
+            icon: FileText,
+        },
+        {
+            id: "draft",
+            title: "Vehicle Draft",
+            subtitle: "Short-term vehicle finance",
+            icon: Shield,
+        },
+    ];
 
     const handleDownloadPDF = async () => {
         setDownloading(true);
@@ -245,6 +288,255 @@ function VehicleFinancingOptions() {
             setDownloading(false);
         }
     };
+
+    return (
+        <div className="financing-page">
+            <AppModal
+                isOpen={Boolean(dialog)}
+                tone="warning"
+                eyebrow="Financing"
+                title={dialog?.title || ""}
+                message={dialog?.message || ""}
+                confirmLabel="OK"
+                onConfirm={() => setDialog(null)}
+            />
+
+            {!vehicle && (
+                <div className="financing-warning animate-fade-in">
+                    <AlertTriangle className="h-[15px] w-[15px]" />
+                    <div>
+                        <p>Sample data shown</p>
+                        <span>
+                            Go to{" "}
+                            <button type="button" onClick={() => navigate("/price-check")}>Price Check</button>
+                            {" "}to get a personalized prediction
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            <header className="financing-hero animate-fade-in">
+                <div>
+                    <div className="financing-eyebrow">FINANCING</div>
+                    <h1>Vehicle Financing Options</h1>
+                    <p>Explore loan and leasing options for your vehicle</p>
+                </div>
+                <button
+                    type="button"
+                    onClick={handleDownloadPDF}
+                    disabled={downloading || institutions.length === 0}
+                    className="financing-ghost-button"
+                >
+                    <Download className="h-[13px] w-[13px]" />
+                    Download Financing Report
+                </button>
+            </header>
+
+            <section className="financing-metrics animate-fade-in">
+                <article className="financing-metric-card">
+                    <Tag className="financing-metric-icon financing-metric-icon--blue" />
+                    <span>Predicted Price</span>
+                    <strong className="financing-metric-value--blue">LKR {formattedPrice}</strong>
+                </article>
+                <article className="financing-metric-card">
+                    <Wallet className="financing-metric-icon financing-metric-icon--amber" />
+                    <span>Down Payment ({downPaymentPercent}%)</span>
+                    <strong>LKR {downPayment.toLocaleString("en-LK")}</strong>
+                    <p>{downPaymentPercent}% of vehicle price</p>
+                </article>
+                <article className="financing-metric-card">
+                    <Landmark className="financing-metric-icon financing-metric-icon--green" />
+                    <span>Loan Amount</span>
+                    <strong>LKR {loanAmount.toLocaleString("en-LK")}</strong>
+                    <p>Amount to be financed</p>
+                </article>
+            </section>
+
+            <section className="financing-section animate-fade-in animate-delay-100">
+                <div className="financing-section-title">
+                    <Repeat className="h-[14px] w-[14px]" style={{ color: "#58a6ff" }} />
+                    <h2>Select Financing Type</h2>
+                </div>
+                <div className="financing-type-grid">
+                    {financingTypeCards.map((type) => {
+                        const Icon = type.icon;
+                        const isSelected = financingType === type.id;
+                        return (
+                            <button
+                                type="button"
+                                key={type.id}
+                                onClick={() => { setFinancingType(type.id); setSelectedInstitution(null); }}
+                                className={`financing-type-card ${isSelected ? "is-selected" : ""}`}
+                            >
+                                <span className="financing-type-icon"><Icon className="h-4 w-4" /></span>
+                                <strong>{type.title}</strong>
+                                <p>{type.subtitle}</p>
+                                {isSelected && (
+                                    <span className="financing-selected-row">
+                                        <Check className="h-3 w-3" />
+                                        Selected
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
+                </div>
+            </section>
+
+            <section className="financing-section animate-fade-in animate-delay-200">
+                <div className="financing-section-title">
+                    <Building2 className="h-[14px] w-[14px]" style={{ color: "#a78bfa" }} />
+                    <h2>Select a Bank</h2>
+                </div>
+                {isLoading ? (
+                    <div className="financing-empty">Currently fetching the latest Sri Lankan banking rates...</div>
+                ) : filteredInstitutions.length === 0 ? (
+                    <div className="financing-empty">No financing options available for this category yet.</div>
+                ) : (
+                    <div className="financing-bank-grid">
+                        {filteredInstitutions.map((inst) => {
+                            const isSelected = selectedInstitution?.id === inst.id;
+                            return (
+                                <button
+                                    type="button"
+                                    key={inst.id}
+                                    onClick={() => { setSelectedInstitution(inst); setTenure(Math.min(tenure, inst.maxTenure)); }}
+                                    className={`financing-bank-card ${isSelected ? "is-selected" : ""}`}
+                                >
+                                    <div className="financing-bank-top">
+                                        <span className="financing-bank-avatar">
+                                            {inst.logo ? <img src={inst.logo} alt="" /> : getInitials(inst.name)}
+                                        </span>
+                                        <span>
+                                            <strong>{inst.name}</strong>
+                                            <em>{inst.type}</em>
+                                        </span>
+                                    </div>
+                                    <div className="financing-bank-divider" />
+                                    <div className="financing-bank-bottom">
+                                        <span>
+                                            <em>Interest Rate</em>
+                                            <strong>{inst.interestRate}%</strong>
+                                        </span>
+                                        <span>
+                                            <em>Max Tenure</em>
+                                            <strong>{inst.maxTenure} months</strong>
+                                        </span>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
+
+            <section className="financing-comparison animate-fade-in animate-delay-300">
+                <div className="financing-comparison-heading">
+                    <div className="financing-section-title">
+                        <Table className="h-[14px] w-[14px]" style={{ color: "#d29922" }} />
+                        <h2>Financing Comparison</h2>
+                    </div>
+                    <div className="financing-toggle-pills">
+                        <button
+                            type="button"
+                            onClick={() => { setFinancingType("loan"); setSelectedInstitution(null); }}
+                            className={financingType === "loan" ? "is-active" : ""}
+                        >
+                            Banks
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setFinancingType("leasing"); setSelectedInstitution(null); }}
+                            className={financingType === "leasing" ? "is-active" : ""}
+                        >
+                            Leasing
+                        </button>
+                    </div>
+                </div>
+
+                <div className="financing-table-shell">
+                    {isLoading ? (
+                        <div className="financing-empty">Loading comparison data...</div>
+                    ) : filteredInstitutions.length === 0 ? (
+                        <div className="financing-empty">No data available to compare.</div>
+                    ) : (
+                        <table className="financing-table">
+                            <thead>
+                                <tr>
+                                    <th>Institution</th>
+                                    <th>Interest Rate</th>
+                                    <th>Max Tenure</th>
+                                    <th>Min Down Payment</th>
+                                    <th>Est. Monthly Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredInstitutions.map((inst) => {
+                                    const instMonthlyRate = inst.interestRate / 100 / 12;
+                                    const actualDownPayment = Math.max(downPaymentPercent, inst.minDownPayment);
+                                    const instLoan = predictedPrice * (1 - actualDownPayment / 100);
+                                    const actualTenure = Math.min(tenure, inst.maxTenure);
+                                    const instEmi = financingType === "draft"
+                                        ? Math.round((instLoan * (inst.interestRate / 100)) / 12)
+                                        : Math.round(
+                                            (instLoan * instMonthlyRate * Math.pow(1 + instMonthlyRate, actualTenure)) /
+                                            (Math.pow(1 + instMonthlyRate, actualTenure) - 1)
+                                        );
+
+                                    return (
+                                        <tr
+                                            key={inst.id}
+                                            onClick={() => { setSelectedInstitution(inst); setTenure(Math.min(tenure, inst.maxTenure)); }}
+                                        >
+                                            <td>
+                                                <div className="financing-table-institution">
+                                                    <span>{inst.logo ? <img src={inst.logo} alt="" /> : getInitials(inst.name)}</span>
+                                                    <div>
+                                                        <strong>{inst.name}</strong>
+                                                        <em>{inst.type}</em>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td><span className="financing-rate-pill">{inst.interestRate}%</span></td>
+                                            <td>{inst.maxTenure} months</td>
+                                            <td>{inst.minDownPayment}%</td>
+                                            <td>
+                                                <strong className="financing-monthly">LKR {instEmi.toLocaleString("en-LK")}</strong>
+                                                <p>for {actualTenure} months</p>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                    <div className="financing-footnote">
+                        * Estimated monthly payment based on down payment ({downPaymentPercent}%) and tenure ({tenure} months), adjusted for institution limits.
+                    </div>
+                </div>
+            </section>
+
+            <div className="financing-actions animate-fade-in animate-delay-400">
+                <button
+                    type="button"
+                    onClick={() => navigate("/results", { state: { vehicle, predictedPrice } })}
+                    className="financing-ghost-button financing-action-back"
+                >
+                    <ArrowLeft className="h-[14px] w-[14px]" />
+                    Back to Results
+                </button>
+                <button
+                    type="button"
+                    onClick={handleDownloadPDF}
+                    disabled={downloading || institutions.length === 0}
+                    className="financing-primary-button"
+                >
+                    <Download className="h-[14px] w-[14px]" />
+                    {downloading ? "Generating Report..." : "Download Financing Report"}
+                </button>
+            </div>
+        </div>
+    );
 
     return (
         <div className="app-page-shell">

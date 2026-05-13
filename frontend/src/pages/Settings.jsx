@@ -13,7 +13,11 @@ import {
   Clock,
   LogOut,
   Moon,
-  Lock
+  Lock,
+  TrendingUp,
+  Edit2,
+  BellOff,
+  Plus,
 } from "lucide-react";
 import { getCurrentUser, logout, updatePassword } from "../utils/auth";
 import { useNavigate } from "react-router-dom";
@@ -241,11 +245,11 @@ function Settings() {
   };
 
   const tabs = [
-    { id: "profile", label: t("profile"), icon: <User size={20} /> },
-    { id: "notifications", label: t("notification_preferences"), icon: <Bell size={20} /> },
-    { id: "alerts", label: t("manage_alerts"), icon: <Zap size={20} /> },
-    { id: "security", label: t("settings_page.security.tab"), icon: <Lock size={20} /> },
-    { id: "general", label: t("language_preferences"), icon: <Globe size={20} /> },
+    { id: "profile", label: "Profile", icon: <User size={15} /> },
+    { id: "notifications", label: "Notification Preferences", icon: <Bell size={15} /> },
+    { id: "alerts", label: "Manage Price Alerts", icon: <TrendingUp size={15} /> },
+    { id: "security", label: "Security", icon: <Lock size={15} /> },
+    { id: "general", label: "Language & Region", icon: <Globe size={15} /> },
   ];
 
   if (isLoading) {
@@ -257,7 +261,7 @@ function Settings() {
   }
 
   return (
-    <div className="app-page-shell animate-fade-in">
+    <div className="settings-page app-page-shell animate-fade-in">
       <SuccessToast
         isOpen={toast.isOpen && toast.type === "success"}
         message={toast.message}
@@ -290,47 +294,48 @@ function Settings() {
           </div>
         </div>
       )}
-      <div className="w-full">
-        <div className="dashboard-page-hero mb-10">
-          <div className="dashboard-page-eyebrow mb-4">{t("settings")}</div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-2">{t("settings")}</h1>
-          <p className="text-sm text-slate-300 max-w-2xl">{t("settings_page.subtitle")}</p>
+      <div className="settings-page-inner">
+        <div className="settings-hero">
+          <div>
+            <div className="settings-hero-eyebrow">SETTINGS</div>
+            <h1>Settings</h1>
+            <p>Manage your account, preferences, and data security</p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="settings-layout">
           
           {/* Sidebar Tabs */}
-          <div className="lg:col-span-1 space-y-2">
+          <div className="settings-nav-panel">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl transition-all duration-300 ${
+                className={`settings-nav-item ${
                   activeTab === tab.id 
-                    ? 'settings-tab-button active border' 
-                    : 'settings-tab-button'
+                    ? 'active' 
+                    : ''
                 }`}
               >
                 {tab.icon}
-                <span className="font-semibold">{tab.label}</span>
-                {activeTab === tab.id && <ChevronRight size={16} className="ml-auto" />}
+                <span>{tab.label}</span>
               </button>
             ))}
             
-            <div className="theme-divider pt-4 mt-4 border-t">
+            <div className="settings-nav-divider">
                 <button 
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-rose-400 hover:bg-rose-500/10 transition-all duration-300"
+                  className="settings-nav-logout"
                 >
-                  <LogOut size={20} />
-                  <span className="font-semibold">{t("logout")}</span>
+                  <LogOut size={15} />
+                  <span>{t("logout")}</span>
                 </button>
             </div>
           </div>
 
           {/* Content Area */}
-          <div className="lg:col-span-3">
-            <div className="dashboard-page-panel min-h-[500px]">
+          <div className="settings-content-wrap">
+            <div className="settings-content-panel">
               
               {/* Profile Tab */}
               {activeTab === "profile" && (
@@ -341,7 +346,7 @@ function Settings() {
                         {userInfo.avatar_url ? (
                             <img src={userInfo.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                         ) : (
-                            <User size={40} className="text-slate-500" />
+                            <span className="settings-avatar-initial">{(userInfo.username || userInfo.email || "U").charAt(0).toUpperCase()}</span>
                         )}
                       </div>
                     </div>
@@ -350,6 +355,10 @@ function Settings() {
                       <p className="text-slate-400">{userInfo.email}</p>
                       <span className="badge badge-info mt-2">Personal Account</span>
                     </div>
+                    <button type="button" className="settings-edit-profile">
+                      <Edit2 size={13} />
+                      Edit Profile
+                    </button>
                   </div>
 
                   <div className="grid gap-6">
@@ -448,10 +457,13 @@ function Settings() {
                   {alerts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 bg-slate-800/10 rounded-3xl border border-dashed border-slate-700">
                       <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center text-slate-500">
-                        <Zap size={30} />
+                        <BellOff size={28} />
                       </div>
-                      <p className="text-slate-400">{t("no_alerts")}</p>
-                      <button onClick={() => navigate('/price-check')} className="text-blue-400 hover:underline text-sm font-semibold">Start tracking now</button>
+                      <p className="text-slate-400">No price alerts set</p>
+                      <button onClick={() => navigate('/price-check')} className="settings-add-alert-button">
+                        <Plus size={13} />
+                        Add price alert
+                      </button>
                     </div>
                   ) : (
                     <div className="grid gap-4">

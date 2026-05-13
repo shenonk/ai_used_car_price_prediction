@@ -160,23 +160,23 @@ const MainLayout = () => {
       )}
 
       <div
-        className={`theme-sidebar fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0 ${
+        className={`theme-sidebar fixed left-0 top-0 z-40 flex h-screen w-[200px] flex-col border-r transition-transform duration-300 ease-out lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="theme-divider border-b px-5 py-6">
-          <div className="flex items-center gap-3">
-            <div className="sidebar-brand-logo flex h-11 w-11 items-center justify-center rounded-2xl">
-              <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
+        <div className="theme-divider border-b px-4 py-4">
+          <div className="flex items-center gap-2">
+            <div className="sidebar-brand-logo flex h-9 w-9 items-center justify-center rounded-lg">
+              <img src={logo} alt="AutoValueLK" className="h-7 object-contain" />
             </div>
             <div>
-              <h1 className="heading-display theme-text-primary text-lg font-bold tracking-tight">AutoValueLK</h1>
-              <p className="theme-text-muted text-xs uppercase tracking-[0.24em]">Sri Lankan Market</p>
+              <h1 className="heading-display theme-text-primary text-[13px] font-medium tracking-normal">AutoValueLK</h1>
+              <p className="theme-text-muted text-[10px] uppercase tracking-[0.05em]">Sri Lankan Market</p>
             </div>
           </div>
         </div>
 
-        <nav className="sidebar-nav flex-1 space-y-1.5 px-3 pb-3 pt-3">
+        <nav className="sidebar-nav flex-1 space-y-0.5 px-0 pb-3 pt-2">
           {navItems.map((item) => (
             <Link
               key={item.path}
@@ -199,18 +199,18 @@ const MainLayout = () => {
         <div className="theme-divider border-t p-3">
           <button
             onClick={handleAuthAction}
-            className="sidebar-account-card flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left transition-all duration-300"
+            className="sidebar-account-card flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-all duration-150"
           >
             {loggedIn && userInfo.avatar_url ? (
               <img
                 src={userInfo.avatar_url}
                 alt="Profile"
-                className="theme-divider h-11 w-11 rounded-full border object-cover"
+                className="theme-divider h-8 w-8 rounded-full border object-cover"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="sidebar-account-avatar flex h-11 w-11 items-center justify-center rounded-full">
-                <span className="text-lg font-semibold text-slate-950">
+              <div className="sidebar-account-avatar flex h-8 w-8 items-center justify-center rounded-full">
+                <span className="text-xs font-medium">
                   {loggedIn
                     ? (userInfo.username || userInfo.email || "U").trim().charAt(0).toUpperCase()
                     : "A"}
@@ -219,22 +219,22 @@ const MainLayout = () => {
             )}
 
             <div className="min-w-0 flex-1">
-              <p className="theme-text-primary truncate text-sm font-semibold">
+              <p className="theme-text-primary truncate text-xs font-medium">
                 {loggedIn ? userInfo.username || "Account" : "Account access"}
               </p>
-              <p className="theme-text-muted truncate text-xs">
+              <p className="theme-text-muted truncate text-[11px]">
                 {loggedIn ? userInfo.email || "Signed in" : "Login / Register"}
               </p>
             </div>
 
-            <span className="sidebar-account-action flex h-9 w-9 items-center justify-center rounded-xl" aria-hidden="true">
+            <span className="sidebar-account-action flex h-7 w-7 items-center justify-center rounded-md" aria-hidden="true">
               {loggedIn ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
             </span>
           </button>
         </div>
       </div>
 
-      <div className="min-h-screen w-full lg:ml-64 lg:w-[calc(100%-16rem)]">
+      <div className="min-h-screen w-full lg:ml-[200px] lg:w-[calc(100%-200px)]">
         <div className="min-h-screen pt-20 lg:pt-0">
           <Outlet />
         </div>

@@ -9,6 +9,12 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
+  ExternalLink,
+  HelpCircle,
+  MessageCircle,
+  Reply,
+  Send,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../utils/supabaseClient";
@@ -250,6 +256,211 @@ const HelpCenter = () => {
       setIsLoadingReplies(false);
     }
   };
+
+  return (
+    <div className="help-page animate-fade-in">
+      <header className="help-hero">
+        <div>
+          <div className="help-eyebrow">HELP CENTER</div>
+          <h1>{t("help_center_page.title_prefix")} {t("help_center_page.title_highlight")}</h1>
+          <p>{t("help_center_page.search_placeholder")}</p>
+        </div>
+        <button type="button" className="help-ghost-button" onClick={() => navigate("/settings")}>
+          <ShieldCheck className="h-[13px] w-[13px]" />
+          Account Settings
+        </button>
+      </header>
+
+      <section className="help-search-panel">
+        <div className="help-search-wrap">
+          <Search className="h-[14px] w-[14px]" />
+          <input
+            type="text"
+            placeholder={t("help_center_page.search_placeholder")}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        {selectedCategory !== "all" && (
+          <div className="help-active-filter">
+            <span>{t("help_center_page.filtering_by")} {categories.find((cat) => cat.id === selectedCategory)?.title}</span>
+            <button type="button" onClick={() => setSelectedCategory("all")}>
+              <X className="h-3 w-3" />
+              {t("help_center_page.clear_filter")}
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section className="help-category-grid">
+        {filteredCategories.map((cat) => (
+          <article
+            key={cat.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => handleCategoryClick(cat)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleCategoryClick(cat);
+              }
+            }}
+            className={`help-category-card ${selectedCategory === cat.id ? "is-selected" : ""}`}
+          >
+            <div className="help-category-icon">{cat.icon}</div>
+            <h2>{cat.title}</h2>
+            <p>{cat.description}</p>
+            <div className="help-category-actions">
+              <span>{t("help_center_page.filter_faqs")}</span>
+              <button type="button" onClick={(event) => handleCategoryOpen(event, cat.route)}>
+                <ExternalLink className="h-3 w-3" />
+                {t("help_center_page.open_page")}
+              </button>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section ref={faqSectionRef} className="help-panel">
+        <div className="help-panel-header">
+          <div>
+            <div className="help-panel-title">
+              <HelpCircle className="h-[14px] w-[14px]" />
+              <h2>{t("help_center_page.faq_title")}</h2>
+            </div>
+            <p>{t("help_center_page.faq_subtitle")}</p>
+          </div>
+        </div>
+
+        <div className="help-faq-list">
+          {filteredFaqs.length === 0 ? (
+            <div className="help-empty-state">
+              <Search className="h-8 w-8" />
+              <p>{t("help_center_page.no_matches_title")}</p>
+              <span>{t("help_center_page.no_matches_subtitle")}</span>
+            </div>
+          ) : (
+            filteredFaqs.map((faq) => (
+              <div key={faq.id} className={`help-faq-item ${openFaq === faq.id ? "is-open" : ""}`}>
+                <button type="button" onClick={() => toggleFaq(faq.id)}>
+                  <span>{faq.question}</span>
+                  {openFaq === faq.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                <div className="help-faq-answer">
+                  <p>{faq.answer}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section id="contact-us-section" className="help-contact-layout">
+        <div className="help-panel help-contact-panel">
+          <div className="help-panel-header">
+            <div>
+              <div className="help-panel-title">
+                <MessageCircle className="h-[14px] w-[14px]" />
+                <h2>{t("help_center_page.contact_title")}</h2>
+              </div>
+              <p>{t("help_center_page.contact_subtitle")}</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="help-form">
+            <div className="help-form-grid">
+              <input
+                type="text"
+                name="full_name"
+                value={formData.full_name}
+                onChange={handleInputChange}
+                placeholder={t("help_center_page.full_name")}
+                required
+              />
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                placeholder={t("help_center_page.email")}
+                required
+              />
+            </div>
+            <textarea
+              name="message"
+              value={formData.message}
+              onChange={handleInputChange}
+              placeholder={t("help_center_page.message")}
+              required
+              rows="6"
+            />
+            <button type="submit" disabled={isSubmitting || !isFormValid} className="help-primary-button">
+              <Send className="h-[13px] w-[13px]" />
+              {isSubmitting ? t("help_center_page.sending") : t("help_center_page.send")}
+            </button>
+            {submitSuccess && <p className="help-success-text">{submitSuccess}</p>}
+            {submitError && <p className="help-error-text">{submitError}</p>}
+          </form>
+        </div>
+
+        <div className="help-panel help-replies-panel">
+          <div className="help-panel-header">
+            <div>
+              <div className="help-panel-title">
+                <Reply className="h-[14px] w-[14px]" />
+                <h2>Replies from AutoValueLK Admins</h2>
+              </div>
+              <p>Enter the same email you used in the contact form to check admin replies.</p>
+            </div>
+            <span className="help-badge">Admin reply</span>
+          </div>
+
+          <div className="help-reply-search">
+            <input
+              type="email"
+              value={replyEmail}
+              onChange={(event) => setReplyEmail(event.target.value)}
+              placeholder="Your email address"
+            />
+            <button type="button" onClick={() => fetchAdminReplies()} disabled={isLoadingReplies} className="help-ghost-button">
+              {isLoadingReplies ? "Checking..." : "Check replies"}
+            </button>
+          </div>
+
+          {replyLookupError && <p className="help-error-text">{replyLookupError}</p>}
+
+          <div className="help-reply-list">
+            {isLoadingReplies ? (
+              <div className="help-empty-state help-empty-state--small">Loading replies from AutoValueLK admins...</div>
+            ) : adminReplies.length > 0 ? (
+              adminReplies.map((reply) => (
+                <article key={reply.id} className="help-reply-card">
+                  <div className="help-reply-head">
+                    <span>Reply from AutoValueLK Admins</span>
+                    <time>
+                      {reply.admin_replied_at
+                        ? new Date(reply.admin_replied_at).toLocaleString()
+                        : "Recently replied"}
+                    </time>
+                  </div>
+                  <div className="help-reply-block">
+                    <span>Your message</span>
+                    <p>{reply.message}</p>
+                  </div>
+                  <div className="help-reply-block help-reply-block--admin">
+                    <span>Admin reply</span>
+                    <p>{reply.admin_reply}</p>
+                  </div>
+                </article>
+              ))
+            ) : hasCheckedReplies ? (
+              <div className="help-empty-state help-empty-state--small">No admin replies found for this email yet.</div>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 
   return (
     <div className="app-page-shell animate-fade-in">

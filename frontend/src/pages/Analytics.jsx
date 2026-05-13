@@ -16,6 +16,7 @@ import {
 } from "chart.js"
 import SuccessToast from "../components/auth/SuccessToast"
 import AppModal from "../components/AppModal"
+import AppDropdown from "../components/AppDropdown"
 import { deletePredictionHistoryEntry, loadPredictionHistory } from "../utils/predictionHistory"
 import { supabase } from "../utils/supabaseClient"
 import analyticsTrends from "../data/analytics_trends.json"
@@ -753,22 +754,17 @@ function Analytics() {
             </div>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{trendSourceMeta.summary}</p>
           </div>
-          <select
-            className="input w-full text-sm py-2 sm:w-auto sm:min-w-64"
+          <AppDropdown
             value={selectedPrediction?.id || ""}
-            onChange={(e) => setSelectedPredictionId(e.target.value)}
+            onChange={setSelectedPredictionId}
             disabled={savedPredictions.length === 0}
-          >
-            {savedPredictions.length === 0 ? (
-              <option value="">{t("analytics_page.no_saved_predictions")}</option>
-            ) : (
-              savedPredictions.map((prediction) => (
-                <option key={prediction.id} value={prediction.id}>
-                  {buildVehicleLabel(prediction)}
-                </option>
-              ))
-            )}
-          </select>
+            placeholder={t("analytics_page.no_saved_predictions")}
+            options={savedPredictions.map((prediction) => ({
+              value: prediction.id,
+              label: buildVehicleLabel(prediction),
+            }))}
+            className="w-full sm:w-72"
+          />
         </div>
         {selectedPrediction ? (
           <>
@@ -847,18 +843,16 @@ function Analytics() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
-            <select
-              className="input w-full text-sm py-2 sm:w-auto"
+            <AppDropdown
               value={brandFilter}
-              onChange={(e) => setBrandFilter(e.target.value)}
-            >
-              <option value="">{t("analytics_page.all_brands")}</option>
-              {brandOptions.map((brand) => (
-                <option key={brand} value={brand}>
-                  {brand}
-                </option>
-              ))}
-            </select>
+              onChange={setBrandFilter}
+              placeholder={t("analytics_page.all_brands")}
+              options={[
+                { value: "", label: t("analytics_page.all_brands") },
+                ...brandOptions.map((brand) => ({ value: brand, label: brand })),
+              ]}
+              className="w-full sm:w-56"
+            />
           </div>
         </div>
 

@@ -6,6 +6,7 @@ import { getCurrentUser } from "../utils/auth";
 import { supabase } from "../utils/supabaseClient";
 import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png";
 import AppModal from "../components/AppModal";
+import AppDropdown from "../components/AppDropdown";
 
 // ============================================
 // COMPONENT
@@ -511,21 +512,21 @@ function VehicleFinancingOptions() {
                     {/* Institution Selector Dropdown */}
                     <div className="mb-8 p-4 bg-slate-900/50 rounded-xl border border-slate-700/50 flex flex-col sm:flex-row items-center gap-4">
                         <label className="text-sm font-medium text-slate-400 whitespace-nowrap">Switch Institution:</label>
-                        <select 
-                            value={selectedInstitution?.id || ""} 
-                            onChange={(e) => {
-                                const inst = filteredInstitutions.find(i => i.id === e.target.value);
+                        <AppDropdown
+                            value={selectedInstitution?.id || ""}
+                            onChange={(value) => {
+                                const inst = filteredInstitutions.find(i => i.id === value);
                                 if (inst) {
                                     setSelectedInstitution(inst);
                                     setTenure(Math.min(tenure, inst.maxTenure));
                                 }
                             }}
-                            className="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                        >
-                            {filteredInstitutions.map(inst => (
-                                <option key={inst.id} value={inst.id}>{inst.name} ({inst.interestRate}%)</option>
-                            ))}
-                        </select>
+                            options={filteredInstitutions.map(inst => ({
+                                value: inst.id,
+                                label: `${inst.name} (${inst.interestRate}%)`,
+                            }))}
+                            className="flex-1"
+                        />
                     </div>
 
                     {/* Sliders */}

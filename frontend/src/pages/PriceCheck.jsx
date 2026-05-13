@@ -4,13 +4,14 @@ import { Trans, useTranslation } from "react-i18next"
 import {
   BrainCircuit, Car, Fuel, Gauge, MapPin, Calendar, Cog,
   ArrowRight, Info, Sparkles, ShieldCheck, Zap, Clock,
-  Settings2, ChevronDown, Search,
+  Settings2,
 } from "lucide-react"
 import logo from "../assets/logo/autovaluelk-logo.png"
 import brandModelOptions from "../data/brand_model_options.json"
 import { savePredictionHistoryEntry } from "../utils/predictionHistory"
 import { supabase } from "../utils/supabaseClient"
 import AppModal from "../components/AppModal"
+import AppDropdown from "../components/AppDropdown"
 
 const GEAR_TYPE_OPTIONS = [
   { label: "Automatic", value: "automatic" },
@@ -109,8 +110,6 @@ function PriceCheck() {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [dialog, setDialog] = useState(null)
-  const [isBrandPickerOpen, setIsBrandPickerOpen] = useState(false)
-  const [isModelPickerOpen, setIsModelPickerOpen] = useState(false)
 
   const gearTypeOptions = useMemo(() => ([
     { label: t("price_check_page.options.automatic"), value: "automatic" },
@@ -163,7 +162,6 @@ function PriceCheck() {
   const handleChange = (field, value) => {
     setForm(prev => {
       if (field === "brand") {
-        setIsModelPickerOpen(false)
         return { ...prev, brand: value, model: "" }
       }
       return { ...prev, [field]: value }
@@ -326,64 +324,32 @@ function PriceCheck() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Brand */}
             <div className="pc-field relative z-50">
-              <label className="pc-label"><Car className="pc-label-icon" /> {t("price_check_page.brand")}</label>
-              <div className="relative">
-                <input
-                  className={`pc-input ${errors.brand ? 'pc-input--error' : ''}`}
-                  placeholder={t("price_check_page.select_brand")}
-                  value={form.brand}
-                  onChange={(e) => { handleChange('brand', e.target.value); setIsBrandPickerOpen(true) }}
-                  onFocus={() => setIsBrandPickerOpen(true)}
-                  onBlur={() => setTimeout(() => setIsBrandPickerOpen(false), 120)}
-                  autoComplete="off"
-                  role="combobox"
-                  aria-expanded={isBrandPickerOpen && brandSuggestions.length > 0}
-                  aria-controls="price-check-brand-options"
-                />
-                {isBrandPickerOpen && brandSuggestions.length > 0 && (
-                  <div id="price-check-brand-options" className="pc-dropdown" role="listbox">
-                    {brandSuggestions.map((brand) => (
-                      <button key={brand} type="button" className="pc-dropdown-item"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => { handleChange('brand', brand); setIsBrandPickerOpen(false) }}
-                        role="option"
-                      >{brand}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <AppDropdown
+                label={t("price_check_page.brand")}
+                icon={Car}
+                value={form.brand}
+                options={brandSuggestions}
+                onChange={(value) => handleChange('brand', value)}
+                placeholder={t("price_check_page.select_brand")}
+                searchable
+                error={Boolean(errors.brand)}
+              />
               {errors.brand && <p className="pc-error">{errors.brand}</p>}
             </div>
 
             {/* Model */}
             <div className="pc-field relative z-40">
-              <label className="pc-label"><Settings2 className="pc-label-icon" /> {t("price_check_page.model")}</label>
-              <div className="relative">
-                <input
-                  className={`pc-input ${errors.model ? 'pc-input--error' : ''}`}
-                  placeholder={form.brand ? t("price_check_page.select_model_or_search") : t("price_check_page.select_brand_first")}
-                  value={form.model}
-                  onChange={(e) => { handleChange('model', e.target.value); setIsModelPickerOpen(Boolean(form.brand)) }}
-                  onFocus={() => setIsModelPickerOpen(Boolean(form.brand))}
-                  onBlur={() => setTimeout(() => setIsModelPickerOpen(false), 120)}
-                  disabled={!form.brand}
-                  autoComplete="off"
-                  role="combobox"
-                  aria-expanded={isModelPickerOpen && modelSuggestions.length > 0}
-                  aria-controls="price-check-model-options"
-                />
-                {isModelPickerOpen && form.brand && modelSuggestions.length > 0 && (
-                  <div id="price-check-model-options" className="pc-dropdown" role="listbox">
-                    {modelSuggestions.map((model) => (
-                      <button key={model} type="button" className="pc-dropdown-item"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => { handleChange('model', model); setIsModelPickerOpen(false) }}
-                        role="option"
-                      >{model}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <AppDropdown
+                label={t("price_check_page.model")}
+                icon={Settings2}
+                value={form.model}
+                options={modelSuggestions}
+                onChange={(value) => handleChange('model', value)}
+                placeholder={form.brand ? t("price_check_page.select_model_or_search") : t("price_check_page.select_brand_first")}
+                searchable
+                disabled={!form.brand}
+                error={Boolean(errors.model)}
+              />
               {errors.model && <p className="pc-error">{errors.model}</p>}
             </div>
 
@@ -409,30 +375,41 @@ function PriceCheck() {
 
             {/* Fuel Type */}
             <div className="pc-field">
-              <label className="pc-label"><Fuel className="pc-label-icon" /> {t("price_check_page.fuel_type")}</label>
-              <select className={`pc-input ${errors.fuel_type ? 'pc-input--error' : ''}`} value={form.fuel_type} onChange={(e) => handleChange('fuel_type', e.target.value)}>
-                <option value="">{t("price_check_page.select_fuel_type")}</option>
-                {fuelTypeOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-              </select>
+              <AppDropdown
+                label={t("price_check_page.fuel_type")}
+                icon={Fuel}
+                value={form.fuel_type}
+                options={fuelTypeOptions}
+                onChange={(value) => handleChange('fuel_type', value)}
+                placeholder={t("price_check_page.select_fuel_type")}
+                error={Boolean(errors.fuel_type)}
+              />
               {errors.fuel_type && <p className="pc-error">{errors.fuel_type}</p>}
             </div>
 
             {/* Transmission */}
             <div className="pc-field">
-              <label className="pc-label"><Cog className="pc-label-icon" /> {t("price_check_page.transmission")}</label>
-              <select className={`pc-input ${errors.gear_type ? 'pc-input--error' : ''}`} value={form.gear_type} onChange={(e) => handleChange('gear_type', e.target.value)}>
-                <option value="">{t("price_check_page.select_transmission")}</option>
-                {gearTypeOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-              </select>
+              <AppDropdown
+                label={t("price_check_page.transmission")}
+                icon={Cog}
+                value={form.gear_type}
+                options={gearTypeOptions}
+                onChange={(value) => handleChange('gear_type', value)}
+                placeholder={t("price_check_page.select_transmission")}
+                error={Boolean(errors.gear_type)}
+              />
               {errors.gear_type && <p className="pc-error">{errors.gear_type}</p>}
             </div>
 
             {/* Condition */}
             <div className="pc-field">
-              <label className="pc-label"><ShieldCheck className="pc-label-icon" /> {t("price_check_page.condition")}</label>
-              <select className="pc-input" value={form.condition} onChange={(e) => handleChange('condition', e.target.value)}>
-                {conditionOptions.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}
-              </select>
+              <AppDropdown
+                label={t("price_check_page.condition")}
+                icon={ShieldCheck}
+                value={form.condition}
+                options={conditionOptions}
+                onChange={(value) => handleChange('condition', value)}
+              />
             </div>
 
             {/* Town */}

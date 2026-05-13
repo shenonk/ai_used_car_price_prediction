@@ -8,7 +8,6 @@ import "leaflet/dist/leaflet.css";
 import {
   ArrowUp,
   CalendarRange,
-  ChevronDown,
   Fuel,
   Gauge,
   MapPin,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
+import AppDropdown from "../components/AppDropdown";
 import bumpedSticker from "../assets/marketplace-stickers/bumpup.png";
 import spotlightSticker from "../assets/marketplace-stickers/spotlight.png";
 import urgentSticker from "../assets/marketplace-stickers/urgent.png";
@@ -909,9 +909,11 @@ function Marketplace() {
   };
 
   const handleInputChange = (key, value) => {
+    const nextValue = key === "price" ? String(value).replace(/\D/g, "") : value;
+
     setForm((current) => ({
       ...current,
-      [key]: value,
+      [key]: nextValue,
     }));
 
     if (key === "vehicle_description" && descriptionState.error) {
@@ -1430,7 +1432,7 @@ function Marketplace() {
       </section>
       )}
 
-      <section className="dashboard-page-panel mt-3 animate-fade-in animate-delay-100">
+      <section className="dashboard-page-panel marketplace-filter-panel mt-3 animate-fade-in animate-delay-100">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           <FilterSelect
             label={t("marketplace.labels.brand")}
@@ -2122,7 +2124,8 @@ function Marketplace() {
                 />
                 <InputField
                   label={t("marketplace.labels.price_lkr")}
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={form.price}
                   onChange={(value) => handleInputChange("price", value)}
                   placeholder="7200000"
@@ -2588,37 +2591,21 @@ function LocationPickerButton({ label, value, onClick }) {
 }
 
 function FilterSelect({ label, value, options, onChange }) {
-  return (
-    <label className="marketplace-field block">
-      <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="w-full appearance-none rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 pr-11 text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-      </div>
-    </label>
-  );
+  return <AppDropdown label={label} value={value} options={options} onChange={onChange} />;
 }
 
 function SelectField({ label, value, options, onChange }) {
   return <FilterSelect label={label} value={value} options={options} onChange={onChange} />;
 }
 
-function InputField({ label, value, onChange, placeholder, type = "text" }) {
+function InputField({ label, value, onChange, placeholder, type = "text", inputMode, pattern }) {
   return (
     <label className="marketplace-field block">
       <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
       <input
         type={type}
+        inputMode={inputMode}
+        pattern={pattern}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

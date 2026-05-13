@@ -60,7 +60,7 @@ function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden auth-scanlines">
       <LoadingOverlay isOpen={isLoading} message="Connecting to AutoValueLK..." />
       <SuccessToast
         isOpen={showSuccess}
@@ -70,9 +70,17 @@ function Login() {
 
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
+        {/* Aurora bands */}
+        <div className="auth-aurora top-[10%] left-[-20%] bg-blue-500/15" style={{ animationDelay: '0s' }}></div>
+        <div className="auth-aurora bottom-[5%] right-[-20%] bg-cyan-500/12" style={{ animationDelay: '4s' }}></div>
+        <div className="auth-aurora top-[50%] left-[10%] bg-indigo-500/10" style={{ animationDelay: '8s', height: '30%' }}></div>
+
+        {/* Original floating orbs — enhanced */}
         <div className="absolute top-1/4 -left-20 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-float"></div>
         <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-cyan-500/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '1.5s' }}></div>
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-3xl"></div>
+
+        {/* Grid overlay */}
         <div className="absolute inset-0 opacity-[0.03]"
           style={{
             backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), 
@@ -80,10 +88,22 @@ function Login() {
             backgroundSize: '50px 50px'
           }}>
         </div>
-        <div className="absolute top-20 left-20 w-16 h-16 border border-blue-500/10 rounded-2xl rotate-12 animate-float" style={{ animationDelay: '0.5s' }}></div>
-        <div className="absolute top-40 right-32 w-12 h-12 border border-cyan-500/10 rounded-full animate-float" style={{ animationDelay: '1s' }}></div>
-        <div className="absolute bottom-32 left-32 w-20 h-20 border border-blue-500/10 rounded-3xl -rotate-12 animate-float" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute bottom-20 right-20 w-14 h-14 border border-cyan-500/10 rounded-xl rotate-45 animate-float" style={{ animationDelay: '0.8s' }}></div>
+
+        {/* Floating geometric shapes */}
+        <div className="auth-geo-shape top-20 left-20 w-16 h-16 border border-blue-500/10 rounded-2xl" style={{ animationDelay: '0s', animationDuration: '12s' }}></div>
+        <div className="auth-geo-shape top-40 right-32 w-12 h-12 border border-cyan-500/10 rounded-full" style={{ animationDelay: '3s', animationDuration: '14s' }}></div>
+        <div className="auth-geo-shape bottom-32 left-32 w-20 h-20 border border-blue-500/10 rounded-3xl" style={{ animationDelay: '6s', animationDuration: '16s' }}></div>
+        <div className="auth-geo-shape bottom-20 right-20 w-14 h-14 border border-cyan-500/10 rounded-xl" style={{ animationDelay: '2s', animationDuration: '11s' }}></div>
+
+        {/* Tiny particle dots */}
+        <div className="auth-particle w-1.5 h-1.5 bg-blue-400/50 top-[15%] left-[20%]" style={{ animationDelay: '0s' }}></div>
+        <div className="auth-particle w-1 h-1 bg-cyan-400/40 top-[60%] right-[15%]" style={{ animationDelay: '2s', animationDuration: '10s' }}></div>
+        <div className="auth-particle w-2 h-2 bg-blue-300/30 bottom-[25%] left-[45%]" style={{ animationDelay: '4s', animationDuration: '12s' }}></div>
+        <div className="auth-particle w-1 h-1 bg-indigo-400/40 top-[35%] right-[35%]" style={{ animationDelay: '1s', animationDuration: '9s' }}></div>
+        <div className="auth-particle w-1.5 h-1.5 bg-cyan-300/35 bottom-[40%] left-[10%]" style={{ animationDelay: '5s', animationDuration: '11s' }}></div>
+
+        {/* Radial spotlight behind card */}
+        <div className="auth-spotlight top-1/2 left-1/2 bg-blue-500/8" style={{ filter: 'blur(60px)' }}></div>
       </div>
 
       {/* Login Card */}
@@ -91,22 +111,22 @@ function Login() {
 
         {/* Logo & Branding */}
         <div className="text-center mb-8">
-          <img src={logo} alt="AutoValueLK" className="h-12 object-contain mb-6 mx-auto animate-pulse-glow" />
+          <img src={logo} alt="AutoValueLK" className="h-12 object-contain mb-6 mx-auto auth-logo-float" />
           <h1 className="text-3xl font-bold text-white mb-2">
-            Welcome to <span className="gradient-text">AutoValueLK</span>
+            Welcome to <span className="auth-gradient-text-shimmer">AutoValueLK</span>
           </h1>
           <p className="text-slate-400">
             AI-Powered Vehicle Price Prediction for Sri Lanka
           </p>
         </div>
 
-        {/* Glass Card */}
-        <div className="card-glass p-8">
+        {/* Glass Card with glow + accent */}
+        <div className="card-glass p-8 auth-card-glow auth-card-accent">
           <form onSubmit={handleLogin} className="space-y-6">
 
             {/* Error Message */}
             {error && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-center gap-2 auth-field-enter">
                 <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -115,18 +135,18 @@ function Login() {
             )}
 
             {/* Email Field */}
-            <div className="space-y-2">
+            <div className="space-y-2 auth-field-enter" style={{ animationDelay: '0.1s' }}>
               <label className="label text-center">Email Address</label>
-              <div className="relative group">
+              <div className="relative group auth-input-wrap">
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="input pl-12"
+                  className="input pl-12 auth-input-glow"
                   required
                 />
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors auth-icon">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                   </svg>
@@ -135,18 +155,18 @@ function Login() {
             </div>
 
             {/* Password Field */}
-            <div className="space-y-2">
+            <div className="space-y-2 auth-field-enter" style={{ animationDelay: '0.2s' }}>
               <label className="label text-center">Password</label>
-              <div className="relative group">
+              <div className="relative group auth-input-wrap">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="input pl-12 pr-12"
+                  className="input pl-12 pr-12 auth-input-glow"
                   required
                 />
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors auth-icon">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
@@ -171,7 +191,7 @@ function Login() {
             </div>
 
             {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-sm auth-field-enter" style={{ animationDelay: '0.3s' }}>
               <label className="flex items-center gap-2 cursor-pointer group">
                 <input
                   type="checkbox"
@@ -179,37 +199,39 @@ function Login() {
                 />
                 <span className="text-slate-400 group-hover:text-slate-300 transition-colors">Remember me</span>
               </label>
-              <Link to="/forgot-password" className="text-blue-400 hover:text-blue-300 transition-colors">
+              <Link to="/forgot-password" className="text-blue-400 hover:text-blue-300 transition-colors auth-link-glow">
                 Forgot password?
               </Link>
             </div>
 
             {/* Login Button */}
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full btn-primary flex items-center justify-center gap-3 py-4 text-lg disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span>Signing in...</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign In</span>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </>
-              )}
-            </button>
+            <div className="auth-field-enter" style={{ animationDelay: '0.4s' }}>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full btn-primary auth-btn-neon flex items-center justify-center gap-3 py-4 text-lg disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Sign In</span>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </>
+                )}
+              </button>
+            </div>
 
             {/* Divider */}
-            <div className="relative my-6">
+            <div className="relative my-6 auth-field-enter" style={{ animationDelay: '0.45s' }}>
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-700"></div>
               </div>
@@ -219,7 +241,7 @@ function Login() {
             </div>
 
             {/* Social Login Buttons */}
-            <div className="w-full">
+            <div className="w-full auth-field-enter" style={{ animationDelay: '0.5s' }}>
               <button type="button" onClick={handleGoogleLogin} className="w-full btn-secondary flex items-center justify-center gap-2 py-3">
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -235,15 +257,15 @@ function Login() {
         </div>
 
         {/* Sign Up Link */}
-        <p className="text-center mt-8 text-slate-400">
+        <p className="text-center mt-8 text-slate-400 auth-field-enter" style={{ animationDelay: '0.55s' }}>
           Don't have an account?{" "}
-          <Link to="/register" className="text-blue-400 hover:text-blue-300 font-medium transition-colors hover:underline">
+          <Link to="/register" className="text-blue-400 hover:text-blue-300 font-medium transition-colors hover:underline auth-link-glow">
             Create account
           </Link>
         </p>
 
         {/* Footer */}
-        <div className="text-center mt-6 space-y-2">
+        <div className="text-center mt-6 space-y-2 auth-field-enter" style={{ animationDelay: '0.6s' }}>
           <p className="text-slate-500 text-sm flex items-center justify-center gap-2">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />

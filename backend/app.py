@@ -215,6 +215,12 @@ class MarketplaceDescriptionRequest(BaseModel):
     vehicle_location: str | None = Field(default=None, min_length=1)
 
 
+class AdminFinancingOptionUpdateRequest(BaseModel):
+    status: str | None = Field(default=None, pattern="^(Active|Inactive)$")
+    fixed_rate: float | None = Field(default=None, ge=0)
+    floating_rate: float | None = Field(default=None, ge=0)
+
+
 def normalize_input(data: dict[str, Any]) -> dict[str, Any]:
     return {
         **data,
@@ -435,14 +441,29 @@ def persist_admin_store() -> None:
 def load_admin_store() -> None:
     if not ADMIN_STORE_PERSIST_ENABLED:
         price_model_state.admin_store = ensure_admin_store_shape(get_default_admin_store())
+        price_model_state.admin_store["payments"] = normalize_payment_records(
+            price_model_state.admin_store.get("payments", []),
+            price_model_state.admin_store.get("marketplace_listings", []),
+        )
         return
 
     if ADMIN_DATA_PATH.exists():
         with ADMIN_DATA_PATH.open("r", encoding="utf-8") as file:
             loaded_store = json.load(file)
         price_model_state.admin_store = ensure_admin_store_shape(loaded_store)
+        normalized_payments = normalize_payment_records(
+            price_model_state.admin_store.get("payments", []),
+            price_model_state.admin_store.get("marketplace_listings", []),
+        )
+        if normalized_payments != price_model_state.admin_store.get("payments", []):
+            price_model_state.admin_store["payments"] = normalized_payments
+            persist_admin_store()
     else:
         price_model_state.admin_store = get_default_admin_store()
+        price_model_state.admin_store["payments"] = normalize_payment_records(
+            price_model_state.admin_store.get("payments", []),
+            price_model_state.admin_store.get("marketplace_listings", []),
+        )
         persist_admin_store()
 
 
@@ -620,6 +641,156 @@ def make_supabase_rest_request(
         return None
 
     return json.loads(raw)
+
+
+def make_supabase_auth_admin_request(path: str) -> Any:
+    supabase_url = get_supabase_base_url()
+    supabase_key = get_supabase_api_key()
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("Supabase admin API is not configured.")
+
+    request = UrlRequest(
+        f"{supabase_url}{path}",
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+        },
+    )
+
+    with urlopen(request) as response:
+        raw = response.read().decode("utf-8")
+
+    if not raw:
+        return None
+
+    return json.loads(raw)
+
+
+def fetch_supabase_admin_users(page: int = 1, per_page: int = 1000) -> list[dict[str, Any]]:
+    payload = make_supabase_auth_admin_request(
+        f"/auth/v1/admin/users?page={page}&per_page={per_page}"
+    )
+    users = payload.get("users") if isinstance(payload, dict) else []
+    return users if isinstance(users, list) else []
+
+
+def build_recent_admin_users(limit: int = 15) -> list[dict[str, Any]]:
+    users = fetch_supabase_admin_users(page=1, per_page=max(limit, 1000))
+    sorted_users = sorted(
+        users,
+        key=lambda item: parse_record_timestamp(item.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    return sorted_users[:limit]
+
+
+def get_recent_date_keys(days: int) -> list[str]:
+    today = datetime.now(timezone.utc).date()
+    return [
+        (today - timedelta(days=offset)).isoformat()
+        for offset in range(days - 1, -1, -1)
+    ]
+
+
+def build_admin_dau_snapshot(days: int = 7) -> dict[str, Any]:
+    users = fetch_supabase_admin_users(page=1, per_page=1000)
+    now = datetime.now(timezone.utc)
+    last_24_hours = now - timedelta(hours=24)
+    date_keys = get_recent_date_keys(days)
+    counts = {date_key: 0 for date_key in date_keys}
+    active_today = 0
+
+    for user in users:
+        last_sign_in = parse_record_timestamp(user.get("last_sign_in_at"))
+        if last_sign_in is None:
+            continue
+        if last_sign_in >= last_24_hours:
+            active_today += 1
+        date_key = last_sign_in.date().isoformat()
+        if date_key in counts:
+            counts[date_key] += 1
+
+    trend = [
+        {
+            "date": date_key,
+            "label": datetime.fromisoformat(date_key).strftime("%b %d"),
+            "count": counts[date_key],
+        }
+        for date_key in date_keys
+    ]
+
+    return {
+        "count": active_today,
+        "days": days,
+        "today": trend[-1] if trend else {"date": now.date().isoformat(), "label": "Today", "count": 0},
+        "trend": trend,
+    }
+
+
+def fetch_financing_options_from_supabase() -> list[dict[str, Any]]:
+    rows = make_supabase_rest_request(
+        "/rest/v1/financing_options?select=*&order=created_at.desc",
+        method="GET",
+    )
+    return rows if isinstance(rows, list) else []
+
+
+def create_public_storage_url(bucket_name: str, object_path: str) -> str:
+    supabase_url = get_supabase_base_url()
+    return f"{supabase_url}/storage/v1/object/public/{bucket_name}/{object_path}"
+
+
+def upload_file_to_supabase_storage(bucket_name: str, object_path: str, content: bytes, content_type: str) -> str:
+    supabase_url = get_supabase_base_url()
+    supabase_key = get_supabase_api_key()
+    if not supabase_url or not supabase_key:
+        raise RuntimeError("Supabase storage is not configured.")
+
+    upload_url = f"{supabase_url}/storage/v1/object/{bucket_name}/{quote(object_path, safe='/')}"
+    request = UrlRequest(
+        upload_url,
+        data=content,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+            "Content-Type": content_type or "application/octet-stream",
+            "x-upsert": "false",
+        },
+    )
+
+    with urlopen(request):
+        pass
+
+    return create_public_storage_url(bucket_name, object_path)
+
+
+def delete_file_from_supabase_storage(public_url: str, bucket_name: str) -> None:
+    supabase_url = get_supabase_base_url()
+    supabase_key = get_supabase_api_key()
+    if not supabase_url or not supabase_key or not public_url:
+        return
+
+    public_prefix = f"{supabase_url}/storage/v1/object/public/{bucket_name}/"
+    if public_prefix not in public_url:
+        return
+
+    object_path = unquote(public_url.split(public_prefix, 1)[-1].strip())
+    if not object_path:
+        return
+
+    request = UrlRequest(
+        f"{supabase_url}/storage/v1/object/{bucket_name}/{quote(object_path, safe='/')}",
+        method="DELETE",
+        headers={
+            "Authorization": f"Bearer {supabase_key}",
+            "apikey": supabase_key,
+        },
+    )
+
+    with urlopen(request):
+        pass
 
 
 def get_gemini_api_key() -> str:
@@ -1045,6 +1216,171 @@ def merge_records_by_id(*collections: list[dict[str, Any]]) -> list[dict[str, An
     )
 
 
+def format_legacy_payment_boost_option(payment: dict[str, Any]) -> tuple[str, list[str]]:
+    boost_types = payment.get("boost_types")
+    if isinstance(boost_types, list):
+        normalized = [str(item or "").strip().lower() for item in boost_types if str(item or "").strip()]
+    else:
+        normalized = []
+
+    if not normalized:
+        raw_label = str(payment.get("boost_option") or "").strip().lower()
+        alias_map = {
+            "urgent": "urgent",
+            "spotlight": "spotlight",
+            "bump": "bump",
+            "bump up": "bump",
+        }
+        if raw_label in alias_map:
+            normalized = [alias_map[raw_label]]
+
+    if not normalized:
+        if payment.get("is_urgent"):
+            normalized.append("urgent")
+        if payment.get("is_spotlight"):
+            normalized.append("spotlight")
+        if payment.get("is_bumped"):
+            normalized.append("bump")
+
+    labels = {
+        "urgent": "Urgent",
+        "spotlight": "Spotlight",
+        "bump": "Bump Up",
+    }
+    unique_normalized: list[str] = []
+    for item in normalized:
+        if item not in labels or item in unique_normalized:
+            continue
+        unique_normalized.append(item)
+
+    formatted_label = ", ".join(labels[item] for item in unique_normalized)
+    return formatted_label, unique_normalized
+
+
+def find_listing_for_payment(payment: dict[str, Any], listings: list[dict[str, Any]]) -> dict[str, Any] | None:
+    listing_id = str(payment.get("listing_id") or payment.get("ad_reference") or "").strip()
+    if listing_id:
+        exact_match = next((item for item in listings if str(item.get("id") or "").strip() == listing_id), None)
+        if exact_match is not None:
+            return exact_match
+
+    user_id = str(payment.get("user_id") or "").strip()
+    brand = str(payment.get("vehicle_brand") or "").strip().lower()
+    model = str(payment.get("vehicle_model") or "").strip().lower()
+    ad_title = str(payment.get("ad_title") or "").strip().lower()
+    candidates = listings
+
+    if user_id:
+        user_matches = [item for item in listings if str(item.get("user_id") or "").strip() == user_id]
+        if user_matches:
+            candidates = user_matches
+
+    if brand or model or ad_title:
+        scored_candidates: list[tuple[int, dict[str, Any]]] = []
+        for item in candidates:
+            score = 0
+            item_brand = str(item.get("brand") or "").strip().lower()
+            item_model = str(item.get("model") or "").strip().lower()
+            item_title = " ".join(
+                [
+                    str(item.get("brand") or "").strip(),
+                    str(item.get("model") or "").strip(),
+                    str(item.get("year") or "").strip(),
+                ]
+            ).strip().lower()
+            if brand and item_brand == brand:
+                score += 2
+            if model and item_model == model:
+                score += 2
+            if ad_title and item_title == ad_title:
+                score += 3
+            if score:
+                scored_candidates.append((score, item))
+
+        if scored_candidates:
+            scored_candidates.sort(
+                key=lambda pair: (pair[0], get_record_timestamp(pair[1])),
+                reverse=True,
+            )
+            return scored_candidates[0][1]
+
+    return sorted(candidates, key=get_record_timestamp, reverse=True)[0] if candidates else None
+
+
+def normalize_payment_record(payment: dict[str, Any], listings: list[dict[str, Any]]) -> dict[str, Any]:
+    listing = find_listing_for_payment(payment, listings)
+    boost_option, boost_types = format_legacy_payment_boost_option(payment)
+    legacy_last4 = str(payment.get("card_last4") or "").strip()
+    payment_method = str(payment.get("payment_method") or "").strip()
+    if not payment_method and legacy_last4:
+        payment_method = f"Card ending {legacy_last4}"
+
+    normalized_status = str(payment.get("payment_status") or "").strip().lower()
+    if normalized_status == "paid":
+        normalized_status = "confirmed"
+    elif normalized_status not in {"confirmed", "pending", "failed"}:
+        normalized_status = "pending" if str(payment.get("stripe_status") or "").strip().lower() in {"processing", "requires_action"} else "confirmed"
+
+    amount_value = payment.get("amount")
+    if amount_value in (None, "", 0, 0.0):
+        amount_value = payment.get("amount_lkr") or 0
+
+    currency = str(payment.get("currency") or "LKR").strip().upper() or "LKR"
+    ad_title = str(payment.get("ad_title") or "").strip()
+    if not ad_title and listing is not None:
+        ad_title = " ".join(
+            [
+                str(listing.get("brand") or "").strip(),
+                str(listing.get("model") or "").strip(),
+                str(listing.get("year") or "").strip(),
+            ]
+        ).strip()
+    if not ad_title:
+        ad_title = " ".join(
+            [
+                str(payment.get("vehicle_brand") or "").strip(),
+                str(payment.get("vehicle_model") or "").strip(),
+            ]
+        ).strip()
+
+    confirmed_at = payment.get("confirmed_at")
+    if not confirmed_at and normalized_status == "confirmed":
+        confirmed_at = payment.get("updated_at") or payment.get("created_at")
+
+    normalized = dict(payment)
+    normalized.update(
+        {
+            "listing_id": str(payment.get("listing_id") or (listing or {}).get("id") or "").strip() or None,
+            "user_id": str(payment.get("user_id") or (listing or {}).get("user_id") or "").strip() or None,
+            "payer_name": str(payment.get("payer_name") or (listing or {}).get("seller_name") or "").strip(),
+            "login_name": str(payment.get("login_name") or (listing or {}).get("username") or "").strip(),
+            "phone_number": str(payment.get("phone_number") or (listing or {}).get("phone_number") or "").strip(),
+            "account_email": str(
+                payment.get("account_email")
+                or (listing or {}).get("account_email")
+                or (listing or {}).get("logged_in_account")
+                or ""
+            ).strip(),
+            "ad_title": ad_title,
+            "boost_option": boost_option,
+            "boost_types": boost_types,
+            "amount": round(float(amount_value or 0), 2),
+            "currency": currency,
+            "payment_status": normalized_status,
+            "stripe_status": str(payment.get("stripe_status") or normalized_status or "").strip(),
+            "payment_method": payment_method,
+            "confirmed_at": confirmed_at,
+            "ad_reference": str(payment.get("ad_reference") or (listing or {}).get("id") or "").strip(),
+            "notes": str(payment.get("notes") or "Ad boost activated after Stripe confirmation.").strip(),
+        }
+    )
+    return normalized
+
+
+def normalize_payment_records(payments: list[dict[str, Any]], listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [normalize_payment_record(item, listings) for item in payments or []]
+
+
 def sync_marketplace_listing_to_supabase(listing: dict[str, Any]) -> None:
     payload = {key: value for key, value in listing.items() if key in MARKETPLACE_LISTING_SYNC_FIELDS}
     try:
@@ -1333,14 +1669,16 @@ def hydrate_admin_store_from_supabase() -> None:
         return
 
     with price_model_state.admin_lock:
-        price_model_state.admin_store["marketplace_listings"] = merge_records_by_id(
+        merged_listings = merge_records_by_id(
             price_model_state.admin_store.get("marketplace_listings", []),
             supabase_listings,
         )
-        price_model_state.admin_store["payments"] = merge_records_by_id(
+        merged_payments = merge_records_by_id(
             price_model_state.admin_store.get("payments", []),
             supabase_payments,
         )
+        price_model_state.admin_store["marketplace_listings"] = merged_listings
+        price_model_state.admin_store["payments"] = normalize_payment_records(merged_payments, merged_listings)
         persist_admin_store()
 
 
@@ -2277,14 +2615,152 @@ def delete_marketplace_listing(listing_id: str, _token: str = Depends(require_ad
 @app.get("/api/admin/payments")
 def get_payments(_token: str = Depends(require_admin)) -> dict[str, Any]:
     local_payments = price_model_state.admin_store["payments"]
+    local_listings = price_model_state.admin_store["marketplace_listings"]
     try:
         supabase_payments = fetch_marketplace_payments_from_supabase()
     except Exception as error:
         log_warning(f"Unable to load admin payments from Supabase: {error}")
         supabase_payments = []
 
-    payments = merge_records_by_id(local_payments, supabase_payments)
+    payments = normalize_payment_records(merge_records_by_id(local_payments, supabase_payments), local_listings)
+    with price_model_state.admin_lock:
+        if payments != price_model_state.admin_store.get("payments", []):
+            price_model_state.admin_store["payments"] = payments
+            persist_admin_store()
     return {"payments": payments}
+
+
+@app.get("/api/admin/users/recent")
+def get_recent_admin_users(
+    limit: int = Query(default=15, ge=1, le=100),
+    _token: str = Depends(require_admin),
+) -> dict[str, Any]:
+    users = build_recent_admin_users(limit=limit)
+    return {"users": users}
+
+
+@app.get("/api/admin/dau")
+def get_admin_dau(_token: str = Depends(require_admin)) -> dict[str, Any]:
+    snapshot = build_admin_dau_snapshot(days=7)
+    return {"count": snapshot["count"]}
+
+
+@app.get("/api/admin/dau-trends")
+def get_admin_dau_trends(
+    days: int = Query(default=7, ge=1, le=30),
+    _token: str = Depends(require_admin),
+) -> dict[str, Any]:
+    return build_admin_dau_snapshot(days=days)
+
+
+@app.get("/api/admin/financing-options")
+def get_admin_financing_options(_token: str = Depends(require_admin)) -> dict[str, Any]:
+    try:
+        facilities = fetch_financing_options_from_supabase()
+    except Exception as error:
+        raise admin_error(f"Unable to load financing options: {error}", status_code=502) from error
+    return {"facilities": facilities}
+
+
+@app.post("/api/admin/financing-options")
+def create_admin_financing_option(
+    name: str = Form(...),
+    type: str = Form(...),
+    fixed_rate: float = Form(default=0),
+    floating_rate: float = Form(default=0),
+    max_ltv: float = Form(default=0),
+    logo_file: UploadFile | None = File(default=None),
+    _token: str = Depends(require_admin),
+) -> dict[str, Any]:
+    logo_url = f"https://ui-avatars.com/api/?name={quote(name, safe='')}&background=random&color=fff"
+
+    if logo_file is not None:
+        file_ext = Path(logo_file.filename or "logo.png").suffix or ".png"
+        object_path = f"{uuid4().hex}{file_ext.lower()}"
+        logo_url = upload_file_to_supabase_storage(
+            "bank_logos",
+            object_path,
+            logo_file.file.read(),
+            logo_file.content_type or "application/octet-stream",
+        )
+
+    payload = {
+        "name": name.strip(),
+        "type": type.strip(),
+        "fixed_rate": round(float(fixed_rate or 0), 2),
+        "floating_rate": round(float(floating_rate or 0), 2),
+        "max_ltv": round(float(max_ltv or 0), 2),
+        "logo_url": logo_url,
+        "status": "Active",
+    }
+
+    try:
+        created = make_supabase_rest_request(
+            "/rest/v1/financing_options",
+            method="POST",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Prefer": "return=representation",
+            },
+        )
+    except Exception as error:
+        raise admin_error(f"Unable to create financing option: {error}", status_code=502) from error
+
+    facility = created[0] if isinstance(created, list) and created else payload
+    return {"facility": facility}
+
+
+@app.put("/api/admin/financing-options/{facility_id}")
+def update_admin_financing_option(
+    facility_id: str,
+    payload: AdminFinancingOptionUpdateRequest,
+    _token: str = Depends(require_admin),
+) -> dict[str, Any]:
+    update_payload = {
+        key: value
+        for key, value in payload.model_dump().items()
+        if value is not None
+    }
+    if not update_payload:
+        raise admin_error("No financing fields were provided to update.", status_code=422)
+
+    try:
+        updated = make_supabase_rest_request(
+            f"/rest/v1/financing_options?id=eq.{quote(facility_id)}",
+            method="PATCH",
+            data=json.dumps(update_payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Prefer": "return=representation",
+            },
+        )
+    except Exception as error:
+        raise admin_error(f"Unable to update financing option: {error}", status_code=502) from error
+
+    facility = updated[0] if isinstance(updated, list) and updated else None
+    return {"facility": facility}
+
+
+@app.delete("/api/admin/financing-options/{facility_id}")
+def delete_admin_financing_option(facility_id: str, _token: str = Depends(require_admin)) -> dict[str, str]:
+    try:
+        existing = make_supabase_rest_request(
+            f"/rest/v1/financing_options?select=id,logo_url&id=eq.{quote(facility_id)}",
+            method="GET",
+        )
+        facility = existing[0] if isinstance(existing, list) and existing else None
+        make_supabase_rest_request(
+            f"/rest/v1/financing_options?id=eq.{quote(facility_id)}",
+            method="DELETE",
+            headers={"Prefer": "return=minimal"},
+        )
+        if isinstance(facility, dict):
+            delete_file_from_supabase_storage(str(facility.get("logo_url") or ""), "bank_logos")
+    except Exception as error:
+        raise admin_error(f"Unable to delete financing option: {error}", status_code=502) from error
+
+    return {"message": "Financing option deleted successfully."}
 
 
 def get_prediction_warning(features: dict[str, Any], predicted_price: float) -> str | None:

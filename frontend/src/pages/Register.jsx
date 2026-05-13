@@ -46,15 +46,23 @@ function Register() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden auth-scanlines">
             <LoadingOverlay isOpen={isLoading} message="Securing your account..." />
             <SuccessToast isOpen={showSuccess} message="Account Created!" subMessage="Redirecting to login..." />
 
             {/* Background */}
             <div className="absolute inset-0 overflow-hidden">
+                {/* Aurora bands — emerald palette */}
+                <div className="auth-aurora top-[10%] left-[-20%] bg-emerald-500/15" style={{ animationDelay: '0s' }}></div>
+                <div className="auth-aurora bottom-[5%] right-[-20%] bg-cyan-500/12" style={{ animationDelay: '4s' }}></div>
+                <div className="auth-aurora top-[55%] left-[10%] bg-teal-500/10" style={{ animationDelay: '8s', height: '30%' }}></div>
+
+                {/* Floating orbs */}
                 <div className="absolute top-1/4 -left-20 w-96 h-96 bg-emerald-500/20 rounded-full blur-3xl animate-float"></div>
                 <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '1.5s' }}></div>
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-cyan-600/10 rounded-full blur-3xl"></div>
+
+                {/* Grid overlay */}
                 <div className="absolute inset-0 opacity-[0.03]"
                     style={{
                         backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), 
@@ -62,15 +70,32 @@ function Register() {
                         backgroundSize: '50px 50px'
                     }}>
                 </div>
+
+                {/* Floating geometric shapes */}
+                <div className="auth-geo-shape top-16 left-16 w-14 h-14 border border-emerald-500/10 rounded-2xl" style={{ animationDelay: '0s', animationDuration: '13s' }}></div>
+                <div className="auth-geo-shape top-36 right-28 w-10 h-10 border border-cyan-500/10 rounded-full" style={{ animationDelay: '3s', animationDuration: '15s' }}></div>
+                <div className="auth-geo-shape bottom-28 left-28 w-18 h-18 border border-teal-500/10 rounded-3xl" style={{ animationDelay: '6s', animationDuration: '17s' }}></div>
+                <div className="auth-geo-shape bottom-16 right-16 w-12 h-12 border border-emerald-500/10 rounded-xl" style={{ animationDelay: '2s', animationDuration: '12s' }}></div>
+
+                {/* Tiny particle dots */}
+                <div className="auth-particle w-1.5 h-1.5 bg-emerald-400/50 top-[12%] left-[25%]" style={{ animationDelay: '0s' }}></div>
+                <div className="auth-particle w-1 h-1 bg-cyan-400/40 top-[55%] right-[18%]" style={{ animationDelay: '2s', animationDuration: '10s' }}></div>
+                <div className="auth-particle w-2 h-2 bg-teal-300/30 bottom-[20%] left-[40%]" style={{ animationDelay: '4s', animationDuration: '12s' }}></div>
+                <div className="auth-particle w-1 h-1 bg-emerald-400/40 top-[40%] right-[30%]" style={{ animationDelay: '1s', animationDuration: '9s' }}></div>
+                <div className="auth-particle w-1.5 h-1.5 bg-cyan-300/35 bottom-[35%] left-[12%]" style={{ animationDelay: '5s', animationDuration: '11s' }}></div>
+                <div className="auth-particle w-1 h-1 bg-teal-400/30 top-[70%] left-[60%]" style={{ animationDelay: '3s', animationDuration: '13s' }}></div>
+
+                {/* Radial spotlight */}
+                <div className="auth-spotlight top-1/2 left-1/2 bg-emerald-500/8" style={{ filter: 'blur(60px)' }}></div>
             </div>
 
             <div className="relative z-10 w-full max-w-md animate-fade-in">
 
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <img src={logo} alt="AutoValueLK" className="h-12 object-contain mb-6 mx-auto animate-pulse-glow" />
+                    <img src={logo} alt="AutoValueLK" className="h-12 object-contain mb-6 mx-auto auth-logo-float" />
                     <h1 className="text-3xl font-bold text-white mb-2">
-                        Create Your <span className="gradient-text">Account</span>
+                        Create Your <span className="auth-gradient-text-shimmer">Account</span>
                     </h1>
                     <p className="text-slate-400">
                         Join AutoValueLK and start predicting car prices
@@ -78,12 +103,12 @@ function Register() {
                 </div>
 
                 {/* Form Card */}
-                <div className="card-glass p-8">
+                <div className="card-glass p-8 auth-card-glow-emerald auth-card-accent auth-card-accent-emerald">
                     <form onSubmit={handleRegister} className="space-y-5">
 
                         {/* Error Message */}
                         {error && (
-                            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-center gap-2">
+                            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-center gap-2 auth-field-enter">
                                 <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
@@ -92,18 +117,18 @@ function Register() {
                         )}
 
                         {/* Username */}
-                        <div className="space-y-2">
+                        <div className="space-y-2 auth-field-enter" style={{ animationDelay: '0.1s' }}>
                             <label className="label text-center">Username</label>
-                            <div className="relative group">
+                            <div className="relative group auth-input-wrap">
                                 <input
                                     type="text"
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     placeholder="Choose a username"
-                                    className="input pl-12"
+                                    className="input pl-12 auth-input-glow"
                                     required
                                 />
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors auth-icon">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                                     </svg>
@@ -112,18 +137,18 @@ function Register() {
                         </div>
 
                         {/* Email */}
-                        <div className="space-y-2">
+                        <div className="space-y-2 auth-field-enter" style={{ animationDelay: '0.2s' }}>
                             <label className="label text-center">Email Address</label>
-                            <div className="relative group">
+                            <div className="relative group auth-input-wrap">
                                 <input
                                     type="email"
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="you@example.com"
-                                    className="input pl-12"
+                                    className="input pl-12 auth-input-glow"
                                     required
                                 />
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors auth-icon">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                                     </svg>
@@ -132,18 +157,18 @@ function Register() {
                         </div>
 
                         {/* Password */}
-                        <div className="space-y-2">
+                        <div className="space-y-2 auth-field-enter" style={{ animationDelay: '0.3s' }}>
                             <label className="label text-center">Password</label>
-                            <div className="relative group">
+                            <div className="relative group auth-input-wrap">
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="Create a password"
-                                    className="input pl-12 pr-12"
+                                    className="input pl-12 pr-12 auth-input-glow"
                                     required
                                 />
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors auth-icon">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
@@ -168,18 +193,18 @@ function Register() {
                         </div>
 
                         {/* Confirm Password */}
-                        <div className="space-y-2">
+                        <div className="space-y-2 auth-field-enter" style={{ animationDelay: '0.4s' }}>
                             <label className="label text-center">Confirm Password</label>
-                            <div className="relative group">
+                            <div className="relative group auth-input-wrap">
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     placeholder="Confirm your password"
-                                    className="input pl-12"
+                                    className="input pl-12 auth-input-glow"
                                     required
                                 />
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors auth-icon">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                                     </svg>
@@ -188,42 +213,44 @@ function Register() {
                         </div>
 
                         {/* Submit */}
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full btn-primary flex items-center justify-center gap-3 py-4 text-lg disabled:opacity-70 disabled:cursor-not-allowed"
-                        >
-                            {isLoading ? (
-                                <>
-                                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <span>Creating account...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <span>Create Account</span>
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                    </svg>
-                                </>
-                            )}
-                        </button>
+                        <div className="auth-field-enter" style={{ animationDelay: '0.5s' }}>
+                            <button
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full btn-primary auth-btn-neon-emerald flex items-center justify-center gap-3 py-4 text-lg disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                {isLoading ? (
+                                    <>
+                                        <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Creating account...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>Create Account</span>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        </svg>
+                                    </>
+                                )}
+                            </button>
+                        </div>
 
                     </form>
                 </div>
 
                 {/* Sign In Link */}
-                <p className="text-center mt-8 text-slate-400">
+                <p className="text-center mt-8 text-slate-400 auth-field-enter" style={{ animationDelay: '0.55s' }}>
                     Already have an account?{" "}
-                    <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium transition-colors hover:underline">
+                    <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium transition-colors hover:underline auth-link-glow">
                         Sign in
                     </Link>
                 </p>
 
                 {/* Footer */}
-                <div className="text-center mt-6">
+                <div className="text-center mt-6 auth-field-enter" style={{ animationDelay: '0.6s' }}>
                     <p className="text-slate-600 text-xs">
                         © 2026 AutoValueLK. All rights reserved.
                     </p>

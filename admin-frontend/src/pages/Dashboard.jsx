@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Users } from 'lucide-react';
 import api from '../services/api';
-import { supabaseAdmin } from '../utils/supabaseClient';
 
 const formatDate = (dateStr) => {
     if (!dateStr) return '-';
@@ -26,29 +25,6 @@ const formatRelativeTime = (dateStr) => {
 
     const days = Math.floor(hours / 24);
     return `${days} day${days !== 1 ? 's' : ''} ago`;
-};
-
-const getDateKey = (date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-};
-
-const getRecentDateKeys = (days) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return Array.from({ length: days }, (_, index) => {
-        const date = new Date(today);
-        date.setDate(today.getDate() - (days - 1 - index));
-        return getDateKey(date);
-    });
-};
-
-const formatTrendLabel = (dateKey) => {
-    const date = new Date(`${dateKey}T00:00:00`);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
 function ActivityTrendPopover({ trendData, loading, error, title, subtitle, todayLabel = 'today', chartLabel }) {
@@ -176,48 +152,10 @@ function Dashboard() {
     }, []);
 
     const fetchDAU = async () => {
-        const now = new Date();
-        const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
         try {
             setDauLoading(true);
-
-            if (!supabaseAdmin) {
-                throw new Error('No service role key found.');
-            }
-
-            const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
-                page: 1,
-                perPage: 1000,
-            });
-
-            if (!usersError) {
-                const activeUsers = (data?.users || []).filter((user) => {
-                    if (!user.last_sign_in_at) return false;
-                    return new Date(user.last_sign_in_at) >= last24Hours;
-                });
-
-                setDauCount(activeUsers.length);
-                return;
-            }
-
-            const authListBlocked = /not admin|permission|service role|unauthorized|forbidden/i.test(usersError?.message || '');
-
-            if (authListBlocked) {
-                const { count: updatedCount, error: updatedError } = await supabaseAdmin
-                    .from('profiles')
-                    .select('id', { count: 'exact', head: true })
-                    .gte('updated_at', last24Hours.toISOString());
-
-                if (!updatedError) {
-                    setDauCount(typeof updatedCount === 'number' ? updatedCount : 0);
-                    return;
-                }
-
-                throw updatedError || new Error('Unable to fetch fallback DAU from profiles.updated_at.');
-            }
-
-            throw usersError || new Error('Unable to fetch DAU from auth.users.');
+            const res = await api.get('/api/admin/dau');
+            setDauCount(Number(res.data?.count || 0));
         } catch (err) {
             console.warn('DAU fetch issue:', err.message);
             setDauCount(0);
@@ -228,18 +166,8 @@ function Dashboard() {
 
     const fetchRecentUsers = async () => {
         try {
-            if (!supabaseAdmin) {
-                throw new Error('No service role key found. Using mock users.');
-            }
-
-            const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers();
-            if (usersError) throw usersError;
-
-            const sorted = data.users
-                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                .slice(0, 15);
-
-            setRecentUsers(sorted);
+            const res = await api.get('/api/admin/users/recent?limit=15');
+            setRecentUsers(res.data?.users || []);
         } catch (err) {
             console.warn('Admin users fetch issue:', err.message);
             setRecentUsers([
@@ -306,65 +234,17 @@ function Dashboard() {
         }
     };
 
-    const buildDauTrendFromUsers = (users) => {
-        const dateKeys = getRecentDateKeys(7);
-        const counts = Object.fromEntries(dateKeys.map((dateKey) => [dateKey, 0]));
-
-        (users || []).forEach((user) => {
-            if (!user.last_sign_in_at) return;
-            const dateKey = getDateKey(new Date(user.last_sign_in_at));
-            if (dateKey in counts) {
-                counts[dateKey] += 1;
-            }
-        });
-
-        const trend = dateKeys.map((dateKey) => ({
-            date: dateKey,
-            label: formatTrendLabel(dateKey),
-            count: counts[dateKey],
-        }));
-
-        return {
-            days: 7,
-            today: trend[trend.length - 1],
-            trend,
-        };
-    };
-
     const fetchDauTrend = async () => {
         if (dauTrend || dauTrendLoading) return;
 
         try {
             setDauTrendLoading(true);
             setDauTrendError('');
-
-            if (!supabaseAdmin) {
-                throw new Error('No service role key found.');
-            }
-
-            const { data, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
-                page: 1,
-                perPage: 1000,
-            });
-
-            if (usersError) {
-                throw usersError;
-            }
-
-            setDauTrend(buildDauTrendFromUsers(data?.users || []));
+            const res = await api.get('/api/admin/dau-trends?days=7');
+            setDauTrend(res.data);
         } catch (err) {
             console.warn('DAU trend fetch issue:', err.message);
-            const dateKeys = getRecentDateKeys(7);
-            const emptyTrend = dateKeys.map((dateKey) => ({
-                date: dateKey,
-                label: formatTrendLabel(dateKey),
-                count: 0,
-            }));
-            setDauTrend({
-                days: 7,
-                today: emptyTrend[emptyTrend.length - 1],
-                trend: emptyTrend,
-            });
+            setDauTrend({ days: 7, today: { count: 0 }, trend: [] });
             setDauTrendError('Unable to load DAU trend right now.');
         } finally {
             setDauTrendLoading(false);
@@ -618,12 +498,6 @@ function Dashboard() {
                         </table>
                     </div>
                 </div>
-
-                {!usersLoading && recentUsers.length > 0 && !import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY && (
-                    <p className="text-xs text-amber-500/50 mt-3 text-center">
-                        Viewing mock records. Add <code className="bg-slate-800 px-1 py-0.5 rounded text-amber-400 tracking-wider">VITE_SUPABASE_SERVICE_ROLE_KEY</code> to your .env to see secure live data.
-                    </p>
-                )}
             </div>
         </div>
     );

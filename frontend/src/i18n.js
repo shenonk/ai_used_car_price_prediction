@@ -21,7 +21,7 @@ const marketplaceEn = {
     button: "Publish Ad",
     modal_title: "Publish Ad",
     modal_description:
-      "Fill in your car details below. Your ad will be submitted to the backend, stored in Supabase, and marked as pending until reviewed.",
+      "Fill in your car details below. Your ad will be submitted to the admin and marked as pending until reviewed.",
     image_help:
       "Optional. Add up to 5 JPG, PNG, or WEBP images. You can publish with none, one, or several photos.",
     submitting: "Submitting listing...",

@@ -7,6 +7,10 @@ import {
 } from "recharts"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import {
+  BadgeCheck, Bell, BellRing, BrainCircuit, Car, Download,
+  FileText, HandCoins, Sparkles, TrendingUp, Shield, Zap,
+} from "lucide-react"
 import { getCurrentUser } from "../utils/auth"
 import { supabase } from "../utils/supabaseClient"
 import { loadUserAlerts, upsertUserAlert } from "../utils/userAlerts"
@@ -325,24 +329,34 @@ function Results() {
       <div className="dashboard-page-hero mb-8 animate-fade-in">
         <div className="relative z-10">
           <div className="dashboard-page-eyebrow mb-4">
-            <svg className="h-3.5 w-3.5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <BadgeCheck className="h-3.5 w-3.5 text-emerald-300" />
             {t("results_page.title")}
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">{t("results_page.title")}</h1>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight" style={{ background: 'linear-gradient(135deg, #ffffff, #6ee7b7, #67e8f9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{t("results_page.title")}</h1>
           {vehicleSummary ? (
-            <p className="mt-2 text-slate-300 text-sm mb-4">{vehicleSummary}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Car className="h-4 w-4 text-slate-400" />
+              <p className="text-slate-300 text-sm">{vehicleSummary}</p>
+            </div>
           ) : (
             <p className="mt-2 text-slate-300 text-sm mb-4">{t("results_page.based_on_specs")}</p>
           )}
 
-          <div className="inline-block rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-slate-300 text-sm mb-1">{t("results_page.estimated_market_value")}</p>
+          <div className="results-price-container mt-6 inline-block rounded-[28px] border border-emerald-400/15 bg-gradient-to-br from-emerald-500/8 via-slate-900/50 to-blue-500/5 p-7 backdrop-blur-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4 text-emerald-300 animate-pulse" />
+              <p className="text-emerald-200 text-sm font-semibold">{t("results_page.estimated_market_value")}</p>
+            </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white">LKR {formattedPrice}</h2>
-            <div className="flex items-center gap-2 mt-3">
-              <span className="badge bg-white/20 text-white border-white/30">{t("results_page.accuracy_badge")}</span>
-              <span className="badge bg-white/20 text-white border-white/30">{t("results_page.updated_today")}</span>
+            <div className="flex items-center gap-2 mt-4">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-200">
+                <Shield className="h-3 w-3" />
+                {t("results_page.accuracy_badge")}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-400/20 bg-blue-400/10 px-3 py-1 text-xs font-semibold text-blue-200">
+                <TrendingUp className="h-3 w-3" />
+                {t("results_page.updated_today")}
+              </span>
             </div>
           </div>
         </div>
@@ -351,9 +365,7 @@ function Results() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="dashboard-page-panel animate-fade-in animate-delay-100">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-            </svg>
+            <HandCoins className="w-5 h-5 text-blue-400" />
             {t("results_page.loan_plans")}
           </h2>
           <div className="space-y-4">
@@ -365,7 +377,7 @@ function Results() {
               <p className="text-center py-8 text-slate-500">{t("results_page.no_loan_plans")}</p>
             ) : (
               loanPlans.map((plan, index) => (
-                <div key={index} className={`p-4 rounded-xl border transition-all duration-300 hover:translate-x-1 ${plan.recommended ? "bg-blue-500/20 border-blue-500/50" : "bg-slate-800/30 border-slate-700/50 hover:border-slate-600/50"}`}>
+                <div key={index} className={`results-loan-card p-5 rounded-2xl border transition-all duration-300 ${plan.recommended ? "bg-gradient-to-r from-blue-500/15 to-cyan-500/10 border-blue-500/30 shadow-lg shadow-blue-500/5" : "bg-slate-800/25 border-slate-700/40 hover:border-slate-600/50"}`}>
                   <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center gap-2">
                       <span className="text-lg font-semibold text-white">{t("results_page.years", { count: plan.years })}</span>
@@ -432,7 +444,7 @@ function Results() {
       <div className="flex flex-col sm:flex-row gap-4 mt-6 animate-fade-in animate-delay-400">
         <button
           onClick={() => navigate("/financing", { state: { vehicle, predictedPrice } })}
-          className="flex-1 btn-primary py-4 flex items-center justify-center gap-2 rounded-xl font-semibold shadow-lg shadow-blue-500/20"
+          className="flex-1 marketplace-primary-button py-4 flex items-center justify-center gap-2 rounded-2xl font-bold shadow-lg shadow-blue-500/15"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           {t("results_page.financing_button")}
@@ -441,7 +453,7 @@ function Results() {
         <button
           onClick={handleDownloadPDF}
           disabled={downloading}
-          className="flex-1 py-4 flex items-center justify-center gap-2 rounded-xl font-semibold transition-all duration-300 btn-secondary disabled:opacity-70"
+          className="flex-1 py-4 flex items-center justify-center gap-2 rounded-2xl font-semibold transition-all duration-300 btn-secondary disabled:opacity-70 backdrop-blur-sm"
         >
           {downloading ? (
             <>

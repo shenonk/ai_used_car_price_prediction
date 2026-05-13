@@ -1,0 +1,387 @@
+/* ============================================
+   AUTH PAGE PREMIUM EFFECTS
+   ============================================ */
+
+/* --- Aurora sweep: a soft colored band that drifts across the background --- */
+@keyframes aurora-drift {
+  0%   { transform: translateX(-60%) translateY(-10%) rotate(-8deg); opacity: 0.45; }
+  50%  { transform: translateX(60%) translateY(10%) rotate(8deg);   opacity: 0.7; }
+  100% { transform: translateX(-60%) translateY(-10%) rotate(-8deg); opacity: 0.45; }
+}
+
+.auth-aurora {
+  position: absolute;
+  width: 140%;
+  height: 45%;
+  border-radius: 50%;
+  filter: blur(90px);
+  pointer-events: none;
+  animation: aurora-drift 12s ease-in-out infinite;
+}
+
+/* --- Pulsing border-glow on glass card --- */
+@keyframes card-border-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(59, 130, 246, 0.08),
+      0 0 30px rgba(59, 130, 246, 0.06),
+      0 8px 32px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(59, 130, 246, 0.18),
+      0 0 60px rgba(59, 130, 246, 0.12),
+      0 12px 48px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  }
+}
+
+.auth-card-glow {
+  animation: card-border-glow 4s ease-in-out infinite;
+}
+
+/* --- Input shimmer on focus --- */
+@keyframes input-shimmer {
+  0%   { left: -100%; }
+  100% { left: 200%; }
+}
+
+.auth-input-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+}
+
+.auth-input-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.06), transparent);
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.auth-input-wrap:focus-within::after {
+  opacity: 1;
+  animation: input-shimmer 2s ease-in-out infinite;
+}
+
+/* --- Neon shadow on submit button --- */
+@keyframes neon-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 18px rgba(59, 130, 246, 0.25),
+      0 0 60px rgba(59, 130, 246, 0.08),
+      0 4px 20px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(59, 130, 246, 0.4),
+      0 0 90px rgba(59, 130, 246, 0.14),
+      0 8px 30px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+}
+
+.auth-btn-neon {
+  animation: neon-breathe 3s ease-in-out infinite;
+}
+
+.auth-btn-neon:hover {
+  animation: none;
+  box-shadow:
+    0 0 36px rgba(59, 130, 246, 0.55),
+    0 0 100px rgba(59, 130, 246, 0.2),
+    0 10px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  filter: brightness(1.08);
+}
+
+/* --- Particle-dot drift (tiny floating dots) --- */
+@keyframes particle-drift {
+  0%   { transform: translate(0, 0) scale(1);   opacity: 0.35; }
+  25%  { transform: translate(30px, -40px) scale(1.2); opacity: 0.6; }
+  50%  { transform: translate(-20px, -80px) scale(0.9); opacity: 0.3; }
+  75%  { transform: translate(10px, -60px) scale(1.1); opacity: 0.55; }
+  100% { transform: translate(0, 0) scale(1);   opacity: 0.35; }
+}
+
+.auth-particle {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: particle-drift 8s ease-in-out infinite;
+}
+
+/* --- Staggered field entrance --- */
+@keyframes field-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.auth-field-enter {
+  animation: field-slide-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* --- Floating geometric shape with rotation --- */
+@keyframes geo-rotate-float {
+  0%   { transform: rotate(0deg) translateY(0); }
+  50%  { transform: rotate(180deg) translateY(-15px); }
+  100% { transform: rotate(360deg) translateY(0); }
+}
+
+.auth-geo-shape {
+  position: absolute;
+  pointer-events: none;
+  animation: geo-rotate-float 10s linear infinite;
+}
+
+/* --- Card top accent bar (animated gradient) --- */
+.auth-card-accent {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-card-accent::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #06b6d4, #8b5cf6, #3b82f6);
+  background-size: 300% 100%;
+  animation: accent-slide 4s ease infinite;
+  z-index: 1;
+}
+
+@keyframes accent-slide {
+  0%, 100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+
+/* --- Logo hover lift --- */
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 0 12px rgba(59,130,246,0.3)); }
+  50%      { transform: translateY(-4px) scale(1.03); filter: drop-shadow(0 0 24px rgba(59,130,246,0.5)); }
+}
+
+.auth-logo-float {
+  animation: logo-float 3s ease-in-out infinite;
+}
+
+/* --- Gradient text shimmer overlay --- */
+@keyframes text-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.auth-gradient-text-shimmer {
+  background: linear-gradient(
+    90deg,
+    #3b82f6 0%,
+    #06b6d4 25%,
+    #a78bfa 50%,
+    #06b6d4 75%,
+    #3b82f6 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: text-shimmer 4s linear infinite;
+}
+
+/* --- Input focus glow ring --- */
+.auth-input-glow:focus {
+  border-color: rgba(59, 130, 246, 0.5) !important;
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.12),
+    0 0 20px rgba(59, 130, 246, 0.08),
+    inset 0 1px 2px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* --- Radial spotlight behind card --- */
+@keyframes spotlight-pulse {
+  0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(1); }
+  50%      { opacity: 0.65; transform: translate(-50%, -50%) scale(1.15); }
+}
+
+.auth-spotlight {
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: spotlight-pulse 5s ease-in-out infinite;
+}
+
+/* --- Icon container pulse on focus-within --- */
+@keyframes icon-glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(59,130,246,0.0)); }
+  50%      { filter: drop-shadow(0 0 8px rgba(59,130,246,0.4)); }
+}
+
+.auth-input-wrap:focus-within .auth-icon {
+  color: #60a5fa !important;
+  animation: icon-glow-pulse 2s ease-in-out infinite;
+}
+
+/* --- Hover lift for link text --- */
+.auth-link-glow {
+  transition: all 0.3s ease;
+  text-shadow: 0 0 0 transparent;
+}
+
+.auth-link-glow:hover {
+  text-shadow: 0 0 12px rgba(96, 165, 250, 0.5);
+}
+
+/* --- Subtle scan line overlay on background --- */
+@keyframes scanline {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+.auth-scanlines::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(180deg, transparent, rgba(59, 130, 246, 0.03), transparent);
+  pointer-events: none;
+  animation: scanline 8s linear infinite;
+  z-index: 0;
+}
+
+/* --- Forgot password: purple theme variant --- */
+.auth-card-glow-purple {
+  animation: card-border-glow-purple 4s ease-in-out infinite;
+}
+
+@keyframes card-border-glow-purple {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.08),
+      0 0 30px rgba(139, 92, 246, 0.06),
+      0 8px 32px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(139, 92, 246, 0.18),
+      0 0 60px rgba(139, 92, 246, 0.12),
+      0 12px 48px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  }
+}
+
+/* --- Register: emerald theme variant --- */
+.auth-card-glow-emerald {
+  animation: card-border-glow-emerald 4s ease-in-out infinite;
+}
+
+@keyframes card-border-glow-emerald {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(16, 185, 129, 0.08),
+      0 0 30px rgba(16, 185, 129, 0.06),
+      0 8px 32px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(16, 185, 129, 0.18),
+      0 0 60px rgba(16, 185, 129, 0.12),
+      0 12px 48px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  }
+}
+
+.auth-btn-neon-emerald {
+  animation: neon-breathe-emerald 3s ease-in-out infinite;
+}
+
+@keyframes neon-breathe-emerald {
+  0%, 100% {
+    box-shadow:
+      0 0 18px rgba(16, 185, 129, 0.25),
+      0 0 60px rgba(16, 185, 129, 0.08),
+      0 4px 20px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(16, 185, 129, 0.4),
+      0 0 90px rgba(16, 185, 129, 0.14),
+      0 8px 30px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+}
+
+.auth-btn-neon-emerald:hover {
+  animation: none;
+  box-shadow:
+    0 0 36px rgba(16, 185, 129, 0.55),
+    0 0 100px rgba(16, 185, 129, 0.2),
+    0 10px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  filter: brightness(1.08);
+}
+
+.auth-btn-neon-purple {
+  animation: neon-breathe-purple 3s ease-in-out infinite;
+}
+
+@keyframes neon-breathe-purple {
+  0%, 100% {
+    box-shadow:
+      0 0 18px rgba(139, 92, 246, 0.25),
+      0 0 60px rgba(139, 92, 246, 0.08),
+      0 4px 20px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 28px rgba(139, 92, 246, 0.4),
+      0 0 90px rgba(139, 92, 246, 0.14),
+      0 8px 30px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  }
+}
+
+.auth-btn-neon-purple:hover {
+  animation: none;
+  box-shadow:
+    0 0 36px rgba(139, 92, 246, 0.55),
+    0 0 100px rgba(139, 92, 246, 0.2),
+    0 10px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3) !important;
+  filter: brightness(1.08);
+}
+
+/* Accent bar color variants */
+.auth-card-accent-emerald::before {
+  background: linear-gradient(90deg, #10b981, #06b6d4, #34d399, #10b981) !important;
+}
+
+.auth-card-accent-purple::before {
+  background: linear-gradient(90deg, #8b5cf6, #6366f1, #a78bfa, #8b5cf6) !important;
+}

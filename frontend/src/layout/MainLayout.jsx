@@ -160,11 +160,11 @@ const MainLayout = () => {
       )}
 
       <div
-        className={`theme-sidebar fixed left-0 top-0 z-40 flex h-screen w-72 flex-col border-r backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0 ${
+        className={`theme-sidebar fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="theme-divider border-b p-6">
+        <div className="theme-divider border-b px-5 py-6">
           <div className="flex items-center gap-3">
             <div className="sidebar-brand-logo flex h-11 w-11 items-center justify-center rounded-2xl">
               <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
@@ -176,7 +176,7 @@ const MainLayout = () => {
           </div>
         </div>
 
-        <nav className="sidebar-nav flex-1 space-y-1.5 px-4 pb-3 pt-3">
+        <nav className="sidebar-nav flex-1 space-y-1.5 px-3 pb-3 pt-3">
           {navItems.map((item) => (
             <Link
               key={item.path}
@@ -196,7 +196,7 @@ const MainLayout = () => {
           ))}
         </nav>
 
-        <div className="theme-divider border-t p-4">
+        <div className="theme-divider border-t p-3">
           <button
             onClick={handleAuthAction}
             className="sidebar-account-card flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left transition-all duration-300"
@@ -234,7 +234,7 @@ const MainLayout = () => {
         </div>
       </div>
 
-      <div className="min-h-screen w-full lg:ml-72 lg:w-[calc(100%-18rem)]">
+      <div className="min-h-screen w-full lg:ml-64 lg:w-[calc(100%-16rem)]">
         <div className="min-h-screen pt-20 lg:pt-0">
           <Outlet />
         </div>

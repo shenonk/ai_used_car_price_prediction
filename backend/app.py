@@ -366,6 +366,7 @@ def get_default_admin_store() -> dict[str, Any]:
                 "is_urgent": False,
                 "is_spotlight": False,
                 "is_bumped": False,
+                "view_count": 0,
                 "created_at": "2026-03-31T08:00:00Z",
                 "user_id": "user_104",
             },
@@ -391,6 +392,7 @@ def get_default_admin_store() -> dict[str, Any]:
                 "is_urgent": False,
                 "is_spotlight": True,
                 "is_bumped": False,
+                "view_count": 0,
                 "created_at": "2026-03-29T10:30:00Z",
                 "user_id": "user_087",
             },
@@ -2214,6 +2216,7 @@ async def create_marketplace_listing(
             "is_urgent": parse_boolean_flag(is_urgent),
             "is_spotlight": parse_boolean_flag(is_spotlight),
             "is_bumped": parse_boolean_flag(is_bumped),
+            "view_count": 0,
             "created_at": created_at,
             "updated_at": created_at,
             "user_id": requester["user_id"],
@@ -2226,6 +2229,21 @@ async def create_marketplace_listing(
 
     sync_marketplace_listing_to_supabase(listing)
     return {"message": "Marketplace listing created successfully.", "listing": listing}
+
+
+@app.post("/api/marketplace/listings/{listing_id}/view")
+def record_marketplace_listing_view(listing_id: str) -> dict[str, Any]:
+    with price_model_state.admin_lock:
+        listing = get_marketplace_listing_by_id(listing_id)
+        if listing is None:
+            raise admin_error("Marketplace listing not found.", status_code=404)
+
+        current_count = int(float(listing.get("view_count") or 0))
+        listing["view_count"] = current_count + 1
+        listing["updated_at"] = utc_now_iso()
+        persist_admin_store()
+
+    return {"view_count": listing["view_count"], "listing": listing}
 
 
 @app.post("/api/marketplace/generate-description")

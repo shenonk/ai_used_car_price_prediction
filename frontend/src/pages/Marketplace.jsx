@@ -8,6 +8,7 @@ import "leaflet/dist/leaflet.css";
 import {
   ArrowUp,
   CalendarRange,
+  Eye,
   Fuel,
   Gauge,
   MapPin,
@@ -282,6 +283,8 @@ const formatCurrency = (value, locale) =>
   }).format(Number(value || 0));
 
 const formatNumber = (value, locale) => Number(value || 0).toLocaleString(locale);
+
+const getListingViewCount = (listing) => Number(listing?.view_count || listing?.views || 0);
 
 const normalizeImageCollection = (value) => {
   if (Array.isArray(value)) {
@@ -707,7 +710,32 @@ function Marketplace() {
           .map((value) => String(value || "").trim().toLowerCase())
           .join("|");
 
-        if (!seenKeys.has(key)) {
+        const existingIndex = mergedListings.findIndex((item) => {
+          const sameId = item.id && listing.id && String(item.id) === String(listing.id);
+          const sameKey =
+            [
+              item.brand,
+              item.model,
+              item.year,
+              item.price,
+              item.seller_name,
+              item.phone_number,
+            ]
+              .map((value) => String(value || "").trim().toLowerCase())
+              .join("|") === key;
+          return sameId || sameKey;
+        });
+
+        if (existingIndex >= 0) {
+          mergedListings[existingIndex] = {
+            ...mergedListings[existingIndex],
+            ...listing,
+            view_count: Math.max(
+              getListingViewCount(mergedListings[existingIndex]),
+              getListingViewCount(listing)
+            ),
+          };
+        } else if (!seenKeys.has(key)) {
           seenKeys.add(key);
           mergedListings.push(listing);
         }
@@ -726,6 +754,56 @@ function Marketplace() {
   useEffect(() => {
     fetchListings();
   }, [t]);
+
+  const openListingDetails = (car) => {
+    const nextViewCount = getListingViewCount(car) + 1;
+    const optimisticCar = { ...car, view_count: nextViewCount };
+
+    setSelectedCar(optimisticCar);
+    setSelectedCarImage(getListingImages(car)[0] || "");
+    setCars((current) =>
+      current.map((item) =>
+        String(item.id) === String(car.id) ? { ...item, view_count: nextViewCount } : item
+      )
+    );
+
+    fetch(`${API_BASE_URL}/api/marketplace/listings/${encodeURIComponent(car.id)}/view`, {
+      method: "POST",
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Unable to record listing view.");
+        }
+        return response.json();
+      })
+      .then((result) => {
+        const syncedCount = Number(result.view_count || nextViewCount);
+        setSelectedCar((current) =>
+          current && String(current.id) === String(car.id)
+            ? { ...current, view_count: syncedCount }
+            : current
+        );
+        setCars((current) =>
+          current.map((item) =>
+            String(item.id) === String(car.id) ? { ...item, view_count: syncedCount } : item
+          )
+        );
+      })
+      .catch(() => {
+        setSelectedCar((current) =>
+          current && String(current.id) === String(car.id)
+            ? { ...current, view_count: getListingViewCount(car) }
+            : current
+        );
+        setCars((current) =>
+          current.map((item) =>
+            String(item.id) === String(car.id)
+              ? { ...item, view_count: getListingViewCount(car) }
+              : item
+          )
+        );
+      });
+  };
 
   const approvedCars = useMemo(
     () =>
@@ -1509,14 +1587,12 @@ function Marketplace() {
                 role="button"
                 tabIndex={0}
                 onClick={() => {
-                  setSelectedCar(car);
-                  setSelectedCarImage(getListingImages(car)[0] || "");
+                  openListingDetails(car);
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    setSelectedCar(car);
-                    setSelectedCarImage(getListingImages(car)[0] || "");
+                    openListingDetails(car);
                   }
                 }}
                 className="marketplace-listing-card group overflow-hidden rounded-[20px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
@@ -1600,13 +1676,18 @@ function Marketplace() {
                   </div>
 
                   <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-3">
-                    <p className="text-xs text-slate-400">{t("marketplace.card.tap_to_expand")}</p>
+                    <p className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                      <Eye className="h-4 w-4 text-emerald-400" />
+                      {t("marketplace.card.views", {
+                        count: formatNumber(getListingViewCount(car), locale),
+                        defaultValue: "{{count}} views",
+                      })}
+                    </p>
                     <button
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
-                        setSelectedCar(car);
-                        setSelectedCarImage(getListingImages(car)[0] || "");
+                        openListingDetails(car);
                       }}
                       className="marketplace-secondary-button rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
                     >

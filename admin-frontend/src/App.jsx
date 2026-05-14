@@ -5,7 +5,6 @@ import Sidebar from './components/Sidebar';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminLogin from './pages/AdminLogin';
 import Dashboard from './pages/Dashboard';
-import LoanRates from './pages/LoanRates';
 import Notifications from './pages/Notifications';
 import Financing from './pages/Financing';
 import SupportTickets from './pages/SupportTickets';
@@ -68,7 +67,6 @@ function App() {
           <Route path="/admin/dashboard" element={<Dashboard />} />
           <Route path="/admin/marketplace" element={<Marketplace />} />
           <Route path="/admin/payments" element={<Payments />} />
-          <Route path="/admin/loan-rates" element={<LoanRates />} />
           <Route path="/admin/financing" element={<Financing />} />
           <Route path="/admin/notifications" element={<Notifications />} />
           <Route path="/admin/support-tickets" element={<SupportTickets />} />

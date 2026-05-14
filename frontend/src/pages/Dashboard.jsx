@@ -37,6 +37,8 @@ import { getCurrentUser } from "../utils/auth"
 import { loadPredictionHistory } from "../utils/predictionHistory"
 import { supabase } from "../utils/supabaseClient"
 import { loadUserAlerts } from "../utils/userAlerts"
+import analyticsTrends from "../data/analytics_trends.json"
+import marketTrends from "../data/market_trends.json"
 import {
   dismissNotification,
   inferNotificationType,
@@ -148,6 +150,234 @@ function getLastSixMonths() {
       label: date.toLocaleDateString("en-LK", { month: "short" }),
     }
   })
+}
+
+function buildExactTrendKey(prediction) {
+  return `${prediction.brand}|||${prediction.model}|||${prediction.year}`
+}
+
+function buildMarketTrendKey(prediction) {
+  return `${prediction.brand}|||${prediction.model}|||${prediction.year}`
+}
+
+function buildFamilyTrendKey(prediction) {
+  return `${prediction.brand}|||${prediction.model}`
+}
+
+function normalizeTrendPrediction(prediction) {
+  return {
+    ...prediction,
+    brand: String(prediction?.brand || "TOYOTA").trim().toUpperCase(),
+    model: String(prediction?.model || "AQUA").trim().toUpperCase(),
+    year: Number(prediction?.year || new Date().getFullYear()),
+    predictedPrice: Number(prediction?.predictedPrice || 4_500_000),
+  }
+}
+
+function normalizeModelTokens(value) {
+  return String(value)
+    .trim()
+    .toUpperCase()
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function isRelatedModelVariant(selectedModel, candidateModel) {
+  const selectedTokens = normalizeModelTokens(selectedModel)
+  const candidateTokens = normalizeModelTokens(candidateModel)
+
+  if (selectedTokens.length === 0 || candidateTokens.length === 0) return false
+
+  const selectedPhrase = selectedTokens.join(" ")
+  const candidatePhrase = candidateTokens.join(" ")
+
+  if (candidatePhrase === selectedPhrase) return true
+  if (candidatePhrase.startsWith(`${selectedPhrase} `) || selectedPhrase.startsWith(`${candidatePhrase} `)) return true
+
+  return selectedTokens.every((token) => candidateTokens.includes(token))
+}
+
+function roundToTwo(value) {
+  return Math.round(value * 100) / 100
+}
+
+function getAnnualDepreciationRate(vehicleAge) {
+  if (vehicleAge <= 3) return 0.1
+  if (vehicleAge <= 7) return 0.07
+  return 0.05
+}
+
+function applyBackwardDepreciation(fromValue, manufactureYear, fromYear, targetYear) {
+  let estimatedValue = fromValue
+
+  for (let year = fromYear; year > targetYear; year -= 1) {
+    const vehicleAgeAtYear = year - manufactureYear
+    estimatedValue = estimatedValue / (1 - getAnnualDepreciationRate(vehicleAgeAtYear))
+  }
+
+  return estimatedValue
+}
+
+function buildFullAnnualTrend(prediction, basePoints, sourceLabel) {
+  const currentYear = new Date().getFullYear()
+  const manufactureYear = Math.min(Number(prediction.year) || currentYear, currentYear)
+  const pointMap = new Map(basePoints.map((point) => [Number(point.listingYear), Number(point.medianPrice)]))
+
+  if (!pointMap.has(currentYear)) {
+    pointMap.set(currentYear, Number(prediction.predictedPrice))
+  }
+
+  const anchorYears = [...pointMap.keys()].sort((a, b) => a - b)
+  const firstAnchorYear = anchorYears[0]
+  const firstAnchorValue = pointMap.get(firstAnchorYear)
+  const labels = []
+  const values = []
+
+  for (let year = manufactureYear; year <= currentYear; year += 1) {
+    let value
+
+    if (pointMap.has(year)) {
+      value = pointMap.get(year)
+    } else if (year < firstAnchorYear) {
+      value = applyBackwardDepreciation(firstAnchorValue, manufactureYear, firstAnchorYear, year)
+    } else {
+      const previousYear = [...pointMap.keys()].filter((anchorYear) => anchorYear < year).sort((a, b) => b - a)[0]
+      const nextYear = [...pointMap.keys()].filter((anchorYear) => anchorYear > year).sort((a, b) => a - b)[0]
+
+      if (previousYear && nextYear) {
+        const progress = (year - previousYear) / (nextYear - previousYear)
+        value = pointMap.get(previousYear) + (pointMap.get(nextYear) - pointMap.get(previousYear)) * progress
+      } else if (previousYear) {
+        value = pointMap.get(previousYear) * (1 - getAnnualDepreciationRate(year - manufactureYear))
+      } else {
+        value = Number(prediction.predictedPrice)
+      }
+    }
+
+    labels.push(String(year))
+    values.push(Math.max(0, Math.round(value)))
+  }
+
+  return { labels, values, source: sourceLabel }
+}
+
+function buildVariantMarketTrendSeries(prediction) {
+  const prefix = `${prediction.brand}|||`
+  const targetYear = Number(prediction.year)
+  const candidateEntries = Object.entries(marketTrends.exactTrends || {}).filter(([key]) => {
+    if (!key.startsWith(prefix)) return false
+
+    const [, candidateModel, candidateYear] = key.split("|||")
+    return Number(candidateYear) === targetYear && isRelatedModelVariant(prediction.model, candidateModel)
+  })
+
+  if (candidateEntries.length === 0) return null
+
+  const aggregated = new Map()
+  candidateEntries.forEach(([, points]) => {
+    points.forEach((point) => {
+      const year = Number(point.trendYear)
+      const value = Number(point.marketValueLkr)
+      if (!Number.isFinite(year) || !Number.isFinite(value) || value <= 0) return
+      const values = aggregated.get(year) || []
+      values.push(value)
+      aggregated.set(year, values)
+    })
+  })
+
+  const combinedPoints = [...aggregated.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([trendYear, values]) => {
+      const sortedValues = [...values].sort((a, b) => a - b)
+      const middleIndex = Math.floor(sortedValues.length / 2)
+      const median =
+        sortedValues.length % 2 === 0
+          ? (sortedValues[middleIndex - 1] + sortedValues[middleIndex]) / 2
+          : sortedValues[middleIndex]
+
+      return {
+        trendYear,
+        marketValueLkr: roundToTwo(median),
+      }
+    })
+
+  if (combinedPoints.length === 0) return null
+
+  return {
+    labels: combinedPoints.map((point) => String(point.trendYear)),
+    values: combinedPoints.map((point) => Math.round(point.marketValueLkr)),
+    source: "market_variant",
+  }
+}
+
+function anchorCurrentYearToPrediction(prediction, series) {
+  const currentYear = new Date().getFullYear()
+  const points = series.labels.map((label, index) => ({
+    year: Number(label),
+    value: Number(series.values[index]) || 0,
+  }))
+  const currentYearPoint = points.find((point) => point.year === currentYear)
+
+  if (currentYearPoint) {
+    currentYearPoint.value = Number(prediction.predictedPrice)
+  } else {
+    points.push({ year: currentYear, value: Number(prediction.predictedPrice) })
+  }
+
+  const sortedPoints = points.filter((point) => Number.isFinite(point.year)).sort((a, b) => a.year - b.year)
+  return {
+    ...series,
+    labels: sortedPoints.map((point) => String(point.year)),
+    values: sortedPoints.map((point) => Math.round(point.value)),
+  }
+}
+
+function generateProjectionSeries(prediction) {
+  const currentYear = new Date().getFullYear()
+  const manufactureYear = Math.min(Number(prediction.year) || currentYear, currentYear)
+  const labels = []
+  const values = []
+
+  for (let year = manufactureYear; year <= currentYear; year += 1) {
+    let estimatedValue = Number(prediction.predictedPrice)
+    for (let referenceYear = currentYear; referenceYear > year; referenceYear -= 1) {
+      estimatedValue = estimatedValue / (1 - getAnnualDepreciationRate(referenceYear - manufactureYear))
+    }
+    labels.push(String(year))
+    values.push(Math.max(0, Math.round(estimatedValue)))
+  }
+
+  return { labels, values, source: "projection" }
+}
+
+function getDashboardTrendSeries(predictionInput) {
+  const prediction = normalizeTrendPrediction(predictionInput)
+  const marketTrend = marketTrends.exactTrends?.[buildMarketTrendKey(prediction)] || []
+
+  if (marketTrend.length > 0) {
+    return anchorCurrentYearToPrediction(prediction, {
+      labels: marketTrend.map((point) => String(point.trendYear)),
+      values: marketTrend.map((point) => Math.round(Number(point.marketValueLkr) || 0)),
+      source: "market",
+    })
+  }
+
+  const variantMarketTrend = buildVariantMarketTrendSeries(prediction)
+  if (variantMarketTrend) {
+    return anchorCurrentYearToPrediction(prediction, variantMarketTrend)
+  }
+
+  const exactTrend = analyticsTrends.exactYearTrends?.[buildExactTrendKey(prediction)] || []
+  if (exactTrend.length > 0) {
+    return anchorCurrentYearToPrediction(prediction, buildFullAnnualTrend(prediction, exactTrend, "dataset"))
+  }
+
+  const familyTrend = analyticsTrends.modelFamilyTrends?.[buildFamilyTrendKey(prediction)] || []
+  if (familyTrend.length > 0) {
+    return anchorCurrentYearToPrediction(prediction, buildFullAnnualTrend(prediction, familyTrend, "family"))
+  }
+
+  return null
 }
 
 function average(values) {
@@ -351,11 +581,13 @@ function Dashboard() {
     user: null,
     predictions: [],
     listings: [],
+    financingOptions: [],
     platformBrandActivity: [],
     userAlerts: [],
     alertsCount: 0,
     source: "local",
   })
+  const [financeProduct, setFinanceProduct] = useState("loan")
 
   useEffect(() => {
     let isActive = true
@@ -370,6 +602,7 @@ function Dashboard() {
         const alerts = loadUserAlerts(user || { email: "guest@example.com", username: "Guest" })
         let predictions = []
         let listings = []
+        let financingOptions = []
         let platformBrandActivity = []
         let source = "local"
 
@@ -402,6 +635,23 @@ function Dashboard() {
           listings = marketplaceData.map(normalizeMarketplaceListing)
         }
 
+        const { data: financingData } = await supabase
+          .from("financing_options")
+          .select("id, name, type, fixed_rate, floating_rate, status")
+          .eq("status", "Active")
+          .order("fixed_rate", { ascending: true })
+
+        if (Array.isArray(financingData)) {
+          financingOptions = financingData
+            .map((item) => ({
+              id: String(item.id || item.name || ""),
+              name: String(item.name || "Finance Provider"),
+              type: String(item.type || ""),
+              rate: Number(item.fixed_rate || item.floating_rate || 0),
+            }))
+            .filter((item) => item.name && item.rate > 0)
+        }
+
         platformBrandActivity = await loadPlatformBrandActivity()
 
         if (!isActive) return
@@ -410,6 +660,7 @@ function Dashboard() {
           user,
           predictions,
           listings,
+          financingOptions,
           platformBrandActivity,
           userAlerts: alerts,
           alertsCount: alerts.length,
@@ -437,6 +688,9 @@ function Dashboard() {
           loadDashboard({ showLoading: false })
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "predictions" }, () => {
+          loadDashboard({ showLoading: false })
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "financing_options" }, () => {
           loadDashboard({ showLoading: false })
         })
         .subscribe()
@@ -775,22 +1029,16 @@ function Dashboard() {
     const [topBrand = latestPrediction?.brand || "User", topModel = latestPrediction?.model || "Vehicle"] =
       topVehicleKey?.split("|||") || []
 
-    const userTrend = months.map((month, index) => {
-      const monthValues = predictions
-        .filter((item) => getMonthKey(item.predictedAt) === month.key)
-        .filter((item) => !topVehicleKey || buildVehicleKey(item.brand, item.model) === topVehicleKey)
-        .map((item) => item.predictedPrice)
-      const fallbackBase = latestPrediction?.predictedPrice || currentAverage || 4_500_000
-      return average(monthValues) || fallbackBase * (0.9 + index * 0.025)
-    })
+    const trendPrediction = latestPrediction || {
+      brand: topBrand,
+      model: topModel,
+      year: new Date().getFullYear(),
+      predictedPrice: currentAverage || 4_500_000,
+    }
+    const datasetTrend = getDashboardTrendSeries(trendPrediction)
+    const userTrend = datasetTrend?.values || []
 
-    const marketBase = average(activeListings.map((item) => item.price)) || average(userTrend) || 4_800_000
-    const marketTrend = months.map((month, index) => {
-      const monthValues = activeListings
-        .filter((item) => getMonthKey(item.createdAt) === month.key)
-        .map((item) => item.price)
-      return average(monthValues) || marketBase * (0.94 + index * 0.018)
-    })
+    const marketBase = average(activeListings.map((item) => item.price)) || average(userTrend) || 0
 
     const topBrands = dashboardData.platformBrandActivity
 
@@ -818,12 +1066,14 @@ function Dashboard() {
 
     return {
       months,
+      trendLabels: datasetTrend?.labels || [],
+      trendSource: datasetTrend?.source || "none",
       avgChange,
       totalAdViews,
       todayAdViews: Math.max(listingsToday, 0),
       topVehicleName: `${topBrand} ${topModel}`.trim(),
       userTrend,
-      marketTrend,
+      hasDatasetTrend: Boolean(datasetTrend),
       topBrands,
       pulse: [
         { label: "Listings today", value: listingsToday || activeListings.length, color: "#3fb950" },
@@ -881,10 +1131,10 @@ function Dashboard() {
 
   const priceTrendData = useMemo(
     () => ({
-      labels: dashboardView.months.map((month) => month.label),
+      labels: dashboardView.trendLabels,
       datasets: [
         {
-          label: dashboardView.topVehicleName,
+          label: `${dashboardView.topVehicleName} value trend`,
           data: dashboardView.userTrend,
           borderColor: "#58a6ff",
           backgroundColor: "rgba(88, 166, 255, 0.12)",
@@ -893,18 +1143,106 @@ function Dashboard() {
           pointRadius: 2,
           pointBackgroundColor: "#58a6ff",
         },
-        {
-          label: "Market average",
-          data: dashboardView.marketTrend,
-          borderColor: "#7d8590",
-          borderDash: [6, 5],
-          fill: false,
-          tension: 0.35,
-          pointRadius: 0,
-        },
       ],
     }),
     [dashboardView]
+  )
+
+  const financeProducts = [
+    { id: "loan", label: "Loan", types: ["Personal Loan", "Bank", "Loan"] },
+    { id: "leasing", label: "Leasing", types: ["Leasing"] },
+    { id: "draft", label: "Draft", types: ["Draft"] },
+  ]
+
+  const selectedFinanceProduct = financeProducts.find((item) => item.id === financeProduct) || financeProducts[0]
+
+  const financeRateRows = useMemo(() => {
+    return dashboardData.financingOptions
+      .filter((item) => selectedFinanceProduct.types.includes(item.type))
+      .sort((a, b) => a.rate - b.rate)
+      .slice(0, 10)
+  }, [dashboardData.financingOptions, selectedFinanceProduct])
+
+  const financeRateSummary = useMemo(() => {
+    if (!financeRateRows.length) {
+      return { lowest: null, highest: null, average: 0 }
+    }
+
+    const lowest = financeRateRows[0]
+    const highest = financeRateRows[financeRateRows.length - 1]
+    const averageRate = financeRateRows.reduce((sum, item) => sum + item.rate, 0) / financeRateRows.length
+    return { lowest, highest, average: averageRate }
+  }, [financeRateRows])
+
+  const financeRateData = useMemo(
+    () => ({
+      labels: financeRateRows.map((item) => item.name),
+      datasets: [
+        {
+          label: `${selectedFinanceProduct.label} interest rate`,
+          data: financeRateRows.map((item) => item.rate),
+          borderColor: "#d29922",
+          backgroundColor: "rgba(210, 153, 34, 0.12)",
+          fill: true,
+          tension: 0.32,
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          pointBackgroundColor: financeRateRows.map((item) => {
+            if (financeRateSummary.lowest?.id === item.id) return "#3fb950"
+            if (financeRateSummary.highest?.id === item.id) return "#f85149"
+            return "#d29922"
+          }),
+          pointBorderColor: "#0d1117",
+          pointBorderWidth: 2,
+        },
+      ],
+    }),
+    [financeRateRows, financeRateSummary.highest, financeRateSummary.lowest, selectedFinanceProduct]
+  )
+
+  const financeRateOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#161b22",
+          titleColor: "#f0f6fc",
+          bodyColor: "#c9d1d9",
+          borderColor: "#d29922",
+          borderWidth: 0.5,
+          displayColors: false,
+          callbacks: {
+            label: (context) => `Interest rate: ${Number(context.parsed.y || 0).toFixed(2)}%`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { color: "rgba(210, 153, 34, 0.09)" },
+          ticks: {
+            color: "#c9a45f",
+            font: { size: 9 },
+            maxRotation: 0,
+            minRotation: 0,
+            callback(value) {
+              const label = this.getLabelForValue(value)
+              return label.length > 12 ? `${label.slice(0, 12)}...` : label
+            },
+          },
+        },
+        y: {
+          grid: { color: "rgba(210, 153, 34, 0.12)" },
+          ticks: {
+            color: "#c9a45f",
+            font: { size: 10 },
+            callback: (value) => `${Number(value).toFixed(1)}%`,
+          },
+        },
+      },
+    }),
+    []
   )
 
   const depreciationData = useMemo(
@@ -942,7 +1280,7 @@ function Dashboard() {
   }
 
   return (
-    <div className="page-dashboard dashboard-page min-h-screen bg-[#0d1117] p-5 text-[#f0f6fc] md:p-8">
+    <div className="page-dashboard dashboard-page animate-fade-in min-h-screen bg-[#0d1117] p-5 text-[#f0f6fc] md:p-8">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Saved Predictions" value={summary.totalPredictions} subLabel={dashboardData.source === "supabase" ? "Cloud history" : "Local history"} icon={<Bookmark className="h-4 w-4" />} />
         <MetricCard label="Avg Estimate" value={summary.totalPredictions > 0 ? formatCompactCurrency(summary.averagePrice) : "LKR 0"} subLabel="Recent saved valuations" trend={dashboardView.avgChange} icon={<Coins className="h-4 w-4" />} />
@@ -951,14 +1289,73 @@ function Dashboard() {
       </section>
 
       <section className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-        <Panel icon={<LineChart className="h-4 w-4" />} title="LKR Price Trend" subtitle={`${dashboardView.topVehicleName} vs marketplace average`}>
-          <div className="relative h-[280px]">
-            <Line data={priceTrendData} options={chartOptions} />
-          </div>
+        <Panel icon={<LineChart className="h-4 w-4" />} title="LKR Price Trend" subtitle={`${dashboardView.topVehicleName} using ${dashboardView.trendSource === "none" ? "available saved data" : "market analytics dataset"}`}>
+          {dashboardView.hasDatasetTrend ? (
+            <div className="relative h-[280px]">
+              <Line data={priceTrendData} options={chartOptions} />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-[#21262d] bg-[#0d1117] px-4 py-10 text-center">
+              <p className="text-xs font-medium text-[#7d8590]">No verified market trend data for this vehicle yet</p>
+              <p className="mt-1 text-[11px] text-[#484f58]">The dashboard will show the trend when the analytics dataset has a matching brand, model, and year.</p>
+            </div>
+          )}
         </Panel>
 
         <Panel icon={<TrendingUp className="h-4 w-4" />} title="Top Searched Brands" subtitle="Live platform-wide prediction searches">
           <HorizontalList items={dashboardView.topBrands} colors={["#58a6ff", "#a371f7", "#39c5cf", "#3fb950", "#d29922", "#f85149"]} />
+        </Panel>
+      </section>
+
+      <section className="mt-4">
+        <Panel
+          icon={<Calculator className="h-4 w-4" />}
+          title="Financing Rate Analytics"
+          subtitle="Live bank and leasing interest-rate comparison"
+          action={
+            <div className="dashboard-finance-toggle">
+              {financeProducts.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={financeProduct === item.id ? "is-active" : ""}
+                  onClick={() => setFinanceProduct(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          }
+        >
+          {financeRateRows.length > 0 ? (
+            <div className="dashboard-finance-panel">
+              <div className="dashboard-finance-chart">
+                <Line data={financeRateData} options={financeRateOptions} />
+              </div>
+              <div className="dashboard-finance-stats">
+                <article>
+                  <span>Lowest rate</span>
+                  <strong>{financeRateSummary.lowest?.rate.toFixed(2)}%</strong>
+                  <p>{financeRateSummary.lowest?.name}</p>
+                </article>
+                <article>
+                  <span>Average rate</span>
+                  <strong>{financeRateSummary.average.toFixed(2)}%</strong>
+                  <p>{financeRateRows.length} active providers</p>
+                </article>
+                <article>
+                  <span>Highest rate</span>
+                  <strong>{financeRateSummary.highest?.rate.toFixed(2)}%</strong>
+                  <p>{financeRateSummary.highest?.name}</p>
+                </article>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-[#3d2a0a] bg-[#130f08] px-4 py-10 text-center">
+              <p className="text-xs font-medium text-[#d29922]">No active {selectedFinanceProduct.label.toLowerCase()} rates yet</p>
+              <p className="mt-1 text-[11px] text-[#7d8590]">Add financing providers to see real-time rate analytics here.</p>
+            </div>
+          )}
         </Panel>
       </section>
 

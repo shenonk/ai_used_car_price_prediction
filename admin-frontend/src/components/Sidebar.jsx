@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
-  Percent,
   ShoppingBag,
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -16,7 +15,6 @@ const navItems = [
   { to: '/admin/marketplace', label: 'Marketplace', icon: ShoppingBag },
   { to: '/admin/payments', label: 'Payments', icon: CreditCard },
   { to: '/admin/financing', label: 'Financing', icon: Landmark },
-  { to: '/admin/loan-rates', label: 'Loan Rates', icon: Percent },
   { to: '/admin/notifications', label: 'Notifications', icon: Bell },
   { to: '/admin/support-tickets', label: 'Contact Messages', icon: Mail },
 ];

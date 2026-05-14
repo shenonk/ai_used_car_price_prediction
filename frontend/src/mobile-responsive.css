@@ -152,6 +152,7 @@ textarea {
   .marketplace-secondary-button,
   .results-ghost-button,
   .results-primary-button,
+  .results-valuation-pdf-button,
   .financing-ghost-button,
   .financing-primary-button,
   .analytics-ghost-button,
@@ -211,7 +212,8 @@ textarea {
   }
 
   .marketplace-redesign-search-button,
-  .marketplace-redesign-clear-button {
+  .marketplace-redesign-clear-button,
+  .marketplace-show-more-button {
     width: 100% !important;
   }
 

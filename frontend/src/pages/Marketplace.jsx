@@ -46,6 +46,7 @@ const ALL_MODELS = "__all_models__";
 const ALL_FUEL_TYPES = "__all_fuel_types__";
 const ALL_LOCATION_REGIONS = "__all_location_regions__";
 const ALL_LOCATION_CITIES = "__all_location_cities__";
+const MARKETPLACE_PAGE_SIZE = 25;
 
 const priceRangeValues = ["all", "under_3m", "3m_6m", "6m_10m", "above_10m"];
 
@@ -450,6 +451,7 @@ function Marketplace() {
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [isBumped, setIsBumped] = useState(false);
   const [selectedCar, setSelectedCar] = useState(null);
+  const [visibleListingCount, setVisibleListingCount] = useState(MARKETPLACE_PAGE_SIZE);
   const [selectedCarImage, setSelectedCarImage] = useState("");
   const [lightboxImage, setLightboxImage] = useState("");
   const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -979,6 +981,16 @@ function Marketplace() {
       );
     });
   }, [appliedSearch, approvedCars, filters, selectedLocationRegion]);
+
+  const visibleCars = useMemo(
+    () => filteredCars.slice(0, visibleListingCount),
+    [filteredCars, visibleListingCount]
+  );
+  const hasMoreListings = visibleListingCount < filteredCars.length;
+
+  useEffect(() => {
+    setVisibleListingCount(MARKETPLACE_PAGE_SIZE);
+  }, [appliedSearch, filters]);
 
   const handleFilterChange = (key, value) => {
     setFilters((current) => ({
@@ -1560,8 +1572,9 @@ function Marketplace() {
             </button>
           </div>
         ) : (
+          <>
           <div className="marketplace-redesign-grid">
-            {filteredCars.map((car) => (
+            {visibleCars.map((car) => (
               <article
                 key={car.id}
                 role="button"
@@ -1661,6 +1674,23 @@ function Marketplace() {
               </article>
             ))}
           </div>
+          {hasMoreListings && (
+            <div className="marketplace-show-more-wrap">
+              <button
+                type="button"
+                className="marketplace-show-more-button"
+                onClick={() =>
+                  setVisibleListingCount((current) =>
+                    Math.min(current + MARKETPLACE_PAGE_SIZE, filteredCars.length)
+                  )
+                }
+              >
+                Show More
+                <span>{formatNumber(filteredCars.length - visibleCars.length, locale)} more ads</span>
+              </button>
+            </div>
+          )}
+          </>
         )}
       </section>
 

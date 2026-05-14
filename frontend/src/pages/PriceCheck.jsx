@@ -10,7 +10,6 @@ import {
   Check,
   Clock,
   Cpu,
-  Database,
   Lightbulb,
   List,
   Loader,
@@ -767,13 +766,6 @@ function PriceCheck() {
                     </>
                   )}
                 </button>
-              </div>
-
-              <div className="pc-training-trust">
-                <Database className="h-[13px] w-[13px]" />
-                <p>
-                  Our AI model is trained on <strong>10,000+ Sri Lankan market listings</strong> to provide accurate predictions.
-                </p>
               </div>
             </form>
           </div>

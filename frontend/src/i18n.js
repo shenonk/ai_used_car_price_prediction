@@ -648,7 +648,7 @@ const resources = {
         training_note: "Matching fuel type, transmission, condition, and town to the training data helps the model give more realistic estimates.",
         analyzing: "Analyzing vehicle data...",
         submit: "Predict Car Price",
-        info_note: "Our AI model is trained on <1>10,000+ Sri Lankan market listings</1> to provide accurate predictions.",
+        info_note: "",
         errors: {
           brand_required: "Brand is required",
           model_required: "Model is required",

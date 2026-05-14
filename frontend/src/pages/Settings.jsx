@@ -42,7 +42,6 @@ function Settings() {
   });
   const [alerts, setAlerts] = useState([]);
   const [saved, setSaved] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -70,11 +69,13 @@ function Settings() {
   const isLightTheme = theme === "light";
 
   useEffect(() => {
+    let isActive = true;
+
     const initSettings = async () => {
-      setIsLoading(true);
       // Fetch user info
       const user = await getCurrentUser();
       const resolvedUser = user || { email: 'guest@example.com', username: 'Guest' };
+      if (!isActive) return;
       setUserInfo(resolvedUser);
 
       // Fetch prefs
@@ -84,10 +85,12 @@ function Settings() {
       // Fetch alerts
       const storedAlerts = loadUserAlerts(resolvedUser);
       setAlerts(storedAlerts);
-      
-      setIsLoading(false);
     };
     initSettings();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   const togglePref = (key) => {
@@ -253,14 +256,6 @@ function Settings() {
     { id: "security", label: "Security", icon: <Lock size={15} /> },
     { id: "general", label: "Language & Region", icon: <Globe size={15} /> },
   ];
-
-  if (isLoading) {
-    return (
-      <div className="theme-app-bg min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="settings-page app-page-shell animate-fade-in">

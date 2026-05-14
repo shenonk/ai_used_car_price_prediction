@@ -1,8 +1,8 @@
 {
   "stats": {
     "total_predictions": 0,
-    "r2_score": 0.9234,
-    "mae": 285000,
+    "r2_score": 0.9875,
+    "mae": 616608.99,
     "last_training_date": "2026-02-28"
   },
   "prediction_daily_counts": {},

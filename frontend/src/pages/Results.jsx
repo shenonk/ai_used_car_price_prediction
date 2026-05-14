@@ -14,13 +14,20 @@ import { Bar as ChartBar, Doughnut } from "react-chartjs-2"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import {
-  ArrowDown, ArrowRight, ArrowUp, BarChart2, Bookmark, Car,
-  Cpu, CreditCard, Landmark, Minus, PieChart as PieChartIcon,
+  ArrowDown, ArrowRight, ArrowUp, BarChart2, Car,
+  Cpu, CreditCard, Download, Landmark, Minus, PieChart as PieChartIcon,
   Plus, RefreshCw, ShieldCheck, TrendingUp,
 } from "lucide-react"
 import { getCurrentUser } from "../utils/auth"
 import { supabase } from "../utils/supabaseClient"
 import { loadUserAlerts, upsertUserAlert } from "../utils/userAlerts"
+import {
+  FINANCE_PRODUCTS,
+  VEHICLE_CONDITIONS,
+  calculateMoneyDraft,
+  calculateStandardAmortization,
+  getStandardMaxLtv,
+} from "../utils/vehicleFinanceEngine"
 import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png"
 import AppModal from "../components/AppModal"
 
@@ -43,6 +50,9 @@ function Results() {
   const [dialog, setDialog] = useState(null)
 
   const formattedPrice = predictedPrice.toLocaleString("en-LK")
+  const resultVehicleCondition = String(vehicle?.condition || "").toLowerCase().includes("new")
+    ? VEHICLE_CONDITIONS.BRAND_NEW
+    : VEHICLE_CONDITIONS.USED
 
   useEffect(() => {
     fetchBestRates()
@@ -74,49 +84,104 @@ function Results() {
   const fetchBestRates = async () => {
     try {
       setIsLoading(true)
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("financing_options")
-        .select("fixed_rate")
+        .select("id,name,type,fixed_rate,floating_rate,max_ltv")
         .eq("status", "Active")
-        .eq("type", "Bank")
-        .order("fixed_rate", { ascending: true })
-        .limit(1)
 
-      const bestRate = data && data.length > 0 ? data[0].fixed_rate : 8.5
+      if (error) throw error
 
-      const plans = [
-        {
-          years: 3,
-          interest: `${bestRate}%`,
-          monthly: Math.round((predictedPrice * 0.9 * (1 + (bestRate / 100 * 3))) / 36).toLocaleString(),
-          total: Math.round(predictedPrice * 0.9 * (1 + (bestRate / 100 * 3))).toLocaleString(),
-          recommended: true,
-        },
-        {
-          years: 5,
-          interest: `${bestRate + 0.5}%`,
-          monthly: Math.round((predictedPrice * 0.9 * (1 + ((bestRate + 0.5) / 100 * 5))) / 60).toLocaleString(),
-          total: Math.round(predictedPrice * 0.9 * (1 + ((bestRate + 0.5) / 100 * 5))).toLocaleString(),
-          recommended: false,
-        },
-        {
-          years: 7,
-          interest: `${bestRate + 1.0}%`,
-          monthly: Math.round((predictedPrice * 0.9 * (1 + ((bestRate + 1.0) / 100 * 7))) / 84).toLocaleString(),
-          total: Math.round(predictedPrice * 0.9 * (1 + ((bestRate + 1.0) / 100 * 7))).toLocaleString(),
-          recommended: false,
-        },
-      ]
-      setLoanPlans(plans)
+      setLoanPlans(buildCheapestFinanceOptions(data || []))
     } catch (err) {
       console.error("Error fetching rates:", err)
-      setLoanPlans([
-        { years: 3, interest: "8.5%", monthly: "125,000", total: "4,500,000", recommended: true },
-        { years: 5, interest: "9%", monthly: "85,000", total: "5,100,000", recommended: false },
-        { years: 7, interest: "9.5%", monthly: "65,000", total: "5,460,000", recommended: false },
-      ])
+      setLoanPlans(buildCheapestFinanceOptions([
+        { id: "sample-loan", name: "Sample Bank", type: "Bank", fixed_rate: 8.5, max_ltv: 60 },
+        { id: "sample-leasing", name: "Sample Leasing", type: "Leasing", fixed_rate: 9, max_ltv: 60 },
+        { id: "sample-draft", name: "Sample Draft Provider", type: "Draft", fixed_rate: 15.5, max_ltv: 55 },
+      ]))
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const buildCheapestFinanceOptions = (options) => {
+    const productConfig = [
+      {
+        key: FINANCE_PRODUCTS.VEHICLE_LOAN,
+        label: "Vehicle Loan",
+        types: ["Personal Loan", "Bank", "Loan"],
+        tenureYears: 3,
+      },
+      {
+        key: FINANCE_PRODUCTS.LEASING,
+        label: "Leasing",
+        types: ["Leasing"],
+        tenureYears: 3,
+      },
+      {
+        key: FINANCE_PRODUCTS.MONEY_DRAFT,
+        label: "Money Draft",
+        types: ["Draft"],
+        tenureYears: 2,
+      },
+    ]
+
+    const plans = productConfig
+      .map((product) => {
+        const candidates = options
+          .filter((item) => product.types.includes(item.type))
+          .map((item) => buildFinancePreviewPlan(item, product))
+          .filter(Boolean)
+          .sort((a, b) => a.monthlyValue - b.monthlyValue)
+
+        return candidates[0] || null
+      })
+      .filter(Boolean)
+
+    return plans.map((plan) => ({ ...plan, recommended: true }))
+  }
+
+  const buildFinancePreviewPlan = (option, product) => {
+    const annualRate = Number(option.fixed_rate || option.floating_rate || 0)
+    if (!annualRate) return null
+
+    const maxLtv = product.key === FINANCE_PRODUCTS.MONEY_DRAFT
+      ? 0.55
+      : getStandardMaxLtv(resultVehicleCondition)
+    const minDownFromLtv = Math.ceil((1 - maxLtv) * 100)
+    const minDownFromBank = option.max_ltv ? Math.ceil(100 - Number(option.max_ltv)) : 20
+    const downPaymentPercent = Math.max(20, minDownFromLtv, minDownFromBank)
+    const downPayment = Math.round(predictedPrice * (downPaymentPercent / 100))
+
+    const result = product.key === FINANCE_PRODUCTS.MONEY_DRAFT
+      ? calculateMoneyDraft({
+        vehicleValue: predictedPrice,
+        downPayment,
+        annualRate,
+      })
+      : calculateStandardAmortization({
+        vehicleValue: predictedPrice,
+        downPayment,
+        annualRate,
+        tenureYears: product.tenureYears,
+        vehicleCondition: resultVehicleCondition,
+        productType: product.key,
+      })
+
+    const totalPayable = result.principal + result.totalInterestPaid
+
+    return {
+      productType: product.key,
+      productLabel: product.label,
+      institution: option.name || "Finance Provider",
+      interest: `${annualRate}%`,
+      monthly: Math.round(result.monthlyInstallment).toLocaleString("en-LK"),
+      monthlyValue: Math.round(result.monthlyInstallment),
+      total: Math.round(totalPayable).toLocaleString("en-LK"),
+      loanValue: Math.round(result.principal).toLocaleString("en-LK"),
+      downPaymentPercent,
+      tenureLabel: product.key === FINANCE_PRODUCTS.MONEY_DRAFT ? "24 months" : `${product.tenureYears} years`,
+      note: product.key === FINANCE_PRODUCTS.MONEY_DRAFT ? "Interest only" : "Amortized",
     }
   }
 
@@ -144,8 +209,22 @@ function Results() {
 
       const doc = new jsPDF()
       const pageWidth = doc.internal.pageSize.getWidth()
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const margin = 14
       const user = await getCurrentUser()
       const userEmail = user ? user.username || user.email : t("results_page.guest_user")
+      const generatedAt = new Date().toLocaleString("en-LK", {
+        year: "numeric",
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+      const valuationRef = `AVL-${new Date(predictedAt).getFullYear()}-${String(predictedAt).slice(-6)}`
+      const vehicleTitle = vehicle
+        ? `${vehicle.brand || "Vehicle"} ${vehicle.model || ""} ${vehicle.year || ""}`.replace(/\s+/g, " ").trim()
+        : "Sample Vehicle Valuation"
+      const fileVehicleName = vehicleTitle.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "Vehicle"
 
       const logoImg = new Image()
       logoImg.src = logoUrl
@@ -158,84 +237,181 @@ function Results() {
         }
       })
 
+      doc.setFillColor(13, 17, 23)
+      doc.rect(0, 0, pageWidth, 52, "F")
+      doc.setFillColor(88, 166, 255)
+      doc.rect(0, 50, pageWidth, 2, "F")
+
       if (logoImg.complete && logoImg.naturalWidth > 0) {
-        doc.addImage(logoImg, "PNG", pageWidth / 2 - 15, 10, 30, 30)
+        doc.setFillColor(12, 42, 74)
+        doc.roundedRect(margin, 12, 24, 24, 4, 4, "F")
+        doc.addImage(logoImg, "PNG", margin + 3, 15, 18, 18)
       }
 
       doc.setFont("helvetica", "bold")
-      doc.setFontSize(22)
-      doc.setTextColor(15, 23, 42)
-      doc.text("AutoValueLK", pageWidth / 2, 48, { align: "center" })
+      doc.setFontSize(20)
+      doc.setTextColor(230, 237, 243)
+      doc.text("AutoValueLK", margin + 31, 22)
 
       doc.setFont("helvetica", "normal")
-      doc.setFontSize(14)
-      doc.setTextColor(100, 116, 139)
-      doc.text(t("results_page.pdf_report_title"), pageWidth / 2, 56, { align: "center" })
+      doc.setFontSize(9)
+      doc.setTextColor(125, 133, 144)
+      doc.text("Sri Lankan Vehicle Intelligence", margin + 31, 29)
 
-      doc.setFontSize(10)
-      doc.setTextColor(71, 85, 105)
-      doc.text(`${t("results_page.pdf_generated")}: ${new Date().toLocaleString()}`, 14, 70)
-      doc.text(`${t("results_page.pdf_requested_by")}: ${userEmail}`, 14, 76)
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(12)
+      doc.setTextColor(230, 237, 243)
+      doc.text("Vehicle Valuation Certificate", pageWidth - margin, 20, { align: "right" })
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(8)
+      doc.setTextColor(125, 133, 144)
+      doc.text(`Reference: ${valuationRef}`, pageWidth - margin, 27, { align: "right" })
+      doc.text(`Generated: ${generatedAt}`, pageWidth - margin, 33, { align: "right" })
+
+      doc.setFillColor(248, 250, 252)
+      doc.roundedRect(margin, 62, pageWidth - margin * 2, 38, 4, 4, "F")
+      doc.setDrawColor(226, 232, 240)
+      doc.roundedRect(margin, 62, pageWidth - margin * 2, 38, 4, 4, "S")
+
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(9)
+      doc.setTextColor(100, 116, 139)
+      doc.text("Estimated Market Value", margin + 8, 75)
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(26)
+      doc.setTextColor(15, 23, 42)
+      doc.text(`LKR ${formattedPrice}`, margin + 8, 91)
+
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(11)
+      doc.setTextColor(15, 23, 42)
+      doc.text(vehicleTitle, pageWidth - margin - 8, 77, { align: "right" })
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(9)
+      doc.setTextColor(100, 116, 139)
+      doc.text("Machine-learning valuation for the Sri Lankan vehicle market", pageWidth - margin - 8, 85, { align: "right" })
+      doc.text("Indicative accuracy: +/-5%", pageWidth - margin - 8, 93, { align: "right" })
 
       autoTable(doc, {
-        startY: 85,
-        theme: "grid",
-        headStyles: { fillColor: [59, 130, 246] },
-        head: [[t("results_page.pdf_vehicle_specs"), t("results_page.pdf_details")]],
+        startY: 110,
+        theme: "plain",
+        margin: { left: margin, right: margin },
+        styles: {
+          font: "helvetica",
+          fontSize: 9,
+          cellPadding: { top: 3.5, right: 4, bottom: 3.5, left: 4 },
+          lineColor: [226, 232, 240],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [248, 250, 252],
+          fontStyle: "bold",
+        },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        head: [["Vehicle Details", "Value"]],
         body: [
           [t("results_page.pdf_brand"), vehicle?.brand || "N/A"],
           [t("results_page.pdf_model"), vehicle?.model || "N/A"],
           [t("results_page.pdf_year"), vehicle?.year || "N/A"],
           [t("results_page.pdf_engine"), vehicle?.engine ? `${vehicle.engine} cc` : "N/A"],
-          [t("results_page.pdf_mileage"), vehicle?.mileage ? `${vehicle.mileage} km` : "N/A"],
+          [t("results_page.pdf_mileage"), vehicle?.mileage ? `${Number(vehicle.mileage).toLocaleString("en-LK")} km` : "N/A"],
           [t("results_page.pdf_fuel"), vehicle?.fuel || "N/A"],
           [t("results_page.pdf_transmission"), vehicle?.transmission || "N/A"],
           [t("results_page.pdf_condition"), vehicle?.condition || "N/A"],
+          ["Town / Location", vehicle?.town || "N/A"],
         ],
+        columnStyles: {
+          0: { cellWidth: 58, textColor: [71, 85, 105], fontStyle: "bold" },
+          1: { cellWidth: "auto", textColor: [15, 23, 42] },
+        },
       })
 
-      const currentY = doc.lastAutoTable.finalY + 15
-      doc.setFont("helvetica", "bold")
-      doc.setFontSize(16)
-      doc.setTextColor(15, 23, 42)
-      doc.text(t("results_page.estimated_market_value"), 14, currentY)
-
-      doc.setFontSize(28)
-      doc.setTextColor(16, 185, 129)
-      doc.text(`LKR ${formattedPrice}`, 14, currentY + 12)
-
-      doc.setFontSize(10)
-      doc.setTextColor(100, 116, 139)
-      doc.setFont("helvetica", "italic")
-      doc.text(t("results_page.pdf_accuracy_note"), 14, currentY + 20)
+      const summaryY = doc.lastAutoTable.finalY + 10
+      autoTable(doc, {
+        startY: summaryY,
+        theme: "grid",
+        margin: { left: margin, right: margin },
+        styles: {
+          font: "helvetica",
+          fontSize: 9,
+          cellPadding: 4,
+          lineColor: [226, 232, 240],
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [29, 78, 216],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        bodyStyles: { textColor: [15, 23, 42] },
+        head: [["Valuation Summary", "Amount"]],
+        body: [
+          ["Estimated market value", `LKR ${formattedPrice}`],
+          ["Market low estimate", `LKR ${marketLow.toLocaleString("en-LK")}`],
+          ["Market high estimate", `LKR ${marketHigh.toLocaleString("en-LK")}`],
+          ["Prediction status", saveStatus === "cloud" ? "Saved to AutoValueLK account" : "Saved locally on this device"],
+        ],
+        columnStyles: {
+          0: { cellWidth: 72, fontStyle: "bold" },
+          1: { cellWidth: "auto" },
+        },
+      })
 
       autoTable(doc, {
-        startY: currentY + 30,
+        startY: doc.lastAutoTable.finalY + 10,
         theme: "striped",
-        headStyles: { fillColor: [15, 23, 42] },
+        margin: { left: margin, right: margin },
+        styles: { font: "helvetica", fontSize: 8.5, cellPadding: 3.5 },
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
         head: [[
-          t("results_page.pdf_loan_duration"),
+          "Product",
+          "Provider",
           t("results_page.pdf_interest_rate"),
           t("results_page.monthly_payment"),
-          t("results_page.total_amount"),
+          "Loan Value",
         ]],
         body: loanPlans.map((plan) => [
-          `${t("results_page.years", { count: plan.years })}${plan.recommended ? ` (${t("results_page.recommended")})` : ""}`,
+          `${plan.productLabel}${plan.recommended ? ` (${t("results_page.recommended")})` : ""}`,
+          plan.institution,
           plan.interest,
           `LKR ${plan.monthly}`,
-          `LKR ${plan.total}`,
+          `LKR ${plan.loanValue}`,
         ]),
       })
+
+      const noteY = doc.lastAutoTable.finalY + 10
+      doc.setFillColor(239, 246, 255)
+      doc.roundedRect(margin, noteY, pageWidth - margin * 2, 25, 3, 3, "F")
+      doc.setFont("helvetica", "bold")
+      doc.setFontSize(9)
+      doc.setTextColor(29, 78, 216)
+      doc.text("Valuation Note", margin + 6, noteY + 8)
+      doc.setFont("helvetica", "normal")
+      doc.setFontSize(8)
+      doc.setTextColor(71, 85, 105)
+      doc.text(
+        "This certificate is an AI-assisted indicative valuation based on supplied vehicle details and market patterns. It is intended for guidance and should be reviewed alongside inspection, documentation, and current market conditions.",
+        margin + 6,
+        noteY + 15,
+        { maxWidth: pageWidth - margin * 2 - 12 }
+      )
 
       const totalPages = doc.internal.getNumberOfPages()
       for (let i = 1; i <= totalPages; i += 1) {
         doc.setPage(i)
+        doc.setDrawColor(226, 232, 240)
+        doc.line(margin, pageHeight - 18, pageWidth - margin, pageHeight - 18)
+        doc.setFont("helvetica", "normal")
         doc.setFontSize(8)
-        doc.setTextColor(148, 163, 184)
-        doc.text(t("results_page.pdf_footer"), pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: "center" })
+        doc.setTextColor(100, 116, 139)
+        doc.text("AutoValueLK Vehicle Valuation Certificate", margin, pageHeight - 11)
+        doc.text(`Prepared for: ${userEmail}`, pageWidth / 2, pageHeight - 11, { align: "center" })
+        doc.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 11, { align: "right" })
       }
 
-      doc.save(`AutoValueLK_${vehicle?.brand || "Report"}_${vehicle?.model || ""}.pdf`)
+      doc.save(`AutoValueLK_Valuation_${fileVehicleName}_${valuationRef}.pdf`)
     } catch (err) {
       console.error("PDF generation failed", err)
       setDialog({
@@ -435,10 +611,6 @@ function Results() {
           <p>Based on your vehicle specifications</p>
         </div>
         <div className="results-hero-actions">
-          <button type="button" className="results-ghost-button" onClick={handleDownloadPDF} disabled={downloading}>
-            <Bookmark className="h-[13px] w-[13px]" />
-            Save Prediction
-          </button>
           <button type="button" className="results-primary-button" onClick={() => navigate("/price-check")}>
             <Plus className="h-[13px] w-[13px]" />
             New Prediction
@@ -463,6 +635,15 @@ function Results() {
               Updated today
             </span>
           </div>
+          <button
+            type="button"
+            className="results-valuation-pdf-button"
+            onClick={handleDownloadPDF}
+            disabled={downloading}
+          >
+            <Download className={downloading ? "h-[14px] w-[14px] spin" : "h-[14px] w-[14px]"} />
+            {downloading ? "Preparing PDF..." : "Download Valuation PDF"}
+          </button>
         </section>
 
         <section className="results-panel">
@@ -484,12 +665,12 @@ function Results() {
       <div className="results-three-grid animate-fade-in animate-delay-100">
         <section className="results-panel">
           <div className="results-panel-heading">
-            <span className="results-panel-title"><CreditCard className="h-[14px] w-[14px]" style={{ color: "#a78bfa" }} />Loan Repayment Plans</span>
-            <p>Estimated monthly payments by tenure</p>
+            <span className="results-panel-title"><CreditCard className="h-[14px] w-[14px]" style={{ color: "#a78bfa" }} />Best Finance Estimates</span>
+            <p>Cheapest monthly estimate by product</p>
           </div>
           <div>
             {isLoading ? (
-              <div className="results-loading">Loading plans...</div>
+              <div className="results-loading">Loading finance estimates...</div>
             ) : loanPlans.length === 0 ? (
               <p className="results-empty-text">{t("results_page.no_loan_plans")}</p>
             ) : (
@@ -497,20 +678,26 @@ function Results() {
                 <div key={index} className={`results-loan-row ${plan.recommended ? "results-loan-row--recommended" : ""}`}>
                   <div className="results-loan-top">
                     <div>
-                      <span className="results-loan-tenure">{t("results_page.years", { count: plan.years })}</span>
-                      {plan.recommended && <span className="results-recommended-badge">{t("results_page.recommended")}</span>}
+                      <span className="results-loan-tenure">{plan.productLabel}</span>
+                      <span className="results-recommended-badge">Lowest</span>
                     </div>
                     <span className="results-loan-interest">{plan.interest} {t("results_page.interest_label")}</span>
                   </div>
+                  <p className="results-finance-provider">{plan.institution}</p>
                   <div className="results-loan-bottom">
                     <div>
                       <span>{t("results_page.monthly_payment")}</span>
                       <strong>LKR {plan.monthly}</strong>
                     </div>
                     <div>
-                      <span>{t("results_page.total_amount")}</span>
-                      <strong>LKR {plan.total}</strong>
+                      <span>Loan Value</span>
+                      <strong>LKR {plan.loanValue}</strong>
                     </div>
+                  </div>
+                  <div className="results-finance-meta">
+                    <span>{plan.tenureLabel}</span>
+                    <span>{plan.downPaymentPercent}% down</span>
+                    <span>{plan.note}</span>
                   </div>
                 </div>
               ))

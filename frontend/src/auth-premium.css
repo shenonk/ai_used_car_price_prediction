@@ -185,6 +185,12 @@
   animation: logo-float 3s ease-in-out infinite;
 }
 
+.auth-logo-icon img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
 /* --- Gradient text shimmer overlay --- */
 @keyframes text-shimmer {
   0%   { background-position: -200% center; }

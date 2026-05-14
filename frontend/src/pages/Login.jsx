@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
-import { ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail, Cpu } from "lucide-react";
+import { ArrowRight, Check, Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
 import { login, loginWithGoogle } from "../utils/auth";
 import LoadingOverlay from "../components/auth/LoadingOverlay";
 import SuccessToast from "../components/auth/SuccessToast";
+import logo from "../assets/logo/autovaluelk-logo.png";
 
 function AuthLogo() {
   return (
     <div className="auth-logo-block">
-      <div className="auth-logo-icon"><Cpu /></div>
+      <div className="auth-logo-icon"><img src={logo} alt="AutoValueLK" /></div>
       <strong>AutoValueLK</strong>
       <span>Sri Lankan vehicle intelligence</span>
     </div>

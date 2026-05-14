@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import {
   ArrowRight,
   CheckCircle,
-  Cpu,
   Eye,
   EyeOff,
   Loader2,
@@ -16,11 +15,12 @@ import {
 import { register } from "../utils/auth";
 import LoadingOverlay from "../components/auth/LoadingOverlay";
 import SuccessToast from "../components/auth/SuccessToast";
+import logo from "../assets/logo/autovaluelk-logo.png";
 
 function AuthLogo() {
   return (
     <div className="auth-logo-block">
-      <div className="auth-logo-icon"><Cpu /></div>
+      <div className="auth-logo-icon"><img src={logo} alt="AutoValueLK" /></div>
       <strong>AutoValueLK</strong>
       <span>Sri Lankan vehicle intelligence</span>
     </div>

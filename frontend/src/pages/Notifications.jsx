@@ -13,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import { getCurrentUser } from "../utils/auth"
+import { supabase } from "../utils/supabaseClient"
 import {
   inferNotificationType,
   loadReadNotificationIds,
@@ -41,7 +42,11 @@ function Notifications() {
       setError(null)
       const user = await getCurrentUser()
       setNotificationUser(user)
-      const res = await fetch(`${API_BASE_URL}/api/notifications`)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      })
       if (!res.ok) throw new Error(t("notifications_page.errors.fetch_failed"))
       const data = await res.json()
       

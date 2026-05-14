@@ -250,7 +250,11 @@ function Dashboard() {
           return
         }
 
-        const response = await fetch(`${API_BASE_URL}/api/notifications`)
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData?.session?.access_token
+        const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+        })
         if (!response.ok) {
           throw new Error("Failed to load notifications")
         }

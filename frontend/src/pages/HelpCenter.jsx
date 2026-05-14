@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Search,
@@ -33,14 +33,52 @@ const HelpCenter = () => {
     email: "",
     message: "",
   });
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [submitError, setSubmitError] = useState("");
-  const [replyEmail, setReplyEmail] = useState("");
   const [adminReplies, setAdminReplies] = useState([]);
   const [isLoadingReplies, setIsLoadingReplies] = useState(false);
   const [replyLookupError, setReplyLookupError] = useState("");
   const [hasCheckedReplies, setHasCheckedReplies] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSessionUser = async () => {
+      setAuthLoading(true);
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user || null;
+
+      if (!isMounted) return;
+
+      setCurrentUser(user);
+      setFormData((prev) => ({
+        ...prev,
+        full_name: prev.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || "",
+        email: user?.email || "",
+      }));
+      setAuthLoading(false);
+    };
+
+    loadSessionUser();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user || null;
+      setCurrentUser(user);
+      setFormData((prev) => ({
+        ...prev,
+        full_name: prev.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || "",
+        email: user?.email || "",
+      }));
+    });
+
+    return () => {
+      isMounted = false;
+      listener?.subscription?.unsubscribe();
+    };
+  }, []);
 
   const categories = [
     {
@@ -143,10 +181,16 @@ const HelpCenter = () => {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
+    if (name === "email") return;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+  };
+
+  const getAccessToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || "";
   };
 
   const handleSubmit = async (event) => {
@@ -155,39 +199,33 @@ const HelpCenter = () => {
     setSubmitError("");
     setIsSubmitting(true);
 
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setSubmitError("Please sign in before sending a support message.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const payload = {
       user_name: formData.full_name.trim(),
-      user_email: formData.email.trim(),
       message: formData.message.trim(),
       status: "open",
     };
 
     try {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/support-ticket`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
+      const response = await fetch(`${API_BASE_URL}/api/support-ticket`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-        const result = await response.json();
+      const result = await response.json();
 
-        if (!response.ok) {
-          throw new Error(result.error || t("help_center_page.errors.submit_failed"));
-        }
-      } catch {
-        const { error } = await supabase.from("support_tickets").insert({
-          user_name: payload.user_name,
-          user_email: payload.user_email,
-          message: payload.message,
-          status: payload.status,
-        });
-
-        if (error) {
-          throw new Error(error.message || t("help_center_page.errors.submit_failed"));
-        }
+      if (!response.ok) {
+        throw new Error(result.error || t("help_center_page.errors.submit_failed"));
       }
     } catch (error) {
       setSubmitError(error.message || t("help_center_page.errors.submit_retry"));
@@ -197,11 +235,10 @@ const HelpCenter = () => {
 
     setFormData({
       full_name: "",
-      email: "",
+      email: currentUser?.email || "",
       message: "",
     });
-    setReplyEmail(payload.user_email);
-    fetchAdminReplies(payload.user_email);
+    fetchAdminReplies();
     setSubmitSuccess(t("help_center_page.success"));
     setIsSubmitting(false);
     window.setTimeout(() => {
@@ -214,10 +251,10 @@ const HelpCenter = () => {
     formData.email.trim() &&
     formData.message.trim();
 
-  const fetchAdminReplies = async (emailOverride = replyEmail) => {
-    const email = emailOverride.trim();
-    if (!email) {
-      setReplyLookupError("Please enter the email address you used when contacting us.");
+  const fetchAdminReplies = async () => {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setReplyLookupError("Please sign in to view your admin replies.");
       return;
     }
 
@@ -226,29 +263,18 @@ const HelpCenter = () => {
     setHasCheckedReplies(true);
 
     try {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/support-ticket-replies?email=${encodeURIComponent(email)}`);
-        const result = await response.json();
+      const response = await fetch(`${API_BASE_URL}/api/support-ticket-replies`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const result = await response.json();
 
-        if (!response.ok) {
-          throw new Error(result.error || "Unable to load admin replies.");
-        }
-
-        setAdminReplies(result.replies || []);
-      } catch {
-        const { data, error } = await supabase
-          .from("support_tickets")
-          .select("id, message, admin_reply, admin_replied_at, status, created_at")
-          .eq("user_email", email)
-          .not("admin_reply", "is", null)
-          .order("admin_replied_at", { ascending: false });
-
-        if (error) {
-          throw new Error(error.message || "Unable to load admin replies.");
-        }
-
-        setAdminReplies((data || []).filter((item) => String(item.admin_reply || "").trim()));
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to load admin replies.");
       }
+
+      setAdminReplies(result.replies || []);
     } catch (error) {
       setAdminReplies([]);
       setReplyLookupError(error.message || "Unable to load admin replies right now.");
@@ -383,6 +409,7 @@ const HelpCenter = () => {
                 value={formData.email}
                 onChange={handleInputChange}
                 placeholder={t("help_center_page.email")}
+                readOnly
                 required
               />
             </div>
@@ -394,7 +421,10 @@ const HelpCenter = () => {
               required
               rows="6"
             />
-            <button type="submit" disabled={isSubmitting || !isFormValid} className="help-primary-button">
+            {!authLoading && !currentUser && (
+              <p className="help-error-text">Please sign in to send a support message from your account.</p>
+            )}
+            <button type="submit" disabled={isSubmitting || !isFormValid || !currentUser} className="help-primary-button">
               <Send className="h-[13px] w-[13px]" />
               {isSubmitting ? t("help_center_page.sending") : t("help_center_page.send")}
             </button>
@@ -408,22 +438,17 @@ const HelpCenter = () => {
             <div>
               <div className="help-panel-title">
                 <Reply className="h-[14px] w-[14px]" />
-                <h2>Replies from AutoValueLK Admins</h2>
+                <h2>My Inquiries</h2>
               </div>
-              <p>Enter the same email you used in the contact form to check admin replies.</p>
+              <p>Only replies linked to your signed-in account are shown here.</p>
             </div>
             <span className="help-badge">Admin reply</span>
           </div>
 
           <div className="help-reply-search">
-            <input
-              type="email"
-              value={replyEmail}
-              onChange={(event) => setReplyEmail(event.target.value)}
-              placeholder="Your email address"
-            />
-            <button type="button" onClick={() => fetchAdminReplies()} disabled={isLoadingReplies} className="help-ghost-button">
-              {isLoadingReplies ? "Checking..." : "Check replies"}
+            <input type="email" value={formData.email} readOnly placeholder="Signed-in email" />
+            <button type="button" onClick={() => fetchAdminReplies()} disabled={isLoadingReplies || !currentUser} className="help-ghost-button">
+              {isLoadingReplies ? "Checking..." : "Refresh my replies"}
             </button>
           </div>
 
@@ -454,7 +479,7 @@ const HelpCenter = () => {
                 </article>
               ))
             ) : hasCheckedReplies ? (
-              <div className="help-empty-state help-empty-state--small">No admin replies found for this email yet.</div>
+              <div className="help-empty-state help-empty-state--small">No admin replies found for your account yet.</div>
             ) : null}
           </div>
         </div>
@@ -672,18 +697,18 @@ const HelpCenter = () => {
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <input
                 type="email"
-                value={replyEmail}
-                onChange={(event) => setReplyEmail(event.target.value)}
-                placeholder="Your email address"
+                value={formData.email}
+                readOnly
+                placeholder="Signed-in email"
                 className="w-full rounded-xl border border-slate-700/50 bg-[#0f172a]/60 px-5 py-3 outline-none transition focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20"
               />
               <button
                 type="button"
                 onClick={() => fetchAdminReplies()}
-                disabled={isLoadingReplies}
+                disabled={isLoadingReplies || !currentUser}
                 className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isLoadingReplies ? "Checking..." : "Check replies"}
+                {isLoadingReplies ? "Checking..." : "Refresh my replies"}
               </button>
             </div>
 

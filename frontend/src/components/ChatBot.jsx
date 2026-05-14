@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getCurrentUser } from "../utils/auth";
+import { supabase } from "../utils/supabaseClient";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -198,6 +199,7 @@ const ChatBot = () => {
 
   const handleContactChange = (event) => {
     const { name, value } = event.target;
+    if (name === "email") return;
     setContactDraft((current) => ({
       ...current,
       [name]: value,
@@ -209,12 +211,11 @@ const ChatBot = () => {
 
     const payload = {
       user_name: contactDraft.name.trim(),
-      user_email: contactDraft.email.trim(),
       message: contactDraft.message.trim(),
       status: "open",
     };
 
-    if (!payload.user_name || !payload.user_email || !payload.message) {
+    if (!payload.user_name || !contactDraft.email.trim() || !payload.message) {
       setMessages((current) => [
         ...current,
         {
@@ -228,10 +229,17 @@ const ChatBot = () => {
 
     try {
       setIsSendingTicket(true);
+      const { data } = await supabase.auth.getSession();
+      const accessToken = data?.session?.access_token;
+      if (!accessToken) {
+        throw new Error("Please sign in before sending a message to admin.");
+      }
+
       const response = await fetch(`${API_BASE_URL}/api/support-ticket`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify(payload),
       });
@@ -346,6 +354,7 @@ const ChatBot = () => {
                     value={contactDraft.email}
                     onChange={handleContactChange}
                     placeholder="Email"
+                    readOnly
                     className="min-w-0 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-blue-300/45"
                   />
                 </div>

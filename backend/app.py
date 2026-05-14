@@ -174,7 +174,7 @@ class SupportTicketStatusPayload(BaseModel):
 
 class SupportTicketCreatePayload(BaseModel):
     user_name: str = Field(..., min_length=1)
-    user_email: str = Field(..., min_length=3)
+    user_email: str | None = Field(default=None, min_length=3)
     message: str = Field(..., min_length=1)
     status: str = Field(default="open", pattern="^(open|read|closed)$")
 
@@ -611,6 +611,31 @@ def resolve_requester_identity(authorization: str | None = None) -> dict[str, An
 
 def get_requester_identity(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     return resolve_requester_identity(authorization)
+
+
+def require_authenticated_requester(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    requester_token = get_requester_token(authorization)
+    if requester_token == "anonymous":
+        raise admin_error("Please sign in before contacting support.", status_code=401)
+
+    user_payload = fetch_supabase_user(requester_token)
+    user_id = str(user_payload.get("id") or "").strip()
+    email = str(user_payload.get("email") or "").strip()
+    if not user_id:
+        raise admin_error("Invalid or expired session. Please sign in again.", status_code=401)
+
+    metadata = user_payload.get("user_metadata") or {}
+    username = str(metadata.get("username") or metadata.get("user_name") or "").strip()
+    full_name = str(metadata.get("full_name") or metadata.get("name") or "").strip()
+
+    return {
+        "access_token": requester_token,
+        "is_authenticated": True,
+        "user_id": user_id,
+        "email": email,
+        "username": username,
+        "display_name": full_name or username or (email.split("@")[0] if email else ""),
+    }
 
 
 def make_supabase_rest_request(
@@ -2098,9 +2123,23 @@ def health_check() -> dict[str, Any]:
 
 
 @app.get("/api/notifications")
-def get_public_notifications() -> dict[str, Any]:
+def get_public_notifications(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    requester_user_id = ""
+    requester_token = get_requester_token(authorization)
+    if requester_token != "anonymous":
+        user_payload = fetch_supabase_user(requester_token)
+        requester_user_id = str(user_payload.get("id") or "").strip()
+
     notifications = sorted(
-        [item for item in price_model_state.admin_store.get("notifications", []) if item.get("active", True)],
+        [
+            item
+            for item in price_model_state.admin_store.get("notifications", [])
+            if item.get("active", True)
+            and (
+                not item.get("user_id")
+                or (requester_user_id and str(item.get("user_id")) == requester_user_id)
+            )
+        ],
         key=lambda item: item.get("created_at", ""),
         reverse=True,
     )
@@ -2108,13 +2147,17 @@ def get_public_notifications() -> dict[str, Any]:
 
 
 @app.post("/api/support-ticket")
-def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]:
+def create_support_ticket(
+    payload: SupportTicketCreatePayload,
+    requester: dict[str, Any] = Depends(require_authenticated_requester),
+) -> dict[str, Any]:
     with price_model_state.admin_lock:
         tickets = price_model_state.admin_store["support_tickets"]
         ticket = {
             "id": get_next_numeric_id(tickets),
+            "user_id": requester["user_id"],
             "user_name": payload.user_name.strip(),
-            "user_email": payload.user_email.strip(),
+            "user_email": requester["email"],
             "message": payload.message.strip(),
             "status": payload.status,
             "admin_reply": "",
@@ -2128,11 +2171,14 @@ def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]
 
 
 @app.get("/api/support-ticket-replies")
-def get_support_ticket_replies(email: str = Query(..., min_length=3)) -> dict[str, Any]:
-    normalized_email = email.strip().lower()
+def get_support_ticket_replies(
+    requester: dict[str, Any] = Depends(require_authenticated_requester),
+) -> dict[str, Any]:
+    requester_user_id = requester["user_id"]
     replies = [
         {
             "id": item.get("id"),
+            "user_id": item.get("user_id"),
             "message": item.get("message", ""),
             "admin_reply": item.get("admin_reply", ""),
             "admin_replied_at": item.get("admin_replied_at"),
@@ -2140,7 +2186,7 @@ def get_support_ticket_replies(email: str = Query(..., min_length=3)) -> dict[st
             "created_at": item.get("created_at"),
         }
         for item in price_model_state.admin_store.get("support_tickets", [])
-        if str(item.get("user_email", "")).strip().lower() == normalized_email
+        if str(item.get("user_id", "")).strip() == requester_user_id
         and str(item.get("admin_reply", "")).strip()
     ]
     replies.sort(key=lambda item: item.get("admin_replied_at") or item.get("created_at") or "", reverse=True)
@@ -2551,6 +2597,21 @@ def update_support_ticket(
             ticket["admin_replied_at"] = utc_now_iso() if reply else None
             if reply:
                 ticket["status"] = "closed"
+                user_id = str(ticket.get("user_id") or "").strip()
+                if user_id:
+                    notifications = price_model_state.admin_store.setdefault("notifications", [])
+                    notifications.append(
+                        {
+                            "id": get_next_numeric_id(notifications),
+                            "user_id": user_id,
+                            "title": "Admin replied to your inquiry",
+                            "message": "AutoValueLK admins have replied to your Help Center message.",
+                            "active": True,
+                            "source": "support_ticket",
+                            "support_ticket_id": ticket["id"],
+                            "created_at": utc_now_iso(),
+                        }
+                    )
 
         persist_admin_store()
 

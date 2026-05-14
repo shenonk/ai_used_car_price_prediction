@@ -1406,9 +1406,9 @@ function Marketplace() {
     <div className="marketplace-page app-page-shell">
       <div className="marketplace-redesign-hero animate-fade-in">
         <div>
-          <div className="marketplace-redesign-eyebrow">MARKETPLACE</div>
-          <h1>Browse vehicles</h1>
-          <p>Approved listings from verified sellers across Sri Lanka</p>
+          <div className="marketplace-redesign-eyebrow">{t("marketplace.redesigned.eyebrow")}</div>
+          <h1>{t("marketplace.redesigned.title")}</h1>
+          <p>{t("marketplace.redesigned.subtitle")}</p>
         </div>
         <div className="marketplace-redesign-hero-actions">
           <Link
@@ -1462,8 +1462,8 @@ function Marketplace() {
         <div className="marketplace-redesign-cta-copy">
           <Car className="h-4 w-4" />
           <div>
-            <h2>Selling your vehicle?</h2>
-            <p>Submit an ad for admin review - approved listings go live instantly</p>
+            <h2>{t("marketplace.redesigned.cta_title")}</h2>
+            <p>{t("marketplace.redesigned.cta_subtitle")}</p>
           </div>
         </div>
 
@@ -1545,8 +1545,8 @@ function Marketplace() {
       <section className="mt-4 animate-fade-in animate-delay-200">
         <div className="marketplace-redesign-section-heading">
           <div>
-            <h2>Approved listings</h2>
-            <p>Only admin-approved vehicles appear here</p>
+            <h2>{t("marketplace.redesigned.approved_title")}</h2>
+            <p>{t("marketplace.redesigned.approved_subtitle")}</p>
           </div>
           <AppDropdown
             label=""
@@ -1565,8 +1565,8 @@ function Marketplace() {
         {filteredCars.length === 0 ? (
           <div className="marketplace-redesign-empty">
             <SearchX className="h-8 w-8" />
-            <h3>No listings found</h3>
-            <p>Try adjusting your filters or search term</p>
+            <h3>{t("marketplace.redesigned.no_listings_title")}</h3>
+            <p>{t("marketplace.redesigned.no_listings_subtitle")}</p>
             <button type="button" onClick={handleSearchReset} className="marketplace-redesign-empty-button">
               Clear filters
             </button>
@@ -2586,8 +2586,8 @@ function DistrictCityPicker({
     <section className="marketplace-district-picker rounded-[24px] border border-slate-800/80 bg-slate-950/55 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Districts and cities</p>
-          <h3 className="mt-1 text-base font-semibold text-white">Pick a district on the map, then choose a city</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("marketplace.location_filter.map_eyebrow")}</p>
+          <h3 className="mt-1 text-base font-semibold text-white">{t("marketplace.location_filter.map_title")}</h3>
         </div>
         {allowAll && (
           <button

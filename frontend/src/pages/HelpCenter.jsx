@@ -287,7 +287,7 @@ const HelpCenter = () => {
     <div className="help-page animate-fade-in">
       <header className="help-hero">
         <div>
-          <div className="help-eyebrow">HELP CENTER</div>
+          <div className="help-eyebrow">{t("help_center")}</div>
           <h1>{t("help_center_page.title_prefix")} {t("help_center_page.title_highlight")}</h1>
           <p>{t("help_center_page.search_placeholder")}</p>
         </div>
@@ -422,7 +422,7 @@ const HelpCenter = () => {
               rows="6"
             />
             {!authLoading && !currentUser && (
-              <p className="help-error-text">Please sign in to send a support message from your account.</p>
+              <p className="help-error-text">{t("help_center_page.signed_in_required")}</p>
             )}
             <button type="submit" disabled={isSubmitting || !isFormValid || !currentUser} className="help-primary-button">
               <Send className="h-[13px] w-[13px]" />
@@ -438,11 +438,11 @@ const HelpCenter = () => {
             <div>
               <div className="help-panel-title">
                 <Reply className="h-[14px] w-[14px]" />
-                <h2>My Inquiries</h2>
+                <h2>{t("help_center_page.my_inquiries")}</h2>
               </div>
-              <p>Only replies linked to your signed-in account are shown here.</p>
+              <p>{t("help_center_page.replies_subtitle")}</p>
             </div>
-            <span className="help-badge">Admin reply</span>
+            <span className="help-badge">{t("help_center_page.admin_reply_badge")}</span>
           </div>
 
           <div className="help-reply-search">
@@ -456,12 +456,12 @@ const HelpCenter = () => {
 
           <div className="help-reply-list">
             {isLoadingReplies ? (
-              <div className="help-empty-state help-empty-state--small">Loading replies from AutoValueLK admins...</div>
+              <div className="help-empty-state help-empty-state--small">{t("help_center_page.loading_replies")}</div>
             ) : adminReplies.length > 0 ? (
               adminReplies.map((reply) => (
                 <article key={reply.id} className="help-reply-card">
                   <div className="help-reply-head">
-                    <span>Reply from AutoValueLK Admins</span>
+                    <span>{t("help_center_page.reply_from_admins")}</span>
                     <time>
                       {reply.admin_replied_at
                         ? new Date(reply.admin_replied_at).toLocaleString()
@@ -469,17 +469,17 @@ const HelpCenter = () => {
                     </time>
                   </div>
                   <div className="help-reply-block">
-                    <span>Your message</span>
+                    <span>{t("help_center_page.your_message")}</span>
                     <p>{reply.message}</p>
                   </div>
                   <div className="help-reply-block help-reply-block--admin">
-                    <span>Admin reply</span>
+                    <span>{t("help_center_page.admin_reply")}</span>
                     <p>{reply.admin_reply}</p>
                   </div>
                 </article>
               ))
             ) : hasCheckedReplies ? (
-              <div className="help-empty-state help-empty-state--small">No admin replies found for your account yet.</div>
+              <div className="help-empty-state help-empty-state--small">{t("help_center_page.no_admin_replies")}</div>
             ) : null}
           </div>
         </div>
@@ -684,7 +684,7 @@ const HelpCenter = () => {
           <div className="w-full max-w-2xl rounded-3xl border border-blue-400/20 bg-[#1e293b]/45 p-6 backdrop-blur-md">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h3 className="theme-text-primary text-xl font-bold">Replies from AutoValueLK Admins</h3>
+                <h3 className="theme-text-primary text-xl font-bold">{t("help_center_page.replies_title")}</h3>
                 <p className="theme-text-secondary mt-2 text-sm leading-6">
                   Enter the same email you used in the contact form to check admin replies.
                 </p>
@@ -733,11 +733,11 @@ const HelpCenter = () => {
                       </span>
                     </div>
                     <div className="rounded-xl border border-slate-700/50 bg-slate-950/35 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Your message</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{t("help_center_page.your_message")}</p>
                       <p className="mt-2 text-sm leading-6 text-slate-300 whitespace-pre-wrap">{reply.message}</p>
                     </div>
                     <div className="mt-4 rounded-xl border border-emerald-300/20 bg-slate-950/45 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-emerald-200">Admin reply</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-emerald-200">{t("help_center_page.admin_reply")}</p>
                       <p className="mt-2 text-sm leading-6 text-emerald-50 whitespace-pre-wrap">{reply.admin_reply}</p>
                     </div>
                   </div>

@@ -175,7 +175,7 @@ const MainLayout = () => {
   const navItems = [
     {
       path: "/",
-      label: "Home",
+      label: t("home"),
       icon: <Home className="w-5 h-5" />,
     },
     {
@@ -183,8 +183,8 @@ const MainLayout = () => {
       label: t("dashboard"),
       icon: <LayoutDashboard className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Please log in to access this page.",
-      authSubMessage: "Dashboard, saved activity, and account insights are available only for logged-in users.",
+      authMessage: t("auth.login_required"),
+      authSubMessage: t("auth.dashboard_sub"),
     },
     {
       path: "/marketplace",
@@ -211,24 +211,24 @@ const MainLayout = () => {
       label: t("analytics"),
       icon: <BarChart3 className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Please log in to access this page.",
-      authSubMessage: "Saved prediction trends and deeper account analytics are available only for logged-in users.",
+      authMessage: t("auth.login_required"),
+      authSubMessage: t("auth.analytics_sub"),
     },
     {
       path: "/notifications",
       label: t("notifications"),
       icon: <Bell className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Please log in to access this page.",
-      authSubMessage: "Personal notifications and alert activity are available only for logged-in users.",
+      authMessage: t("auth.login_required"),
+      authSubMessage: t("auth.notifications_sub"),
     },
     {
       path: "/settings",
       label: t("settings"),
       icon: <Settings className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Please log in to access this page.",
-      authSubMessage: "Profile, password, alerts, and notification settings are available only for logged-in users.",
+      authMessage: t("auth.login_required"),
+      authSubMessage: t("auth.settings_sub"),
     },
     {
       path: "/help",
@@ -312,13 +312,13 @@ const MainLayout = () => {
             </div>
             <div className="sidebar-logo-text">
               <h1 className="heading-display theme-text-primary sidebar-logo-name text-[13px] font-medium tracking-normal">AutoValueLK</h1>
-              <p className="theme-text-muted sidebar-logo-sub text-[10px] uppercase tracking-[0.05em]">Sri Lankan Market</p>
+              <p className="theme-text-muted sidebar-logo-sub text-[10px] uppercase tracking-[0.05em]">{t("app.sidebar_market")}</p>
             </div>
           </div>
         </div>
 
         <nav className="sidebar-nav flex-1 space-y-0.5 px-0 pb-3 pt-2">
-          <div className="sidebar-section-label">Navigation</div>
+          <div className="sidebar-section-label">{t("app.navigation")}</div>
           {navItems.map((item) => (
             <Link
               key={item.path}

@@ -207,8 +207,8 @@ function MySubmittedAds() {
           <div className="relative">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Ad performance</p>
-                <h2 className="mt-2 text-2xl font-bold text-white">Your listing insights</h2>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">{t("marketplace.my_ads.performance", { defaultValue: "Ad performance" })}</p>
+                <h2 className="mt-2 text-2xl font-bold text-white">{t("marketplace.my_ads.insights_title", { defaultValue: "Your listing insights" })}</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
                   Track buyer views, review status, and which ads are getting the most attention.
                 </p>
@@ -252,8 +252,8 @@ function MySubmittedAds() {
 
             <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="rounded-[24px] border border-slate-800/80 bg-slate-950/35 p-5">
-                <h3 className="text-lg font-semibold text-white">Views leaderboard</h3>
-                <p className="mt-1 text-sm text-slate-500">Your strongest ads by buyer interest.</p>
+                <h3 className="text-lg font-semibold text-white">{t("marketplace.my_ads.views_leaderboard", { defaultValue: "Views leaderboard" })}</h3>
+                <p className="mt-1 text-sm text-slate-500">{t("marketplace.my_ads.views_leaderboard_subtitle", { defaultValue: "Your strongest ads by buyer interest." })}</p>
                 <div className="mt-5 space-y-3">
                   {summary.leaderboard.length > 0 ? (
                     summary.leaderboard.map((listing) => (
@@ -283,8 +283,8 @@ function MySubmittedAds() {
               </div>
 
               <div className="rounded-[24px] border border-slate-800/80 bg-slate-950/35 p-5">
-                <h3 className="text-lg font-semibold text-white">Review status</h3>
-                <p className="mt-1 text-sm text-slate-500">Submitted ads by current stage.</p>
+                <h3 className="text-lg font-semibold text-white">{t("marketplace.my_ads.review_label")}</h3>
+                <p className="mt-1 text-sm text-slate-500">{t("marketplace.my_ads.review_subtitle", { defaultValue: "Submitted ads by current stage." })}</p>
                 <div className="mt-5 grid grid-cols-2 gap-3">
                   {[
                     ["Approved", summary.approved, "text-emerald-300"],

@@ -606,9 +606,9 @@ function Results() {
 
       <header className="results-hero animate-fade-in">
         <div>
-          <div className="results-eyebrow">PRICE PREDICTION RESULT</div>
-          <h1>Price Prediction Result</h1>
-          <p>Based on your vehicle specifications</p>
+          <div className="results-eyebrow">{t("results_page.price_result_eyebrow")}</div>
+          <h1>{t("results_page.title")}</h1>
+          <p>{t("results_page.based_on_specs")}</p>
         </div>
         <div className="results-hero-actions">
           <button type="button" className="results-primary-button" onClick={() => navigate("/price-check")}>
@@ -648,7 +648,7 @@ function Results() {
 
         <section className="results-panel">
           <div className="results-panel-heading results-panel-heading--border">
-            <span className="results-panel-title"><Car className="h-[14px] w-[14px]" style={{ color: "#7d8590" }} />Vehicle Summary</span>
+            <span className="results-panel-title"><Car className="h-[14px] w-[14px]" style={{ color: "#7d8590" }} />{t("results_page.vehicle_summary")}</span>
           </div>
           {vehicleSummary && <p className="results-vehicle-line">{vehicleSummary}</p>}
           <div className="results-spec-grid">
@@ -665,12 +665,12 @@ function Results() {
       <div className="results-three-grid animate-fade-in animate-delay-100">
         <section className="results-panel">
           <div className="results-panel-heading">
-            <span className="results-panel-title"><CreditCard className="h-[14px] w-[14px]" style={{ color: "#a78bfa" }} />Best Finance Estimates</span>
-            <p>Cheapest monthly estimate by product</p>
+            <span className="results-panel-title"><CreditCard className="h-[14px] w-[14px]" style={{ color: "#a78bfa" }} />{t("results_page.best_finance_estimates")}</span>
+            <p>{t("results_page.cheapest_by_product")}</p>
           </div>
           <div>
             {isLoading ? (
-              <div className="results-loading">Loading finance estimates...</div>
+              <div className="results-loading">{t("results_page.loading_finance")}</div>
             ) : loanPlans.length === 0 ? (
               <p className="results-empty-text">{t("results_page.no_loan_plans")}</p>
             ) : (
@@ -679,7 +679,7 @@ function Results() {
                   <div className="results-loan-top">
                     <div>
                       <span className="results-loan-tenure">{plan.productLabel}</span>
-                      <span className="results-recommended-badge">Lowest</span>
+                      <span className="results-recommended-badge">{t("results_page.lowest")}</span>
                     </div>
                     <span className="results-loan-interest">{plan.interest} {t("results_page.interest_label")}</span>
                   </div>
@@ -690,7 +690,7 @@ function Results() {
                       <strong>LKR {plan.monthly}</strong>
                     </div>
                     <div>
-                      <span>Loan Value</span>
+                      <span>{t("results_page.loan_value")}</span>
                       <strong>LKR {plan.loanValue}</strong>
                     </div>
                   </div>
@@ -707,8 +707,8 @@ function Results() {
 
         <section className="results-panel">
           <div className="results-panel-heading">
-            <span className="results-panel-title"><PieChartIcon className="h-[14px] w-[14px]" style={{ color: "#d29922" }} />Cost Breakdown</span>
-            <p>Principal vs interest vs fees</p>
+            <span className="results-panel-title"><PieChartIcon className="h-[14px] w-[14px]" style={{ color: "#d29922" }} />{t("results_page.cost_breakdown")}</span>
+            <p>{t("results_page.principal_vs_interest")}</p>
           </div>
           <div className="results-donut-wrap">
             <Doughnut
@@ -718,7 +718,7 @@ function Results() {
               aria-label="Principal, interest, and processing fee cost breakdown"
             />
             <div className="results-donut-center">
-              <span>Total</span>
+              <span>{t("results_page.total")}</span>
               <strong>{totalLoanAmount}</strong>
             </div>
           </div>
@@ -734,11 +734,11 @@ function Results() {
 
         <section className="results-panel">
           <div className="results-panel-heading">
-            <span className="results-panel-title"><TrendingUp className="h-[14px] w-[14px]" style={{ color: "#3fb950" }} />Market Position</span>
-            <p>Where your vehicle sits in the market</p>
+            <span className="results-panel-title"><TrendingUp className="h-[14px] w-[14px]" style={{ color: "#3fb950" }} />{t("results_page.market_position")}</span>
+            <p>{t("results_page.market_position_subtitle")}</p>
           </div>
           <div className="results-range">
-            <div className="results-range-label">Your estimate</div>
+            <div className="results-range-label">{t("results_page.your_estimate")}</div>
             <div className="results-range-track">
               <span className="results-range-marker results-range-marker--low" />
               <span className="results-range-marker results-range-marker--you" />
@@ -762,8 +762,8 @@ function Results() {
 
       <section className="results-panel results-down-panel animate-fade-in animate-delay-200">
         <div className="results-panel-heading">
-          <span className="results-panel-title"><Landmark className="h-[14px] w-[14px]" style={{ color: "#58a6ff" }} />Down Payment Options</span>
-          <p>Impact of down payment on monthly repayment</p>
+          <span className="results-panel-title"><Landmark className="h-[14px] w-[14px]" style={{ color: "#58a6ff" }} />{t("results_page.down_payment_options")}</span>
+          <p>{t("results_page.down_payment_impact")}</p>
         </div>
         <div className="results-bar-legend">
           <span><i style={{ background: "#d97706" }} />{t("results_page.down_payment_label")}</span>
@@ -794,7 +794,7 @@ function Results() {
           className="results-ghost-button results-cta-ghost"
         >
           <BarChart2 className="h-[14px] w-[14px]" />
-          {alertSet ? t("results_page.alert_set") : "Save to Analytics"}
+          {alertSet ? t("results_page.alert_set") : t("results_page.save_to_analytics")}
         </button>
 
         <button

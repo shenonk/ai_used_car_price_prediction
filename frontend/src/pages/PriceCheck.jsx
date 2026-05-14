@@ -270,6 +270,7 @@ function PriceCheckPanelHeader({ icon: Icon, iconColor, title, subtitle, action 
 }
 
 function PriceCheckInsights({ insights, recentPredictions, onViewAnalytics }) {
+  const { t } = useTranslation()
   return (
     <aside className="pc-insights" aria-label="Live price insights">
       <section className="pc-insight-panel">
@@ -310,8 +311,8 @@ function PriceCheckInsights({ insights, recentPredictions, onViewAnalytics }) {
           ) : (
             <div className="pc-empty-state">
               <Search />
-              <p>No fuel data yet</p>
-              <span>Saved predictions will appear here by fuel type</span>
+              <p>{t("price_check_page.no_fuel_data")}</p>
+              <span>{t("price_check_page.fuel_data_waiting")}</span>
             </div>
           )}
         </div>
@@ -337,8 +338,8 @@ function PriceCheckInsights({ insights, recentPredictions, onViewAnalytics }) {
           ) : (
             <div className="pc-empty-state">
               <Search />
-              <p>No weekly trends yet</p>
-              <span>Predictions made this week will appear here</span>
+              <p>{t("price_check_page.no_weekly_trends")}</p>
+              <span>{t("price_check_page.weekly_trends_waiting")}</span>
             </div>
           )}
         </div>
@@ -350,7 +351,7 @@ function PriceCheckInsights({ insights, recentPredictions, onViewAnalytics }) {
           iconColor="#a78bfa"
           title="Your Recent Predictions"
           subtitle="Your last 3 saved estimates"
-          action={<button type="button" className="pc-view-all" onClick={onViewAnalytics}>View all →</button>}
+          action={<button type="button" className="pc-view-all" onClick={onViewAnalytics}>{t("price_check_page.view_all")} →</button>}
         />
         {recentPredictions.length > 0 ? (
           <div className="pc-recent-list">
@@ -368,15 +369,15 @@ function PriceCheckInsights({ insights, recentPredictions, onViewAnalytics }) {
         ) : (
           <div className="pc-empty-state">
             <Search />
-            <p>No predictions yet</p>
-            <span>Run your first prediction using the form</span>
+            <p>{t("price_check_page.no_predictions")}</p>
+            <span>{t("price_check_page.first_prediction_hint")}</span>
           </div>
         )}
       </section>
 
       <section className="pc-tip-card">
-        <div className="pc-tip-title"><Lightbulb /> <h3>Pro tip</h3></div>
-        <p>Vehicles with full service history and low mileage typically estimate 15-20% above market average. Enter accurate mileage for the best prediction.</p>
+        <div className="pc-tip-title"><Lightbulb /> <h3>{t("price_check_page.pro_tip")}</h3></div>
+        <p>{t("price_check_page.pro_tip_body")}</p>
       </section>
     </aside>
   )
@@ -609,14 +610,14 @@ function PriceCheck() {
           {/* -------- Hero Header -------- */}
           <header className="pc-hero">
             <div>
-              <div className="pc-hero__eyebrow">PRICE CHECK</div>
-              <h1 className="pc-hero__title">Vehicle Price Prediction</h1>
-              <p className="pc-hero__sub">Enter your vehicle details to get an AI-powered market estimate</p>
+              <div className="pc-hero__eyebrow">{t("price_check_page.hero_badge")}</div>
+              <h1 className="pc-hero__title">{t("price_check_page.title")}</h1>
+              <p className="pc-hero__sub">{t("price_check_page.hero_subtitle")}</p>
             </div>
             <div className="pc-badges">
-              <span className="pc-badge pc-badge--green"><ShieldCheck className="h-[13px] w-[13px]" /> 98% Accuracy</span>
-              <span className="pc-badge pc-badge--amber"><Zap className="h-[13px] w-[13px]" /> Instant Results</span>
-              <span className="pc-badge pc-badge--blue"><RefreshCw className="h-[13px] w-[13px]" /> Updated Daily</span>
+              <span className="pc-badge pc-badge--green"><ShieldCheck className="h-[13px] w-[13px]" /> {t("price_check_page.accuracy_badge")}</span>
+              <span className="pc-badge pc-badge--amber"><Zap className="h-[13px] w-[13px]" /> {t("price_check_page.instant_results")}</span>
+              <span className="pc-badge pc-badge--blue"><RefreshCw className="h-[13px] w-[13px]" /> {t("price_check_page.updated_daily")}</span>
             </div>
           </header>
 
@@ -640,8 +641,8 @@ function PriceCheck() {
                 <Cpu className="h-[18px] w-[18px]" />
               </div>
               <div>
-                <h2 className="pc-form-title">Enter Vehicle Details</h2>
-                <p className="pc-form-subtitle">All fields help improve prediction accuracy</p>
+                <h2 className="pc-form-title">{t("price_check_page.form_title")}</h2>
+                <p className="pc-form-subtitle">{t("price_check_page.form_subtitle")}</p>
               </div>
             </div>
 
@@ -746,7 +747,7 @@ function PriceCheck() {
 
                 <div className="pc-helper-note md:col-span-2">
                   <Info className="h-[13px] w-[13px]" />
-                  <p>Matching fuel type, transmission, condition, and town to the training data helps the model give more realistic estimates.</p>
+                  <p>{t("price_check_page.training_note")}</p>
                 </div>
               </div>
 

@@ -1149,9 +1149,9 @@ function Dashboard() {
   )
 
   const financeProducts = [
-    { id: "loan", label: "Loan", types: ["Personal Loan", "Bank", "Loan"] },
-    { id: "leasing", label: "Leasing", types: ["Leasing"] },
-    { id: "draft", label: "Draft", types: ["Draft"] },
+    { id: "loan", label: t("dashboard_page.finance.loan", { defaultValue: "Loan" }), types: ["Personal Loan", "Bank", "Loan"] },
+    { id: "leasing", label: t("dashboard_page.finance.leasing", { defaultValue: "Leasing" }), types: ["Leasing"] },
+    { id: "draft", label: t("dashboard_page.finance.draft", { defaultValue: "Draft" }), types: ["Draft"] },
   ]
 
   const selectedFinanceProduct = financeProducts.find((item) => item.id === financeProduct) || financeProducts[0]
@@ -1296,8 +1296,8 @@ function Dashboard() {
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-[#21262d] bg-[#0d1117] px-4 py-10 text-center">
-              <p className="text-xs font-medium text-[#7d8590]">No verified market trend data for this vehicle yet</p>
-              <p className="mt-1 text-[11px] text-[#484f58]">The dashboard will show the trend when the analytics dataset has a matching brand, model, and year.</p>
+              <p className="text-xs font-medium text-[#7d8590]">{t("dashboard_page.no_verified_trend")}</p>
+              <p className="mt-1 text-[11px] text-[#484f58]">{t("dashboard_page.trend_waiting")}</p>
             </div>
           )}
         </Panel>
@@ -1334,17 +1334,17 @@ function Dashboard() {
               </div>
               <div className="dashboard-finance-stats">
                 <article>
-                  <span>Lowest rate</span>
+                  <span>{t("dashboard_page.lowest_rate")}</span>
                   <strong>{financeRateSummary.lowest?.rate.toFixed(2)}%</strong>
                   <p>{financeRateSummary.lowest?.name}</p>
                 </article>
                 <article>
-                  <span>Average rate</span>
+                  <span>{t("dashboard_page.average_rate")}</span>
                   <strong>{financeRateSummary.average.toFixed(2)}%</strong>
                   <p>{financeRateRows.length} active providers</p>
                 </article>
                 <article>
-                  <span>Highest rate</span>
+                  <span>{t("dashboard_page.highest_rate")}</span>
                   <strong>{financeRateSummary.highest?.rate.toFixed(2)}%</strong>
                   <p>{financeRateSummary.highest?.name}</p>
                 </article>
@@ -1352,8 +1352,8 @@ function Dashboard() {
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-[#3d2a0a] bg-[#130f08] px-4 py-10 text-center">
-              <p className="text-xs font-medium text-[#d29922]">No active {selectedFinanceProduct.label.toLowerCase()} rates yet</p>
-              <p className="mt-1 text-[11px] text-[#7d8590]">Add financing providers to see real-time rate analytics here.</p>
+              <p className="text-xs font-medium text-[#d29922]">{t("dashboard_page.no_finance_rates", { product: selectedFinanceProduct.label.toLowerCase() })}</p>
+              <p className="mt-1 text-[11px] text-[#7d8590]">{t("dashboard_page.add_finance_rates")}</p>
             </div>
           )}
         </Panel>
@@ -1364,7 +1364,7 @@ function Dashboard() {
           icon={<Activity className="h-4 w-4" />}
           title="Market Pulse"
           subtitle="Live marketplace and prediction signals"
-          action={<span className="rounded-full bg-[#238636] px-2 py-0.5 text-[10px] font-medium text-white">Live</span>}
+          action={<span className="rounded-full bg-[#238636] px-2 py-0.5 text-[10px] font-medium text-white">{t("dashboard_page.live")}</span>}
         >
           <div className="space-y-3">
             {dashboardView.pulse.map((item) => (
@@ -1397,8 +1397,8 @@ function Dashboard() {
               ))
             ) : (
               <div className="rounded-lg border border-dashed border-[#21262d] bg-[#0d1117] px-4 py-8 text-center">
-                <p className="text-xs font-medium text-[#7d8590]">No live price alerts yet</p>
-                <p className="mt-1 text-[11px] text-[#484f58]">Save a prediction to Analytics to track matching listings.</p>
+                <p className="text-xs font-medium text-[#7d8590]">{t("dashboard_page.no_live_alerts")}</p>
+                <p className="mt-1 text-[11px] text-[#484f58]">{t("dashboard_page.save_prediction_alert_hint")}</p>
               </div>
             )}
           </div>
@@ -1418,7 +1418,7 @@ function Dashboard() {
         >
           <div className="space-y-3">
             {isLoading ? (
-              <p className="py-8 text-center text-xs text-[#7d8590]">Loading dashboard...</p>
+              <p className="py-8 text-center text-xs text-[#7d8590]">{t("dashboard_page.loading")}</p>
             ) : recentPredictions.length > 0 ? (
               recentPredictions.map((item, index) => (
                 <button key={item.id} type="button" onClick={() => navigate("/analytics")} className="panel panel-interactive flex w-full items-center gap-3 px-3 py-3 text-left">
@@ -1433,7 +1433,7 @@ function Dashboard() {
                 </button>
               ))
             ) : (
-              <p className="py-8 text-center text-xs text-[#7d8590]">No saved predictions yet.</p>
+              <p className="py-8 text-center text-xs text-[#7d8590]">{t("dashboard_page.no_predictions_yet")}</p>
             )}
           </div>
         </Panel>
@@ -1496,10 +1496,11 @@ function MetricCard({ label, value, subLabel, trend, icon, accent = "#58a6ff" })
 }
 
 function HorizontalList({ items, colors }) {
+  const { t } = useTranslation()
   const max = Math.max(...items.map((item) => item.count), 1)
   const total = items.reduce((sum, item) => sum + Number(item.count || 0), 0)
   if (!items.length) {
-    return <p className="py-8 text-center text-xs text-[#7d8590]">No platform search activity yet.</p>
+    return <p className="py-8 text-center text-xs text-[#7d8590]">{t("dashboard_page.no_platform_search_activity")}</p>
   }
 
   return (
@@ -1525,13 +1526,14 @@ function HorizontalList({ items, colors }) {
 }
 
 function PercentList({ items }) {
+  const { t } = useTranslation()
   const [showAll, setShowAll] = useState(false)
   const colors = ["#58a6ff", "#4694e8", "#388bfd", "#1f6feb", "#1158c7", "#0d419d"]
   if (!items.length) {
     return (
       <div className="rounded-lg border border-dashed border-[#21262d] bg-[#0d1117] px-4 py-8 text-center">
-        <p className="text-xs font-medium text-[#7d8590]">No district data yet</p>
-        <p className="mt-1 text-[11px] text-[#484f58]">Approved listings need a saved location to appear here.</p>
+        <p className="text-xs font-medium text-[#7d8590]">{t("dashboard_page.no_district_data")}</p>
+        <p className="mt-1 text-[11px] text-[#484f58]">{t("dashboard_page.district_waiting")}</p>
       </div>
     )
   }
@@ -1553,7 +1555,7 @@ function PercentList({ items }) {
       ))}
       {items.length > 5 && (
         <button type="button" className="btn-ghost mt-1 w-full justify-center !py-2 !text-[11px]" onClick={() => setShowAll((value) => !value)}>
-          {showAll ? "Show less" : `Show all districts (${items.length})`}
+          {showAll ? t("dashboard_page.show_less") : t("dashboard_page.show_all_districts", { count: items.length })}
         </button>
       )}
     </div>

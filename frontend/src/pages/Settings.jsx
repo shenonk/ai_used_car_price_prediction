@@ -294,9 +294,9 @@ function Settings() {
       <div className="settings-page-inner">
         <div className="settings-hero">
           <div>
-            <div className="settings-hero-eyebrow">SETTINGS</div>
-            <h1>Settings</h1>
-            <p>Manage your account, preferences, and data security</p>
+            <div className="settings-hero-eyebrow">{t("settings")}</div>
+            <h1>{t("settings")}</h1>
+            <p>{t("settings_page.subtitle")}</p>
           </div>
         </div>
 
@@ -350,7 +350,7 @@ function Settings() {
                     <div>
                       <h2 className="text-2xl font-bold text-white mb-1">{userInfo.username || "Guest User"}</h2>
                       <p className="text-slate-400">{userInfo.email}</p>
-                      <span className="badge badge-info mt-2">Personal Account</span>
+                      <span className="badge badge-info mt-2">{t("settings_page.personal_account", { defaultValue: "Personal Account" })}</span>
                     </div>
                     <button type="button" className="settings-edit-profile">
                       <Edit2 size={13} />
@@ -365,11 +365,11 @@ function Settings() {
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800/50">
-                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">Username</p>
+                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">{t("settings_page.username", { defaultValue: "Username" })}</p>
                         <p className="text-white">{userInfo.username || "Not set"}</p>
                       </div>
                       <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800/50">
-                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">Email Address</p>
+                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">{t("settings_page.email_address", { defaultValue: "Email Address" })}</p>
                         <p className="text-white">{userInfo.email}</p>
                       </div>
                     </div>
@@ -377,8 +377,8 @@ function Settings() {
                     <div className="p-6 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex items-start gap-4">
                         <Clock className="text-blue-400 mt-1" size={20} />
                         <div>
-                            <p className="font-semibold text-white">Member since 2026</p>
-                            <p className="text-sm text-slate-400">You joined AutoValueLK on March 27, 2026. Keep track of your car price history here.</p>
+                            <p className="font-semibold text-white">{t("settings_page.member_since", { defaultValue: "Member since 2026" })}</p>
+                            <p className="text-sm text-slate-400">{t("settings_page.member_hint", { defaultValue: "You joined AutoValueLK on March 27, 2026. Keep track of your car price history here." })}</p>
                         </div>
                     </div>
                   </div>
@@ -390,7 +390,7 @@ function Settings() {
                 <div className="space-y-8 animate-slide-up">
                   <div>
                     <h2 className="text-2xl font-bold text-white mb-2">{t("notification_preferences")}</h2>
-                    <p className="text-slate-400">Choose how you want to be notified about market changes.</p>
+                    <p className="text-slate-400">{t("settings_page.notifications_hint", { defaultValue: "Choose how you want to be notified about market changes." })}</p>
                   </div>
 
                   <div className="space-y-4">
@@ -444,7 +444,7 @@ function Settings() {
                   <div className="flex justify-between items-end">
                     <div>
                         <h2 className="text-2xl font-bold text-white mb-2">{t("manage_alerts")}</h2>
-                        <p className="text-slate-400">Track and manage your saved price alerts.</p>
+                        <p className="text-slate-400">{t("settings_page.alerts_hint", { defaultValue: "Track and manage your saved price alerts." })}</p>
                     </div>
                     {alerts.length > 0 && (
                         <span className="badge badge-warning">{alerts.length} Active Alerts</span>
@@ -456,7 +456,7 @@ function Settings() {
                       <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center text-slate-500">
                         <BellOff size={28} />
                       </div>
-                      <p className="text-slate-400">No price alerts set</p>
+                      <p className="text-slate-400">{t("settings_page.no_price_alerts", { defaultValue: "No price alerts set" })}</p>
                       <button onClick={() => navigate('/price-check')} className="settings-add-alert-button">
                         <Plus size={13} />
                         Add price alert
@@ -609,7 +609,7 @@ function Settings() {
                 <div className="space-y-8 animate-slide-up">
                   <div>
                     <h2 className="theme-text-primary text-2xl font-bold mb-2">{t("language_preferences")}</h2>
-                    <p className="theme-text-secondary">Configure your interface language and preferences.</p>
+                    <p className="theme-text-secondary">{t("settings_page.language_hint", { defaultValue: "Configure your interface language and preferences." })}</p>
                   </div>
 
                   <div className="space-y-6">
@@ -693,7 +693,7 @@ function Settings() {
                             {t("danger_zone")}
                         </h3>
                         <div className="space-y-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6">
-                            <p className="theme-text-secondary text-sm">Once you clear your local data, there is no going back. This includes preferences and alerts.</p>
+                            <p className="theme-text-secondary text-sm">{t("settings_page.clear_data_warning", { defaultValue: "Once you clear your local data, there is no going back. This includes preferences and alerts." })}</p>
                             <button 
                                 onClick={clearAllData}
                                 className="btn-danger"

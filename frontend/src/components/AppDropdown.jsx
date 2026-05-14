@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 function normalizeOption(option) {
   if (typeof option === "string") {
@@ -24,6 +25,7 @@ export default function AppDropdown({
   searchable = false,
   className = "",
 }) {
+  const { t } = useTranslation();
   const normalizedOptions = useMemo(() => (options || []).map(normalizeOption), [options]);
   const currentValue = String(value ?? "");
   const selectedOption = normalizedOptions.find((option) => option.value === currentValue);
@@ -188,7 +190,7 @@ export default function AppDropdown({
                 </button>
               ))
             ) : (
-              <div className="app-dropdown__empty">No options</div>
+              <div className="app-dropdown__empty">{t("app.no_options")}</div>
             )}
           </div>
         )}

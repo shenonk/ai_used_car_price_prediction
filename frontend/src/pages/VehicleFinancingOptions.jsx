@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getCurrentUser } from "../utils/auth";
@@ -32,6 +33,7 @@ import {
 function VehicleFinancingOptions() {
     const location = useLocation();
     const navigate = useNavigate();
+    const { t } = useTranslation();
 
     const predictedPrice = location.state?.predictedPrice || 3450000;
     const vehicle = location.state?.vehicle || null;
@@ -116,29 +118,29 @@ function VehicleFinancingOptions() {
     const financingTypeCards = [
         {
             id: "loan",
-            title: "Vehicle Loan",
-            subtitle: "Fixed monthly EMIs via bank",
+            title: t("financing_page.vehicle_loan"),
+            subtitle: t("financing_page.vehicle_loan_subtitle"),
             icon: CreditCard,
         },
         {
             id: "leasing",
-            title: "Vehicle Leasing",
-            subtitle: "Leasing company financing",
+            title: t("financing_page.vehicle_leasing"),
+            subtitle: t("financing_page.vehicle_leasing_subtitle"),
             icon: FileText,
         },
         {
             id: "draft",
-            title: "Vehicle Draft",
-            subtitle: "Short-term credit line",
+            title: t("financing_page.vehicle_draft"),
+            subtitle: t("financing_page.vehicle_draft_subtitle"),
             icon: Shield,
         },
     ];
 
     const financingTypeLabel = financingType === "loan"
-        ? "Vehicle Loan"
+        ? t("financing_page.vehicle_loan")
         : financingType === "leasing"
-            ? "Vehicle Leasing"
-            : "Vehicle Draft";
+            ? t("financing_page.vehicle_leasing")
+            : t("financing_page.vehicle_draft");
 
     const selectedProductType = financingType === "draft"
         ? FINANCE_PRODUCTS.MONEY_DRAFT
@@ -157,9 +159,9 @@ function VehicleFinancingOptions() {
     const selectedFinanceResult = financeComparison.find((item) => item.productType === selectedProductType);
     const selectedLtvError = selectedFinanceResult ? getLtvError(selectedFinanceResult) : "";
     const productLabels = {
-        [FINANCE_PRODUCTS.LEASING]: "Leasing",
-        [FINANCE_PRODUCTS.VEHICLE_LOAN]: "Vehicle Loan",
-        [FINANCE_PRODUCTS.MONEY_DRAFT]: "Money Draft",
+        [FINANCE_PRODUCTS.LEASING]: t("financing_page.vehicle_leasing"),
+        [FINANCE_PRODUCTS.VEHICLE_LOAN]: t("financing_page.vehicle_loan"),
+        [FINANCE_PRODUCTS.MONEY_DRAFT]: t("financing_page.money_draft"),
     };
 
     const comparisonRows = filteredInstitutions.map((inst) => {
@@ -185,9 +187,9 @@ function VehicleFinancingOptions() {
     });
 
     const progressSteps = [
-        { label: "Choose type", state: financingType ? "complete" : "active" },
-        { label: "Select institution", state: selectedInstitution ? "complete" : financingType ? "active" : "upcoming" },
-        { label: "Review plan", state: selectedInstitution ? "active" : "upcoming" },
+        { label: t("financing_page.progress_choose_type"), state: financingType ? "complete" : "active" },
+        { label: t("financing_page.progress_select_institution"), state: selectedInstitution ? "complete" : financingType ? "active" : "upcoming" },
+        { label: t("financing_page.progress_review_plan"), state: selectedInstitution ? "active" : "upcoming" },
     ];
 
     const handleDownloadPDF = async () => {
@@ -333,10 +335,10 @@ function VehicleFinancingOptions() {
                 <div className="financing-warning animate-fade-in">
                     <AlertTriangle className="financing-warning-icon" />
                     <div>
-                        <p>Sample data shown</p>
+                        <p>{t("financing_page.sample_title")}</p>
                         <span>
                             Go to{" "}
-                            <button type="button" onClick={() => navigate("/price-check")}>Price Check</button>
+                            <button type="button" onClick={() => navigate("/price-check")}>{t("price_check")}</button>
                             {" "}to get a personalized prediction
                         </span>
                     </div>
@@ -352,36 +354,36 @@ function VehicleFinancingOptions() {
 
             <header className="financing-hero animate-fade-in">
                 <div className="financing-hero-copy">
-                    <div className="financing-eyebrow">FINANCING</div>
-                    <h1>Vehicle Financing Options</h1>
-                    <p>Follow the steps below to find your best plan</p>
+                    <div className="financing-eyebrow">{t("financing_page.eyebrow")}</div>
+                    <h1>{t("financing_page.title")}</h1>
+                    <p>{t("financing_page.subtitle")}</p>
                 </div>
                 <div className="financing-hero-stats">
                     <article className="financing-stat-pill">
                         <Tag className="financing-stat-icon financing-stat-icon--blue" />
                         <span>
                             <strong className="financing-stat-value--blue">LKR {formattedPrice}</strong>
-                            <em>Predicted price</em>
+                            <em>{t("financing_page.predicted_price")}</em>
                         </span>
                     </article>
                     <article className="financing-stat-pill">
                         <Wallet className="financing-stat-icon financing-stat-icon--amber" />
                         <span>
                             <strong>LKR {downPayment.toLocaleString("en-LK")}</strong>
-                            <em>Down payment ({downPaymentPercent}%)</em>
+                            <em>{t("financing_page.down_payment_percent", { percent: downPaymentPercent })}</em>
                         </span>
                     </article>
                     <article className="financing-stat-pill">
                         <Landmark className="financing-stat-icon financing-stat-icon--green" />
                         <span>
                             <strong>LKR {loanAmount.toLocaleString("en-LK")}</strong>
-                            <em>Loan amount</em>
+                            <em>{t("financing_page.loan_amount")}</em>
                         </span>
                     </article>
                 </div>
             </header>
 
-            <section className="financing-progress" aria-label="Financing steps">
+            <section className="financing-progress" aria-label={t("financing_page.steps_aria")}>
                 {progressSteps.map((step, index) => (
                     <div className="financing-progress-item" key={step.label}>
                         <div className={`financing-progress-step is-${step.state}`}>
@@ -401,8 +403,8 @@ function VehicleFinancingOptions() {
                 <div className="financing-step-label">
                     <span className="financing-step-badge">1</span>
                     <div className="financing-step-copy">
-                        <h2>Choose your financing type</h2>
-                        <p>Select how you want to finance your vehicle</p>
+                        <h2>{t("financing_page.choose_type_title")}</h2>
+                        <p>{t("financing_page.choose_type_subtitle")}</p>
                     </div>
                 </div>
                 <div className="financing-type-grid">
@@ -426,7 +428,7 @@ function VehicleFinancingOptions() {
                                 {isSelected && (
                                     <span className="financing-selected-row">
                                         <CheckCircle className="h-3 w-3" />
-                                        Selected
+                                        {t("financing_page.selected")}
                                     </span>
                                 )}
                             </button>
@@ -441,17 +443,17 @@ function VehicleFinancingOptions() {
                         {selectedInstitution ? <Check className="h-[13px] w-[13px]" /> : "2"}
                     </span>
                     <div className="financing-step-copy">
-                        <h2>Select your financial institution</h2>
-                        <p>Choose which bank or leasing company to use</p>
+                        <h2>{t("financing_page.select_institution_title")}</h2>
+                        <p>{t("financing_page.select_institution_subtitle")}</p>
                     </div>
                 </div>
 
                 {!financingType ? (
-                    <div className="financing-empty">Select a financing type first</div>
+                    <div className="financing-empty">{t("financing_page.select_type_first")}</div>
                 ) : isLoading ? (
-                    <div className="financing-empty">Currently fetching the latest Sri Lankan financing rates...</div>
+                    <div className="financing-empty">{t("financing_page.fetching_rates")}</div>
                 ) : filteredInstitutions.length === 0 ? (
-                    <div className="financing-empty">No financing options available for this category yet.</div>
+                    <div className="financing-empty">{t("financing_page.no_options")}</div>
                 ) : (
                     <div className="financing-bank-grid">
                         {filteredInstitutions.map((inst) => {
@@ -478,12 +480,12 @@ function VehicleFinancingOptions() {
                                     <div className="financing-bank-divider" />
                                     <div className="financing-bank-bottom">
                                         <span>
-                                            <em>Interest Rate</em>
+                                            <em>{t("financing_page.interest_rate")}</em>
                                             <strong>{inst.interestRate}%</strong>
                                         </span>
                                         <span>
-                                            <em>Max Tenure</em>
-                                            <strong>{inst.maxTenure} months</strong>
+                                            <em>{t("financing_page.max_tenure")}</em>
+                                            <strong>{t("financing_page.months", { count: inst.maxTenure })}</strong>
                                         </span>
                                     </div>
                                 </button>
@@ -497,43 +499,43 @@ function VehicleFinancingOptions() {
                 <div className="financing-step-label">
                     <span className={`financing-step-badge ${selectedInstitution ? "" : "is-upcoming"}`}>3</span>
                     <div className="financing-step-copy">
-                        <h2>Review your financing plan</h2>
-                        <p>Compare institutions and choose your best option</p>
+                        <h2>{t("financing_page.review_title")}</h2>
+                        <p>{t("financing_page.review_subtitle")}</p>
                     </div>
                 </div>
 
                 {!selectedInstitution ? (
-                    <div className="financing-empty">Select an institution to review your financing plan.</div>
+                    <div className="financing-empty">{t("financing_page.select_institution_first")}</div>
                 ) : (
                     <>
                     <article className="financing-adjustments">
                         <div className="financing-plan-header">
                             <Wallet className="h-[14px] w-[14px]" />
-                            <strong>Adjust your estimate</strong>
+                            <strong>{t("financing_page.adjust_estimate")}</strong>
                         </div>
                         <div className="financing-adjustment-grid">
                             <div className="financing-condition-field">
-                                <strong>Vehicle Condition</strong>
+                                <strong>{t("financing_page.vehicle_condition")}</strong>
                                 <div className="financing-condition-toggle">
                                     <button
                                         type="button"
                                         className={vehicleCondition === VEHICLE_CONDITIONS.BRAND_NEW ? "is-active" : ""}
                                         onClick={() => setVehicleCondition(VEHICLE_CONDITIONS.BRAND_NEW)}
                                     >
-                                        Brand New
+                                        {t("price_check_page.options.brand_new")}
                                     </button>
                                     <button
                                         type="button"
                                         className={vehicleCondition === VEHICLE_CONDITIONS.USED ? "is-active" : ""}
                                         onClick={() => setVehicleCondition(VEHICLE_CONDITIONS.USED)}
                                     >
-                                        Used
+                                        {t("price_check_page.options.used")}
                                     </button>
                                 </div>
                             </div>
                             <label className="financing-slider-field">
                                 <span>
-                                    <strong>Down Payment</strong>
+                                    <strong>{t("financing_page.down_payment")}</strong>
                                     <em>{downPaymentPercent}% · LKR {downPayment.toLocaleString("en-LK")}</em>
                                 </span>
                                 <input
@@ -550,8 +552,8 @@ function VehicleFinancingOptions() {
                             </label>
                             <label className="financing-slider-field">
                                 <span>
-                                    <strong>Loan Tenure</strong>
-                                    <em>{tenure} months · {(tenure / 12).toFixed(1)} years</em>
+                                    <strong>{t("financing_page.loan_tenure")}</strong>
+                                    <em>{t("financing_page.months", { count: tenure })} · {t("results_page.years", { count: Number((tenure / 12).toFixed(1)) })}</em>
                                 </span>
                                 <input
                                     type="range"
@@ -563,8 +565,8 @@ function VehicleFinancingOptions() {
                                     onChange={(event) => setTenure(Number(event.target.value))}
                                 />
                                 <small>
-                                    <span>12 months</span>
-                                    <span>{selectedInstitution.maxTenure} months</span>
+                                    <span>{t("financing_page.months", { count: 12 })}</span>
+                                    <span>{t("financing_page.months", { count: selectedInstitution.maxTenure })}</span>
                                 </small>
                             </label>
                         </div>
@@ -580,35 +582,35 @@ function VehicleFinancingOptions() {
                         <article className="financing-selected-plan">
                             <div className="financing-plan-header">
                                 <CheckCircle className="h-[14px] w-[14px]" />
-                                <strong>Your selected plan</strong>
+                                <strong>{t("financing_page.selected_plan")}</strong>
                             </div>
                             <dl className="financing-plan-details">
-                                <div><dt>Institution</dt><dd>{selectedInstitution.name}</dd></div>
-                                <div><dt>Type</dt><dd>{financingTypeLabel}</dd></div>
-                                <div><dt>Interest Rate</dt><dd>{interestRate}%</dd></div>
-                                <div><dt>Max Tenure</dt><dd>{selectedInstitution.maxTenure} months</dd></div>
-                                <div><dt>Min Down</dt><dd>{selectedInstitution.minDownPayment}%</dd></div>
-                                <div><dt>LTV</dt><dd>{selectedFinanceResult ? `${Math.round(selectedFinanceResult.ltv * 100)}% / ${Math.round(selectedFinanceResult.maxLtv * 100)}%` : "N/A"}</dd></div>
-                                <div><dt>Loan Value</dt><dd>LKR {loanAmount.toLocaleString("en-LK")}</dd></div>
+                                <div><dt>{t("financing_page.institution")}</dt><dd>{selectedInstitution.name}</dd></div>
+                                <div><dt>{t("financing_page.type")}</dt><dd>{financingTypeLabel}</dd></div>
+                                <div><dt>{t("financing_page.interest_rate")}</dt><dd>{interestRate}%</dd></div>
+                                <div><dt>{t("financing_page.max_tenure")}</dt><dd>{t("financing_page.months", { count: selectedInstitution.maxTenure })}</dd></div>
+                                <div><dt>{t("financing_page.min_down")}</dt><dd>{selectedInstitution.minDownPayment}%</dd></div>
+                                <div><dt>{t("financing_page.ltv")}</dt><dd>{selectedFinanceResult ? `${Math.round(selectedFinanceResult.ltv * 100)}% / ${Math.round(selectedFinanceResult.maxLtv * 100)}%` : "N/A"}</dd></div>
+                                <div><dt>{t("financing_page.loan_value")}</dt><dd>LKR {loanAmount.toLocaleString("en-LK")}</dd></div>
                             </dl>
                             <div className="financing-plan-monthly">
-                                <span>Est. Monthly Payment</span>
+                                <span>{t("financing_page.est_monthly_payment")}</span>
                                 <strong>LKR {emi.toLocaleString("en-LK")}</strong>
-                                <em>for {tenure} months</em>
+                                <em>{t("financing_page.for_months", { count: tenure })}</em>
                             </div>
                         </article>
 
                         <article className="financing-mini-compare">
                             <div className="financing-mini-header">
                                 <BarChart2 className="h-[14px] w-[14px]" />
-                                <strong>Compare options</strong>
+                                <strong>{t("financing_page.compare_options")}</strong>
                             </div>
                             <table className="financing-mini-table">
                                 <thead>
                                     <tr>
-                                        <th>Institution</th>
-                                        <th>Rate</th>
-                                        <th>Monthly</th>
+                                        <th>{t("financing_page.institution")}</th>
+                                        <th>{t("financing_page.rate")}</th>
+                                        <th>{t("financing_page.monthly")}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -626,16 +628,16 @@ function VehicleFinancingOptions() {
                     <article className="financing-financial-comparison">
                         <div className="financing-mini-header">
                             <Table className="h-[14px] w-[14px]" />
-                            <strong>Financial Comparison</strong>
+                            <strong>{t("financing_page.financial_comparison")}</strong>
                         </div>
                         <div className="financing-financial-table-shell">
                             <table className="financing-financial-table">
                                 <thead>
                                     <tr>
-                                        <th>Product Type</th>
-                                        <th>Monthly Installment</th>
-                                        <th>Total Interest Paid</th>
-                                        <th>Principal Settlement Due</th>
+                                        <th>{t("financing_page.product_type")}</th>
+                                        <th>{t("financing_page.monthly_installment")}</th>
+                                        <th>{t("financing_page.total_interest_paid")}</th>
+                                        <th>{t("financing_page.principal_settlement_due")}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -650,14 +652,14 @@ function VehicleFinancingOptions() {
                                             </td>
                                             <td>{formatLkr(result.monthlyInstallment)}</td>
                                             <td>{formatLkr(result.totalInterestPaid)}</td>
-                                            <td>{result.principalSettlementDue > 0 ? formatLkr(result.principalSettlementDue) : "None"}</td>
+                                            <td>{result.principalSettlementDue > 0 ? formatLkr(result.principalSettlementDue) : t("financing_page.none")}</td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
                         <p className="financing-draft-disclaimer">
-                            Monthly payment covers interest only. Full principal must be settled at end of tenure.
+                            {t("financing_page.draft_disclaimer")}
                         </p>
                     </article>
                     </>
@@ -668,7 +670,7 @@ function VehicleFinancingOptions() {
                 <div className="financing-comparison-heading">
                     <div className="financing-section-title">
                         <Table className="h-[14px] w-[14px]" />
-                        <h2>Full Financing Comparison</h2>
+                        <h2>{t("financing_page.full_comparison")}</h2>
                     </div>
                     <div className="financing-toggle-pills">
                         <button
@@ -690,18 +692,18 @@ function VehicleFinancingOptions() {
 
                 <div className="financing-table-shell">
                     {isLoading ? (
-                        <div className="financing-empty">Loading comparison data...</div>
+                        <div className="financing-empty">{t("financing_page.loading_comparison")}</div>
                     ) : filteredInstitutions.length === 0 ? (
-                        <div className="financing-empty">No data available to compare.</div>
+                        <div className="financing-empty">{t("financing_page.no_comparison")}</div>
                     ) : (
                         <table className="financing-table">
                             <thead>
                                 <tr>
-                                    <th>Institution</th>
-                                    <th>Rate</th>
-                                    <th>Max Tenure</th>
-                                    <th>Min Down</th>
-                                    <th>Est. Monthly</th>
+                                    <th>{t("financing_page.institution")}</th>
+                                    <th>{t("financing_page.rate")}</th>
+                                    <th>{t("financing_page.max_tenure")}</th>
+                                    <th>{t("financing_page.min_down")}</th>
+                                    <th>{t("financing_page.est_monthly")}</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -726,11 +728,11 @@ function VehicleFinancingOptions() {
                                                 </div>
                                             </td>
                                             <td><span className="financing-rate-pill">{inst.interestRate}%</span></td>
-                                            <td>{inst.maxTenure} months</td>
+                                            <td>{t("financing_page.months", { count: inst.maxTenure })}</td>
                                             <td>{inst.minDownPayment}%</td>
                                             <td>
                                                 <strong className="financing-monthly">LKR {instEmi.toLocaleString("en-LK")}</strong>
-                                                <p>for {actualTenure} months</p>
+                                                <p>{t("financing_page.for_months", { count: actualTenure })}</p>
                                             </td>
                                         </tr>
                                     );
@@ -739,7 +741,7 @@ function VehicleFinancingOptions() {
                         </table>
                     )}
                     <div className="financing-footnote">
-                        * Estimated monthly payment based on down payment ({downPaymentPercent}%) and tenure ({tenure} months), adjusted for institution limits.
+                        {t("financing_page.footnote", { percent: downPaymentPercent, count: tenure })}
                     </div>
                 </div>
             </section>
@@ -760,7 +762,7 @@ function VehicleFinancingOptions() {
                     className="financing-primary-button"
                 >
                     <Download className="h-[14px] w-[14px]" />
-                    {downloading ? "Generating Report..." : "Download Financing Report"}
+                    {downloading ? t("financing_page.generating_report") : t("financing_page.download_report")}
                 </button>
             </div>
         </div>

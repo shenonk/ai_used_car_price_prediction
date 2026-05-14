@@ -738,18 +738,18 @@ function Analytics() {
 
       <header className="analytics-hero animate-fade-in">
         <div>
-          <div className="analytics-eyebrow">ANALYTICS DASHBOARD</div>
-          <h1>Analytics Dashboard</h1>
-          <p>Track depreciation trends and prediction history</p>
+          <div className="analytics-eyebrow">{t("analytics_page.eyebrow")}</div>
+          <h1>{t("analytics_page.title")}</h1>
+          <p>{t("analytics_page.subtitle")}</p>
         </div>
         <div className="analytics-hero-actions">
           <button type="button" className="analytics-ghost-button">
             <Download className="h-[13px] w-[13px]" />
-            Export Data
+            {t("analytics_page.export_data", { defaultValue: "Export Data" })}
           </button>
           <Link to="/price-check" className="analytics-primary-button">
             <Plus className="h-[13px] w-[13px]" />
-            New Prediction
+            {t("dashboard_page.quick_actions.new_prediction_title")}
           </Link>
         </div>
       </header>
@@ -757,21 +757,21 @@ function Analytics() {
       <section className="analytics-summary-grid animate-fade-in">
         <article className="analytics-summary-card">
           <Cpu className="analytics-summary-icon analytics-summary-icon--blue" />
-          <span>Total Predictions</span>
+          <span>{t("analytics_page.total_predictions")}</span>
           <strong>{savedPredictions.length}</strong>
-          <p>{historySource === "supabase" ? "Synced from cloud" : "Local browser history"}</p>
+          <p>{historySource === "supabase" ? t("analytics_page.synced_cloud_history") : t("analytics_page.local_browser_history")}</p>
         </article>
         <article className="analytics-summary-card analytics-summary-card--blue">
           <TrendingUp className="analytics-summary-icon analytics-summary-icon--green" />
-          <span>Estimated Current Value</span>
+          <span>{t("analytics_page.estimated_current_value")}</span>
           <strong>LKR {CURRENCY_FORMATTER.format(displayCurrentValue)}</strong>
-          <p>Selected vehicle</p>
+          <p>{t("analytics_page.selected_vehicle")}</p>
         </article>
         <article className="analytics-summary-card">
           <Car className="analytics-summary-icon analytics-summary-icon--purple" />
-          <span>Selected Vehicle</span>
-          <strong className="analytics-summary-vehicle">{selectedPrediction ? buildVehicleLabel(selectedPrediction) : "No vehicle selected"}</strong>
-          <p>From prediction history</p>
+          <span>{t("analytics_page.selected_vehicle")}</span>
+          <strong className="analytics-summary-vehicle">{selectedPrediction ? buildVehicleLabel(selectedPrediction) : t("analytics_page.no_saved_predictions")}</strong>
+          <p>{t("analytics_page.from_prediction_history")}</p>
         </article>
       </section>
 
@@ -780,7 +780,7 @@ function Analytics() {
           <div>
             <div className="analytics-trend-title-row">
               <TrendingUp className="h-[14px] w-[14px]" />
-              <h2>Market Value Trend</h2>
+              <h2>{t("analytics_page.market_value_trend")}</h2>
               <span>{trendSourceMeta.label}</span>
             </div>
             <p>{trendSourceMeta.summary}</p>
@@ -802,21 +802,21 @@ function Analytics() {
             <div className="analytics-chart-shell">
               <div className="analytics-chart-legend">
                 <span />
-                <p>Vehicle Value (LKR)</p>
+                <p>{t("analytics_page.vehicle_value_label")}</p>
               </div>
               <Line data={data} options={options} />
             </div>
             <div className="analytics-trend-info-grid">
               <article>
-                <span>Selected Vehicle</span>
+                <span>{t("analytics_page.selected_vehicle")}</span>
                 <strong>{buildVehicleLabel(selectedPrediction)}</strong>
               </article>
               <article>
-                <span>Estimated Current Value</span>
+                <span>{t("analytics_page.estimated_current_value")}</span>
                 <strong className="analytics-info-blue">LKR {CURRENCY_FORMATTER.format(displayCurrentValue)}</strong>
               </article>
               <article>
-                <span>Depreciation Assumption</span>
+                <span>{t("analytics_page.depreciation_assumption")}</span>
                 <strong className="analytics-info-muted">
                   {chartSeries.source === "projection" ? depreciationAssumptionLabel : t("analytics_page.dataset_backed_market_values")}
                 </strong>
@@ -826,9 +826,9 @@ function Analytics() {
         ) : (
           <div className="analytics-empty-state">
             <BarChart2 className="h-8 w-8" />
-            <p>No predictions yet</p>
-            <span>Run a price check to save your first prediction</span>
-            <Link to="/price-check" className="analytics-ghost-button">Start Price Check →</Link>
+            <p>{t("analytics_page.no_predictions_yet_short")}</p>
+            <span>{t("analytics_page.run_prediction_hint")}</span>
+            <Link to="/price-check" className="analytics-ghost-button">{t("analytics_page.start_price_check")} →</Link>
           </div>
         )}
         <div className="analytics-dataset-banner">
@@ -845,13 +845,13 @@ function Analytics() {
           <div>
             <div className="analytics-history-title">
               <Clock className="h-[14px] w-[14px]" />
-              <h2>Prediction History</h2>
+              <h2>{t("analytics_page.prediction_history")}</h2>
             </div>
             <p>
               {isHistoryLoading
                 ? t("analytics_page.loading_saved_predictions")
                 : historySource === "supabase"
-                  ? "Showing your synced cloud history"
+                  ? t("analytics_page.synced_cloud_history")
                   : t("analytics_page.local_browser_history")}
             </p>
           </div>
@@ -883,13 +883,13 @@ function Analytics() {
             <table className="analytics-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Brand</th>
-                  <th>Model</th>
-                  <th>Year</th>
-                  <th>Predicted Price</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th>{t("analytics_page.date")}</th>
+                  <th>{t("analytics_page.brand")}</th>
+                  <th>{t("analytics_page.model")}</th>
+                  <th>{t("analytics_page.year")}</th>
+                  <th>{t("analytics_page.predicted_price")}</th>
+                  <th>{t("analytics_page.status")}</th>
+                  <th>{t("analytics_page.actions")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -903,7 +903,7 @@ function Analytics() {
                     <td>
                       <span className="analytics-status-badge">
                         <Check className="h-[11px] w-[11px]" />
-                        Completed
+                        {t("analytics_page.completed")}
                       </span>
                     </td>
                     <td>
@@ -914,7 +914,7 @@ function Analytics() {
                           className="analytics-view-button"
                         >
                           <Eye className="h-3 w-3" />
-                          View
+                          {t("analytics_page.view_all", { defaultValue: "View" })}
                         </button>
                         <button
                           type="button"
@@ -937,9 +937,9 @@ function Analytics() {
           ) : (
             <div className="analytics-empty-state analytics-empty-state--table">
               <BarChart2 className="h-8 w-8" />
-              <p>No predictions yet</p>
-              <span>Run a price check to save your first prediction</span>
-              <Link to="/price-check" className="analytics-ghost-button">Start Price Check →</Link>
+              <p>{t("analytics_page.no_predictions_yet_short")}</p>
+              <span>{t("analytics_page.run_prediction_hint")}</span>
+              <Link to="/price-check" className="analytics-ghost-button">{t("analytics_page.start_price_check")} →</Link>
             </div>
           )}
         </div>

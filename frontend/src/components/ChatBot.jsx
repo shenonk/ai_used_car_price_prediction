@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { getCurrentUser } from "../utils/auth";
 import { supabase } from "../utils/supabaseClient";
 
@@ -34,6 +35,7 @@ const getGreetingForPath = (pathname) => {
 };
 
 const ChatBot = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -287,8 +289,8 @@ const ChatBot = () => {
         <div className="chatbot-panel">
           <div className="chatbot-header">
             <div>
-              <p className="chatbot-eyebrow">Support Bot</p>
-              <h3>AutoValue Assistant</h3>
+              <p className="chatbot-eyebrow">{t("chatbot.eyebrow")}</p>
+              <h3>{t("chatbot.title")}</h3>
             </div>
             <button type="button" onClick={() => setIsOpen(false)} aria-label="Close support bot" className="chatbot-close">
               <X className="h-5 w-5" />
@@ -310,7 +312,7 @@ const ChatBot = () => {
             <div className="chatbot-quick-replies">
               {quickReplies.map((reply) => (
                 <button key={reply.id} type="button" onClick={() => handleQuickReply(reply.id)} className="chatbot-chip">
-                  {reply.label}
+                  {t(`chatbot.quick.${reply.id}`, { defaultValue: reply.label })}
                 </button>
               ))}
             </div>
@@ -318,10 +320,10 @@ const ChatBot = () => {
             {contactMode ? (
               <form onSubmit={submitContactTicket} className="chatbot-contact-form">
                 <div className="chatbot-contact-grid">
-                  <input type="text" name="name" value={contactDraft.name} onChange={handleContactChange} placeholder="Your name" className="chatbot-input" />
-                  <input type="email" name="email" value={contactDraft.email} onChange={handleContactChange} placeholder="Email" readOnly className="chatbot-input" />
+                  <input type="text" name="name" value={contactDraft.name} onChange={handleContactChange} placeholder={t("help_center_page.full_name")} className="chatbot-input" />
+                  <input type="email" name="email" value={contactDraft.email} onChange={handleContactChange} placeholder={t("help_center_page.email")} readOnly className="chatbot-input" />
                 </div>
-                <textarea name="message" value={contactDraft.message} onChange={handleContactChange} placeholder="Message to admin" rows={3} className="chatbot-input chatbot-textarea" />
+                <textarea name="message" value={contactDraft.message} onChange={handleContactChange} placeholder={t("help_center_page.message")} rows={3} className="chatbot-input chatbot-textarea" />
                 <div className="chatbot-contact-actions">
                   <button
                     type="button"
@@ -336,17 +338,17 @@ const ChatBot = () => {
                     }}
                     className="chatbot-secondary-button"
                   >
-                    Full form
+                    {t("chatbot.full_form", { defaultValue: "Full form" })}
                   </button>
                   <button type="submit" className="chatbot-primary-button" disabled={isSendingTicket}>
                     <Send className="h-3.5 w-3.5" />
-                    {isSendingTicket ? "Sending..." : "Send to Admin"}
+                    {isSendingTicket ? t("help_center_page.sending") : t("chatbot.send_to_admin", { defaultValue: "Send to Admin" })}
                   </button>
                 </div>
               </form>
             ) : (
               <form onSubmit={handleSubmit} className="chatbot-input-row">
-                <input type="text" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask about prices, ads, loans..." className="chatbot-input chatbot-input--message" />
+                <input type="text" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={t("chatbot.placeholder")} className="chatbot-input chatbot-input--message" />
                 <button type="submit" aria-label="Send message" className="chatbot-send" disabled={!draft.trim() || isAsking}>
                   <Send className="h-4 w-4" />
                 </button>

@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Activity,
   ArrowRight,
@@ -159,20 +160,59 @@ function useHomeObservers() {
 }
 
 function Home() {
+  const { t } = useTranslation();
   const homeRef = useHomeObservers();
+  const navLinks = [
+    { label: t("home"), path: "/" },
+    { label: t("price_check"), path: "/price-check" },
+    { label: t("marketplace_nav"), path: "/marketplace" },
+    { label: t("analytics"), path: "/analytics" },
+    { label: t("financing"), path: "/financing" },
+  ];
+  const stats = [
+    { target: 15000, suffix: "+", label: t("home_page.stats.predictions") },
+    { target: 98, suffix: "%", label: t("home_page.stats.accuracy") },
+    { target: 5000, suffix: "+", label: t("home_page.stats.users") },
+    { target: 2500, suffix: "+", label: t("home_page.stats.cars") },
+  ];
+  const features = [
+    { icon: Cpu, bg: "#0c2a4a", color: "#58a6ff", title: t("home_page.features.ai_title"), body: t("home_page.features.ai_body") },
+    { icon: SlidersHorizontal, bg: "#0c2a4a", color: "#58a6ff", title: t("home_page.features.input_title"), body: t("home_page.features.input_body") },
+    { icon: BarChart2, bg: "#052e16", color: "#3fb950", title: t("home_page.features.analytics_title"), body: t("home_page.features.analytics_body") },
+    { icon: ShoppingBag, bg: "#2d1b00", color: "#d29922", title: t("home_page.features.market_title"), body: t("home_page.features.market_body") },
+    { icon: Calculator, bg: "#1a0a28", color: "#a78bfa", title: t("home_page.features.loan_title"), body: t("home_page.features.loan_body") },
+    { icon: MessageCircle, bg: "#0c1929", color: "#58a6ff", title: t("home_page.features.chat_title"), body: t("home_page.features.chat_body") },
+  ];
+  const steps = [
+    { icon: Car, bg: "#0c2a4a", color: "#58a6ff", title: t("home_page.steps.details_title"), body: t("home_page.steps.details_body") },
+    { icon: Cpu, bg: "#052e16", color: "#3fb950", title: t("home_page.steps.predict_title"), body: t("home_page.steps.predict_body") },
+    { icon: TrendingUp, bg: "#2d1b00", color: "#d29922", title: t("home_page.steps.analytics_title"), body: t("home_page.steps.analytics_body") },
+    { icon: Zap, bg: "#1a0a28", color: "#a78bfa", title: t("home_page.steps.action_title"), body: t("home_page.steps.action_body") },
+  ];
+  const proofItems = [
+    t("home_page.proof.local_market"),
+    t("home_page.proof.ml_data"),
+    t("home_page.proof.marketplace"),
+    t("home_page.proof.financing"),
+  ];
+  const testimonials = [
+    { initials: "KP", name: "Kasun Perera", role: t("home_page.testimonials.dealer_role"), text: t("home_page.testimonials.dealer_text") },
+    { initials: "NS", name: "Nadeesha Silva", role: t("home_page.testimonials.buyer_role"), text: t("home_page.testimonials.buyer_text") },
+    { initials: "RF", name: "Ruwan Fernando", role: t("home_page.testimonials.manager_role"), text: t("home_page.testimonials.manager_text") },
+  ];
 
   return (
     <main ref={homeRef} className="home-ds home-page">
       <header className="home-ds-nav">
-        <Link to="/" className="home-ds-brand" aria-label="AutoValueLK home">
+        <Link to="/" className="home-ds-brand" aria-label={t("home_page.brand_aria")}>
           <span className="home-ds-logo"><img src={logo} alt="" /></span>
           <span>
             <strong>AutoValueLK</strong>
-            <small>Sri Lankan vehicle intelligence</small>
+            <small>{t("home_page.brand_subtitle")}</small>
           </span>
         </Link>
 
-        <nav className="home-ds-links" aria-label="Navigation">
+        <nav className="home-ds-links" aria-label={t("app.navigation")}>
           {navLinks.map((item) => (
             <Link key={item.path} to={item.path} className={item.path === "/" ? "is-active" : ""}>
               {item.label}
@@ -181,8 +221,8 @@ function Home() {
         </nav>
 
         <div className="home-ds-actions">
-          <Link to="/login" className="home-ds-btn home-ds-btn--ghost">Login</Link>
-          <Link to="/register" className="home-ds-btn home-ds-btn--primary">Sign Up</Link>
+          <Link to="/login" className="home-ds-btn home-ds-btn--ghost">{t("login")}</Link>
+          <Link to="/register" className="home-ds-btn home-ds-btn--primary">{t("signup")}</Link>
         </div>
       </header>
 
@@ -190,48 +230,45 @@ function Home() {
         <div className="home-ds-hero-copy">
           <div className="home-ds-eyebrow-pill">
             <Cpu />
-            #1 AI Vehicle Valuation Platform in Sri Lanka
+            {t("home_page.hero_badge")}
           </div>
           <h1>
-            <span>Know Your Car's</span>
-            <span className="home-ds-blue">True Value</span>
-            <span>Before You Trade</span>
+            <span>{t("home_page.hero_title_1")}</span>
+            <span className="home-ds-blue">{t("home_page.hero_title_2")}</span>
+            <span>{t("home_page.hero_title_3")}</span>
           </h1>
-          <p>
-            Powered by machine learning trained on thousands of Sri Lankan vehicle transactions.
-            Get instant, accurate price predictions and make confident decisions.
-          </p>
+          <p>{t("home_page.hero_subtitle")}</p>
           <div className="home-ds-hero-buttons">
             <Link to="/price-check" className="home-ds-large-btn home-ds-large-btn--primary">
-              Get Free Price Estimate <ArrowRight />
+              {t("home_page.get_estimate")} <ArrowRight />
             </Link>
             <Link to="/marketplace" className="home-ds-large-btn home-ds-large-btn--ghost">
-              <ShoppingBag /> Browse Marketplace
+              <ShoppingBag /> {t("home_page.browse_marketplace")}
             </Link>
           </div>
           <div className="home-ds-trust-pills">
-            <span><ShieldCheck style={{ color: "#3fb950" }} />ML-Powered Engine</span>
-            <span><Activity style={{ color: "#58a6ff" }} />Real-Time Analytics</span>
-            <span><CheckCircle style={{ color: "#a78bfa" }} />Verified Marketplace</span>
+            <span><ShieldCheck style={{ color: "#3fb950" }} />{t("home_page.trust.ml_engine")}</span>
+            <span><Activity style={{ color: "#58a6ff" }} />{t("home_page.trust.analytics")}</span>
+            <span><CheckCircle style={{ color: "#a78bfa" }} />{t("home_page.trust.verified")}</span>
           </div>
         </div>
 
         <aside className="home-ds-live-panel">
           <div className="home-ds-panel-head">
-            <span><Activity />Live Market Pulse</span>
-            <strong>LIVE</strong>
+            <span><Activity />{t("home_page.market_pulse")}</span>
+            <strong>{t("dashboard_page.live_badge", { defaultValue: "LIVE" })}</strong>
           </div>
           <div className="home-ds-stat-list">
-            <div><span><List />Active listings</span><strong>2,847</strong></div>
-            <div><span><TrendingUp />Avg price this week</span><strong style={{ color: "#58a6ff" }}>LKR 8.4M</strong></div>
-            <div><span><Zap />Most searched brand</span><strong style={{ color: "#3fb950" }}>Toyota</strong></div>
-            <div><span><Clock />Avg days to sell</span><strong style={{ color: "#d29922" }}>14 days</strong></div>
+            <div><span><List />{t("home_page.active_listings")}</span><strong>2,847</strong></div>
+            <div><span><TrendingUp />{t("home_page.avg_price_week")}</span><strong style={{ color: "#58a6ff" }}>LKR 8.4M</strong></div>
+            <div><span><Zap />{t("home_page.most_searched_brand")}</span><strong style={{ color: "#3fb950" }}>Toyota</strong></div>
+            <div><span><Clock />{t("home_page.avg_days_sell")}</span><strong style={{ color: "#d29922" }}>{t("home_page.days", { count: 14 })}</strong></div>
           </div>
 
           <div className="home-ds-panel-divider" />
 
           <div className="home-ds-estimate-card">
-            <span className="home-ds-mini-label">Sample estimate</span>
+            <span className="home-ds-mini-label">{t("home_page.sample_estimate")}</span>
             <div className="home-ds-estimate-row">
               <strong>Toyota Aqua 2019</strong>
               <b>LKR 7,200,000</b>
@@ -242,17 +279,17 @@ function Home() {
               <span>Colombo</span>
             </div>
             <div className="home-ds-confidence">
-              <div><span>Prediction confidence</span><strong>98%</strong></div>
+              <div><span>{t("home_page.prediction_confidence")}</span><strong>98%</strong></div>
               <i><em /></i>
             </div>
           </div>
 
-          <Link to="/price-check" className="home-ds-panel-cta">Try it free <ArrowRight /></Link>
+          <Link to="/price-check" className="home-ds-panel-cta">{t("home_page.try_free")} <ArrowRight /></Link>
         </aside>
       </section>
 
       <section className="home-ds-ticker-section">
-        <p>TRUSTED FOR VALUATIONS ACROSS MAJOR BRANDS</p>
+        <p>{t("home_page.trusted_brands")}</p>
         <div className="home-ds-ticker">
           <div className="home-ds-ticker-track">
             {[0, 1].map((group) => (
@@ -272,8 +309,8 @@ function Home() {
 
       <section className="home-ds-section home-ds-features">
         <div className="home-ds-section-head">
-          <span>PLATFORM FEATURES</span>
-          <h2>Everything you need for <b>smarter vehicle decisions</b></h2>
+          <span>{t("home_page.features_eyebrow")}</span>
+          <h2>{t("home_page.features_title")} <b>{t("home_page.features_title_highlight")}</b></h2>
         </div>
         <div className="home-ds-feature-grid">
           {features.map((feature) => {
@@ -292,15 +329,15 @@ function Home() {
       <section className="home-ds-steps-band">
         <div className="home-ds-steps-inner">
           <div className="home-ds-section-head home-ds-section-head--center">
-            <span>HOW IT WORKS</span>
-            <h2>Get your vehicle's value in <b>4 simple steps</b></h2>
+            <span>{t("home_page.how_it_works")}</span>
+            <h2>{t("home_page.steps_title")} <b>{t("home_page.steps_title_highlight")}</b></h2>
           </div>
           <div className="home-ds-steps-grid">
             {steps.map((step, index) => {
               const Icon = step.icon;
               return (
                 <article key={step.title} className="observe">
-                  <span className="home-ds-step-badge">Step {index + 1}</span>
+                  <span className="home-ds-step-badge">{t("home_page.step_badge", { count: index + 1 })}</span>
                   <IconBlock icon={Icon} bg={step.bg} color={step.color} className="home-ds-step-icon" />
                   <h3>{step.title}</h3>
                   <p>{step.body}</p>
@@ -313,26 +350,18 @@ function Home() {
 
       <section className="home-ds-about">
         <div>
-          <span className="home-ds-about-eyebrow">ABOUT AUTOVALUELK</span>
-          <h2>Built for the <b>Sri Lankan market</b></h2>
-          <p>
-            AutoValueLK is an AI-powered vehicle valuation platform designed specifically for Sri Lanka.
-            Our models are tuned around local market behavior, district-level demand, and real buyer activity.
-          </p>
+          <span className="home-ds-about-eyebrow">{t("home_page.about_eyebrow")}</span>
+          <h2>{t("home_page.about_title")} <b>{t("home_page.about_title_highlight")}</b></h2>
+          <p>{t("home_page.about_body")}</p>
           <div className="home-ds-proof-list">
-            {[
-              "Localized Sri Lankan automotive market focus",
-              "ML model trained on real transaction data",
-              "Integrated marketplace with admin moderation",
-              "Comprehensive financing and loan calculators",
-            ].map((item) => (
+            {proofItems.map((item) => (
               <div key={item} className="observe"><CheckCircle />{item}</div>
             ))}
           </div>
         </div>
 
         <aside className="home-ds-market-card observe">
-          <h3><MapPin />Sri Lankan Market Data</h3>
+          <h3><MapPin />{t("home_page.market_data")}</h3>
           <div className="home-ds-district-list">
             {districtActivity.map(([district, pct]) => (
               <div key={district}>
@@ -344,14 +373,14 @@ function Home() {
           <div className="home-ds-panel-divider" />
           <div className="home-ds-mini-stats">
             <div>
-              <span>Districts covered</span>
+              <span>{t("home_page.districts_covered")}</span>
               <strong>25</strong>
-              <small>All of Sri Lanka</small>
+              <small>{t("home_page.all_sri_lanka")}</small>
             </div>
             <div>
-              <span>Data points</span>
+              <span>{t("home_page.data_points")}</span>
               <strong style={{ color: "#3fb950" }}>10K+</strong>
-              <small>Real transactions</small>
+              <small>{t("home_page.real_transactions")}</small>
             </div>
           </div>
         </aside>
@@ -360,8 +389,8 @@ function Home() {
       <section className="home-ds-testimonials-band">
         <div className="home-ds-testimonials-inner">
           <div className="home-ds-section-head home-ds-section-head--center home-ds-section-head--amber">
-            <span>TESTIMONIALS</span>
-            <h2>Loved by <b>thousands</b> of users</h2>
+            <span>{t("home_page.testimonials_eyebrow")}</span>
+            <h2>{t("home_page.testimonials_title")} <b>{t("home_page.testimonials_title_highlight")}</b> {t("home_page.testimonials_title_suffix")}</h2>
           </div>
           <div className="home-ds-testimonial-grid">
             {testimonials.map((item) => (
@@ -386,13 +415,13 @@ function Home() {
       <section className="home-ds-cta-wrap">
         <div className="home-ds-cta observe">
           <div>
-            <span>READY TO GET STARTED?</span>
-            <h2>Discover your vehicle's <b>true market value</b> today.</h2>
-            <p>Join Sri Lankan users making smarter decisions with AI-powered vehicle intelligence.</p>
+            <span>{t("home_page.cta_eyebrow")}</span>
+            <h2>{t("home_page.cta_title")} <b>{t("home_page.cta_title_highlight")}</b> {t("home_page.cta_title_suffix")}</h2>
+            <p>{t("home_page.cta_body")}</p>
           </div>
           <div>
-            <Link to="/price-check" className="home-ds-large-btn home-ds-large-btn--primary"><Cpu />Check Vehicle Price <ArrowRight /></Link>
-            <Link to="/register" className="home-ds-large-btn home-ds-large-btn--ghost">Create Free Account <ArrowRight /></Link>
+            <Link to="/price-check" className="home-ds-large-btn home-ds-large-btn--primary"><Cpu />{t("home_page.check_vehicle_price")} <ArrowRight /></Link>
+            <Link to="/register" className="home-ds-large-btn home-ds-large-btn--ghost">{t("home_page.create_free_account")} <ArrowRight /></Link>
           </div>
         </div>
       </section>
@@ -401,30 +430,30 @@ function Home() {
         <div className="home-ds-footer-top">
           <div className="home-ds-footer-brand">
             <div><span className="home-ds-logo"><img src={logo} alt="" /></span><strong>AutoValueLK</strong></div>
-            <p>AI-powered vehicle price prediction, marketplace, analytics, and financing support for Sri Lanka.</p>
+            <p>{t("home_page.footer_body")}</p>
           </div>
           <div className="home-ds-footer-links">
             <div>
-              <h4>Product</h4>
-              <Link to="/price-check">Price Check</Link>
-              <Link to="/marketplace">Marketplace</Link>
-              <Link to="/analytics">Analytics</Link>
-              <Link to="/financing">Financing</Link>
+              <h4>{t("home_page.product")}</h4>
+              <Link to="/price-check">{t("price_check")}</Link>
+              <Link to="/marketplace">{t("marketplace_nav")}</Link>
+              <Link to="/analytics">{t("analytics")}</Link>
+              <Link to="/financing">{t("financing")}</Link>
             </div>
             <div>
-              <h4>Account</h4>
-              <Link to="/login">Login</Link>
-              <Link to="/register">Sign Up</Link>
-              <Link to="/help">Help Center</Link>
+              <h4>{t("home_page.account")}</h4>
+              <Link to="/login">{t("login")}</Link>
+              <Link to="/register">{t("signup")}</Link>
+              <Link to="/help">{t("help_center")}</Link>
             </div>
             <div>
-              <h4>Company</h4>
+              <h4>{t("home_page.company")}</h4>
             </div>
           </div>
         </div>
         <div className="home-ds-footer-bottom">
-          <span>© 2026 AutoValueLK. All rights reserved.</span>
-          <span>Built for Sri Lanka</span>
+          <span>{t("home_page.copyright")}</span>
+          <span>{t("home_page.built_for_sri_lanka")}</span>
         </div>
       </footer>
     </main>

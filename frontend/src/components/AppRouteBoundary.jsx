@@ -1,4 +1,5 @@
 import { Component } from "react";
+import i18n from "../i18n";
 
 class AppRouteBoundary extends Component {
   constructor(props) {
@@ -27,11 +28,11 @@ class AppRouteBoundary extends Component {
 
     return (
       <div className="app-route-error">
-        <span>PAGE ERROR</span>
-        <h1>Something went wrong loading this page</h1>
+        <span>{i18n.t("app.page_error")}</span>
+        <h1>{i18n.t("app.page_error_title")}</h1>
         <p>{this.state.error?.message || "The page failed to render. Please refresh and try again."}</p>
         <button type="button" className="btn-primary" onClick={() => window.location.reload()}>
-          Reload page
+          {i18n.t("app.reload_page", { defaultValue: "Reload page" })}
         </button>
       </div>
     );

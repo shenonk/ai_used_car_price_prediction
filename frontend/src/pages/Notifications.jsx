@@ -105,7 +105,7 @@ function Notifications() {
       {/* Page Header */}
       <header className="notifications-hero animate-fade-in">
         <div>
-          <div className="notifications-eyebrow">NOTIFICATIONS</div>
+          <div className="notifications-eyebrow">{t("notifications")}</div>
           <h1>{t("notifications_page.title")}</h1>
           <p>{t("notifications_page.subtitle")}</p>
         </div>
@@ -125,19 +125,19 @@ function Notifications() {
           <Inbox className="notifications-summary-icon notifications-summary-icon--blue" />
           <span>{t("notifications_page.total")}</span>
           <strong>{notifications.length}</strong>
-          <p>All system messages</p>
+          <p>{t("notifications_page.all_messages", { defaultValue: "All system messages" })}</p>
         </article>
         <article className="notifications-summary-card notifications-summary-card--blue">
           <BellRing className="notifications-summary-icon notifications-summary-icon--green" />
           <span>{t("notifications_page.unread")}</span>
           <strong>{unreadCount}</strong>
-          <p>Needs your attention</p>
+          <p>{t("notifications_page.needs_attention", { defaultValue: "Needs your attention" })}</p>
         </article>
         <article className="notifications-summary-card">
           <ShieldAlert className="notifications-summary-icon notifications-summary-icon--amber" />
           <span>{t("notifications_page.price_alerts")}</span>
           <strong>{alertCount}</strong>
-          <p>Pricing and market alerts</p>
+          <p>{t("notifications_page.pricing_alerts_subtitle", { defaultValue: "Pricing and market alerts" })}</p>
         </article>
       </section>
 
@@ -149,7 +149,7 @@ function Notifications() {
               <ClockIcon />
               <h2>{t("notifications_page.recent")}</h2>
             </div>
-            <p>Latest updates, price alerts, and system messages</p>
+            <p>{t("notifications_page.recent_subtitle", { defaultValue: "Latest updates, price alerts, and system messages" })}</p>
           </div>
           {notifications.some(n => n.unread) && (
             <button type="button" onClick={markAllRead} className="notifications-ghost-button">
@@ -167,7 +167,7 @@ function Notifications() {
             <div className="notifications-empty">
               <Bell className="h-8 w-8" />
               <p>{t("notifications_page.empty")}</p>
-              <span>You are all caught up.</span>
+              <span>{t("notifications_page.caught_up", { defaultValue: "You are all caught up." })}</span>
             </div>
         ) : (
             <div className="notifications-list">

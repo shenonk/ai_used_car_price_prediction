@@ -20,11 +20,11 @@ function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#0b1120]">
+    <div className="admin-layout">
       <button
         type="button"
         onClick={() => setIsMobileMenuOpen((open) => !open)}
-        className="fixed left-4 top-4 z-50 rounded-xl border border-gray-700 bg-gray-800/95 p-2 text-white shadow-lg shadow-black/20 backdrop-blur lg:hidden"
+        className="admin-mobile-toggle lg:hidden"
         aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
         aria-expanded={isMobileMenuOpen}
       >
@@ -41,8 +41,8 @@ function AdminLayout() {
           aria-hidden="true"
         />
       )}
-      <main className="min-h-screen w-full lg:ml-64 lg:w-[calc(100%-16rem)]">
-        <div className="w-full px-4 pb-6 pt-20 sm:pb-8 sm:pt-24 lg:px-8 lg:pt-8">
+      <main className="admin-main">
+        <div className="admin-main-inner">
           <Outlet />
         </div>
       </main>

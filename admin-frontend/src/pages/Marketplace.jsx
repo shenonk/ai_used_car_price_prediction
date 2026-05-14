@@ -19,6 +19,7 @@ import {
 import api from '../services/api';
 
 const statusTabs = ['all', 'pending', 'approved', 'rejected', 'sold'];
+const INITIAL_QUEUE_LIMIT = 10;
 
 const fallbackListings = [
   {
@@ -240,6 +241,7 @@ function Marketplace() {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [selectedImage, setSelectedImage] = useState('');
+  const [visibleCount, setVisibleCount] = useState(INITIAL_QUEUE_LIMIT);
 
   useEffect(() => {
     fetchListings();
@@ -269,29 +271,38 @@ function Marketplace() {
   const filteredListings = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return listings.filter((listing) => {
-      const matchesTab = activeTab === 'all' || listing.status === activeTab;
-      const haystack = [
-        listing.brand,
-        listing.model,
-        listing.seller_name,
-        listing.phone_number,
-        listing.vehicle_location,
-        listing.vehicle_description,
-        listing.year,
-        listing.fuel_type,
-        listing.transmission,
-        listing.condition,
-        listing.user_id,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
+    return listings
+      .filter((listing) => {
+        const matchesTab = activeTab === 'all' || listing.status === activeTab;
+        const haystack = [
+          listing.brand,
+          listing.model,
+          listing.seller_name,
+          listing.phone_number,
+          listing.vehicle_location,
+          listing.vehicle_description,
+          listing.year,
+          listing.fuel_type,
+          listing.transmission,
+          listing.condition,
+          listing.user_id,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
 
-      const matchesSearch = !query || haystack.includes(query);
-      return matchesTab && matchesSearch;
-    });
+        const matchesSearch = !query || haystack.includes(query);
+        return matchesTab && matchesSearch;
+      })
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
   }, [activeTab, listings, search]);
+
+  const visibleListings = useMemo(
+    () => filteredListings.slice(0, visibleCount),
+    [filteredListings, visibleCount]
+  );
+
+  const hiddenListingsCount = Math.max(filteredListings.length - visibleListings.length, 0);
 
   const selectedListing = useMemo(
     () => filteredListings.find((listing) => listing.id === selectedId) || filteredListings[0] || null,
@@ -309,6 +320,10 @@ function Marketplace() {
       setSelectedImage(getListingImages(selectedListing)[0] || '');
     }
   }, [selectedListing]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_QUEUE_LIMIT);
+  }, [activeTab, search]);
 
   const summary = useMemo(
     () => ({
@@ -383,10 +398,6 @@ function Marketplace() {
             <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white md:text-4xl">
               Review ads before they go live in the user marketplace
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 md:text-base">
-              Every new submission lands here first. Admin approval is the gate that decides what
-              shows up publicly for buyers.
-            </p>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -422,7 +433,8 @@ function Marketplace() {
               <div>
                 <h2 className="text-xl font-semibold text-white">Submission queue</h2>
                 <p className="mt-1 text-sm text-slate-400">
-                  Browse all ads, then approve the ones ready for the public marketplace.
+                  Showing the latest {Math.min(visibleListings.length, filteredListings.length)} of{' '}
+                  {filteredListings.length} ads. Use show more to review older submissions.
                 </p>
               </div>
 
@@ -467,7 +479,8 @@ function Marketplace() {
                 </p>
               </div>
             ) : (
-              filteredListings.map((listing) => (
+              <>
+                {visibleListings.map((listing) => (
                 <button
                   key={listing.id}
                   type="button"
@@ -516,7 +529,38 @@ function Marketplace() {
                     )}
                   </div>
                 </button>
-              ))
+                ))}
+
+                {(hiddenListingsCount > 0 || visibleCount > INITIAL_QUEUE_LIMIT) && (
+                  <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-slate-500">
+                      {hiddenListingsCount > 0
+                        ? `${hiddenListingsCount} older ad${hiddenListingsCount === 1 ? '' : 's'} hidden`
+                        : 'All matching ads are visible'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {visibleCount > INITIAL_QUEUE_LIMIT && (
+                        <button
+                          type="button"
+                          onClick={() => setVisibleCount(INITIAL_QUEUE_LIMIT)}
+                          className="rounded-full border border-slate-700/70 bg-slate-900/70 px-4 py-2 text-sm font-medium text-slate-400 transition hover:border-slate-500/80 hover:text-white"
+                        >
+                          Show latest 10
+                        </button>
+                      )}
+                      {hiddenListingsCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setVisibleCount((count) => count + INITIAL_QUEUE_LIMIT)}
+                          className="rounded-full border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-100 transition hover:bg-cyan-500/15"
+                        >
+                          Show 10 older ads
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

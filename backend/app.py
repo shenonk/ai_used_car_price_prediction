@@ -216,9 +216,12 @@ class MarketplaceDescriptionRequest(BaseModel):
 
 
 class AdminFinancingOptionUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    type: str | None = Field(default=None, min_length=1)
     status: str | None = Field(default=None, pattern="^(Active|Inactive)$")
     fixed_rate: float | None = Field(default=None, ge=0)
     floating_rate: float | None = Field(default=None, ge=0)
+    max_ltv: float | None = Field(default=None, ge=0)
 
 
 def normalize_input(data: dict[str, Any]) -> dict[str, Any]:

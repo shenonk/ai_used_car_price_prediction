@@ -282,41 +282,24 @@ const ChatBot = () => {
   };
 
   return (
-    <div className="fixed bottom-20 right-4 z-50 flex flex-col items-end gap-4 sm:bottom-6 sm:right-6">
+    <div className="chatbot-shell">
       {isOpen && (
-        <div
-          className="w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-blue-400/20 bg-[#0f2747]/75 shadow-[0_20px_60px_rgba(15,39,71,0.45)]"
-          style={{ backdropFilter: "blur(10px)" }}
-        >
-          <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4">
+        <div className="chatbot-panel">
+          <div className="chatbot-header">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-200/70">Support Bot</p>
-              <h3 className="mt-1 text-lg font-semibold text-white">AutoValue Assistant</h3>
+              <p className="chatbot-eyebrow">Support Bot</p>
+              <h3>AutoValue Assistant</h3>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsOpen(false)}
-              aria-label="Close support bot"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10 hover:text-white"
-            >
+            <button type="button" onClick={() => setIsOpen(false)} aria-label="Close support bot" className="chatbot-close">
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="space-y-4 px-5 py-5">
-            <div className="max-h-72 space-y-3 overflow-y-auto pr-1">
+          <div className="chatbot-content">
+            <div className="chatbot-messages">
               {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[90%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-inner ${
-                      message.role === "user"
-                        ? "rounded-br-md border border-cyan-300/10 bg-cyan-500/20 text-cyan-50 shadow-cyan-950/20"
-                        : "rounded-bl-md border border-blue-300/10 bg-[#102f57]/85 text-slate-100 shadow-blue-950/20"
-                    }`}
-                  >
+                <div key={message.id} className={`chatbot-message-wrap ${message.role === "user" ? "chatbot-message-wrap--user" : ""}`}>
+                  <div className={`chatbot-message ${message.role === "user" ? "chatbot-message--user" : "chatbot-message--assistant"} ${message.isPending ? "chatbot-message--pending" : ""}`}>
                     {message.content}
                   </div>
                 </div>
@@ -324,49 +307,22 @@ const ChatBot = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="chatbot-quick-replies">
               {quickReplies.map((reply) => (
-                <button
-                  key={reply.id}
-                  type="button"
-                  onClick={() => handleQuickReply(reply.id)}
-                  className="rounded-full border border-blue-300/15 bg-white/5 px-4 py-2 text-sm font-medium text-blue-50 transition hover:border-blue-300/35 hover:bg-blue-400/15"
-                >
+                <button key={reply.id} type="button" onClick={() => handleQuickReply(reply.id)} className="chatbot-chip">
                   {reply.label}
                 </button>
               ))}
             </div>
 
             {contactMode ? (
-              <form onSubmit={submitContactTicket} className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <input
-                    type="text"
-                    name="name"
-                    value={contactDraft.name}
-                    onChange={handleContactChange}
-                    placeholder="Your name"
-                    className="min-w-0 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-blue-300/45"
-                  />
-                  <input
-                    type="email"
-                    name="email"
-                    value={contactDraft.email}
-                    onChange={handleContactChange}
-                    placeholder="Email"
-                    readOnly
-                    className="min-w-0 rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-blue-300/45"
-                  />
+              <form onSubmit={submitContactTicket} className="chatbot-contact-form">
+                <div className="chatbot-contact-grid">
+                  <input type="text" name="name" value={contactDraft.name} onChange={handleContactChange} placeholder="Your name" className="chatbot-input" />
+                  <input type="email" name="email" value={contactDraft.email} onChange={handleContactChange} placeholder="Email" readOnly className="chatbot-input" />
                 </div>
-                <textarea
-                  name="message"
-                  value={contactDraft.message}
-                  onChange={handleContactChange}
-                  placeholder="Message to admin"
-                  rows={3}
-                  className="w-full resize-none rounded-xl border border-white/10 bg-slate-950/30 px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-blue-300/45"
-                />
-                <div className="flex items-center justify-between gap-2">
+                <textarea name="message" value={contactDraft.message} onChange={handleContactChange} placeholder="Message to admin" rows={3} className="chatbot-input chatbot-textarea" />
+                <div className="chatbot-contact-actions">
                   <button
                     type="button"
                     onClick={() => {
@@ -378,35 +334,20 @@ const ChatBot = () => {
                       navigate("/help");
                       scrollToContactForm();
                     }}
-                    className="rounded-full border border-white/10 px-3 py-2 text-xs font-medium text-slate-200 transition hover:bg-white/10"
+                    className="chatbot-secondary-button"
                   >
                     Full form
                   </button>
-                  <button
-                    type="submit"
-                    className="inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-blue-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={isSendingTicket}
-                  >
+                  <button type="submit" className="chatbot-primary-button" disabled={isSendingTicket}>
                     <Send className="h-3.5 w-3.5" />
                     {isSendingTicket ? "Sending..." : "Send to Admin"}
                   </button>
                 </div>
               </form>
             ) : (
-              <form onSubmit={handleSubmit} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Ask about prices, ads, loans..."
-                  className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-400 focus:border-blue-300/45 focus:bg-white/10"
-                />
-                <button
-                  type="submit"
-                  aria-label="Send message"
-                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-blue-300/20 bg-blue-500 text-white transition hover:bg-blue-400 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={!draft.trim() || isAsking}
-                >
+              <form onSubmit={handleSubmit} className="chatbot-input-row">
+                <input type="text" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Ask about prices, ads, loans..." className="chatbot-input chatbot-input--message" />
+                <button type="submit" aria-label="Send message" className="chatbot-send" disabled={!draft.trim() || isAsking}>
                   <Send className="h-4 w-4" />
                 </button>
               </form>
@@ -415,18 +356,9 @@ const ChatBot = () => {
         </div>
       )}
 
-      <div className="relative">
-        <span className="pointer-events-none absolute inset-0 rounded-full bg-cyan-300/20 blur-xl animate-ping"></span>
-        <button
-          type="button"
-          onClick={() => setIsOpen((prev) => !prev)}
-          aria-label={isOpen ? "Hide support bot" : "Open support bot"}
-          className="relative inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border border-white/30 bg-white/10 text-white shadow-[0_18px_45px_rgba(37,99,235,0.35),inset_0_1px_0_rgba(255,255,255,0.45)] transition duration-300 hover:scale-105 hover:border-cyan-200/60 hover:bg-white/15 hover:shadow-[0_22px_55px_rgba(34,211,238,0.28),inset_0_1px_0_rgba(255,255,255,0.55)]"
-          style={{ backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" }}
-        >
-          <span className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/35 via-cyan-300/18 to-blue-600/30"></span>
-          <span className="pointer-events-none absolute left-3 top-2 h-5 w-7 rounded-full bg-white/35 blur-sm"></span>
-          <MessageCircle className="relative h-7 w-7 drop-shadow-[0_2px_8px_rgba(15,23,42,0.35)]" />
+      <div className="chatbot-launcher-wrap">
+        <button type="button" onClick={() => setIsOpen((prev) => !prev)} aria-label={isOpen ? "Hide support bot" : "Open support bot"} className="chatbot-launcher">
+          <MessageCircle className="relative h-7 w-7" />
         </button>
       </div>
     </div>

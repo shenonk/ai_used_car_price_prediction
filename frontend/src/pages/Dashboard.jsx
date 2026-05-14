@@ -49,6 +49,42 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler, Tooltip)
 
+const SRI_LANKA_DISTRICT_CITIES = [
+  ["Colombo", ["Colombo", "Dehiwala-Mount Lavinia", "Moratuwa", "Sri Jayawardenepura Kotte", "Malabe", "Maharagama", "Nugegoda", "Padukka", "Avissawella"]],
+  ["Gampaha", ["Gampaha", "Negombo", "Kelaniya", "Wattala", "Ja-Ela", "Minuwangoda", "Kadawatha", "Ragama", "Kiribathgoda", "Katunayaka", "Katunayake", "Seeduwa"]],
+  ["Kalutara", ["Kalutara", "Panadura", "Horana", "Beruwala", "Alutgama", "Matugama", "Bandaragama"]],
+  ["Kandy", ["Kandy", "Gampola", "Nawalapitiya", "Peradeniya", "Akurana", "Kadugannawa", "Kundasale"]],
+  ["Matale", ["Matale", "Dambulla", "Sigiriya", "Pallepola", "Galewela", "Rattota"]],
+  ["Nuwara Eliya", ["Nuwara Eliya", "Hatton", "Talawakele", "Lindula", "Ginigathena", "Walapane"]],
+  ["Galle", ["Galle", "Hikkaduwa", "Ambalangoda", "Baddegama", "Bentota", "Karapitiya", "Elpitiya"]],
+  ["Matara", ["Matara", "Weligama", "Akuressa", "Deniyaya", "Dikwella", "Kekanadurra"]],
+  ["Hambantota", ["Hambantota", "Tangalle", "Beliatta", "Ambalantota", "Tissamaharama"]],
+  ["Jaffna", ["Jaffna", "Chavakachcheri", "Point Pedro", "Valvettithurai", "Nallur"]],
+  ["Kilinochchi", ["Kilinochchi", "Pallai", "Pooneryn"]],
+  ["Mannar", ["Mannar", "Nanattan", "Madhu"]],
+  ["Vavuniya", ["Vavuniya", "Cheddikulam", "Nedunkeni"]],
+  ["Mullaitivu", ["Mullaitivu", "Puthukkudiyiruppu", "Oddusuddan"]],
+  ["Trincomalee", ["Trincomalee", "Kinniya", "Muttur", "Kantale"]],
+  ["Batticaloa", ["Batticaloa", "Kattankudy", "Eravur", "Valaichchenai"]],
+  ["Ampara", ["Ampara", "Akkaraipattu", "Kalmunai", "Sainthamaruthu", "Pottuvil"]],
+  ["Kurunegala", ["Kurunegala", "Kuliyapitiya", "Narammala", "Polgahawela", "Wariyapola", "Pannala", "Giriulla"]],
+  ["Puttalam", ["Puttalam", "Chilaw", "Wennappuwa", "Marawila", "Dankotuwa", "Anamaduwa"]],
+  ["Anuradhapura", ["Anuradhapura", "Kekirawa", "Tambuttegama", "Medawachchiya", "Mihintale"]],
+  ["Polonnaruwa", ["Polonnaruwa", "Kaduruwela", "Medirigiriya", "Hingurakgoda"]],
+  ["Badulla", ["Badulla", "Bandarawela", "Haputale", "Welimada", "Mahiyanganaya", "Diyatalawa"]],
+  ["Moneragala", ["Moneragala", "Wellawaya", "Buttala", "Kataragama", "Bibile"]],
+  ["Ratnapura", ["Ratnapura", "Balangoda", "Pelmadulla", "Embilipitiya", "Kuruwita"]],
+  ["Kegalle", ["Kegalle", "Mawanella", "Warakapola", "Rambukkana", "Ruwanwella"]],
+]
+
+const SRI_LANKA_DISTRICT_NAMES = new Set(SRI_LANKA_DISTRICT_CITIES.map(([district]) => district.toLowerCase()))
+const SRI_LANKA_CITY_TO_DISTRICT = SRI_LANKA_DISTRICT_CITIES.reduce((acc, [district, cities]) => {
+  cities.forEach((city) => {
+    acc[city.toLowerCase()] = district
+  })
+  return acc
+}, {})
+
 function formatCurrency(value) {
   return `LKR ${Math.round(Number(value || 0)).toLocaleString("en-LK")}`
 }
@@ -81,6 +117,10 @@ function formatRelativeDate(value) {
   if (diffDays < 30) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`
 
   return new Date(value).toLocaleDateString("en-LK")
+}
+
+function formatListingName(listing) {
+  return `${listing.brand || "Vehicle"} ${listing.model || ""}`.trim()
 }
 
 function toTimestamp(value) {
@@ -134,11 +174,130 @@ function normalizeMarketplaceListing(row) {
     model: row.model,
     price: Number(row.price || 0),
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
     status: row.status,
+    vehicleLocation: row.vehicle_location || "",
     isSpotlight: Boolean(row.is_spotlight),
     isUrgent: Boolean(row.is_urgent),
     isBumped: Boolean(row.is_bumped),
   }
+}
+
+function extractDistrictFromLocation(value) {
+  const location = String(value || "").trim()
+  if (!location) return ""
+  if (/not\s+(provided|listed)|unknown/i.test(location)) return ""
+
+  const parts = location
+    .split(",")
+    .map((part) => part.replace(/\s+district$/i, "").trim())
+    .filter(Boolean)
+
+  for (const part of parts) {
+    const key = part.toLowerCase()
+    if (SRI_LANKA_DISTRICT_NAMES.has(key)) {
+      return SRI_LANKA_DISTRICT_CITIES.find(([district]) => district.toLowerCase() === key)?.[0] || part
+    }
+  }
+
+  for (const part of parts) {
+    const district = SRI_LANKA_CITY_TO_DISTRICT[part.toLowerCase()]
+    if (district) return district
+  }
+
+  return ""
+}
+
+function buildDistrictDistribution(listings) {
+  const counts = listings.reduce((acc, listing) => {
+    const district = extractDistrictFromLocation(listing.vehicleLocation)
+    if (!district) return acc
+
+    acc[district] = (acc[district] || 0) + 1
+    return acc
+  }, {})
+
+  const sortedCounts = Object.entries(counts).sort((a, b) => b[1] - a[1])
+  const total = sortedCounts.reduce((sum, [, count]) => sum + count, 0)
+  if (!total) return []
+
+  return sortedCounts.map(([label, count]) => ({
+    label,
+    count,
+    percent: Math.round((count / total) * 100),
+  }))
+}
+
+function alertMatchesListing(alert, listing) {
+  const alertVehicle = alert?.vehicle || {}
+  const alertBrand = String(alertVehicle.brand || "").trim().toUpperCase()
+  const alertModel = String(alertVehicle.model || "").trim().toUpperCase()
+  const listingBrand = String(listing.brand || "").trim().toUpperCase()
+  const listingModel = String(listing.model || "").trim().toUpperCase()
+
+  if (!alertBrand || alertBrand !== listingBrand) return false
+  return !alertModel || !listingModel || listingModel.includes(alertModel) || alertModel.includes(listingModel)
+}
+
+function buildLivePriceAlerts(userAlerts, listings) {
+  const trackedAlerts = userAlerts.filter((alert) => alert?.tracked !== false && alert?.vehicle)
+  if (!trackedAlerts.length) return []
+
+  const now = Date.now()
+  const recentWindow = now - 7 * 24 * 60 * 60 * 1000
+  const activeListings = listings.filter((listing) => listing.status === "approved")
+  const soldListings = listings.filter((listing) => listing.status === "sold")
+  const liveAlerts = []
+
+  trackedAlerts.forEach((alert) => {
+    const targetPrice = Number(alert.price || 0)
+    const matchingListings = activeListings.filter((listing) => alertMatchesListing(alert, listing))
+    const cheaperListing = matchingListings
+      .filter((listing) => targetPrice > 0 && listing.price > 0 && listing.price <= targetPrice * 0.95)
+      .sort((a, b) => a.price - b.price)[0]
+
+    if (cheaperListing) {
+      const discount = Math.round(((targetPrice - cheaperListing.price) / targetPrice) * 100)
+      liveAlerts.push({
+        type: "amber",
+        text: `${formatListingName(cheaperListing)} is ${discount}% below your saved estimate`,
+        time: formatRelativeDate(cheaperListing.updatedAt || cheaperListing.createdAt),
+        timestamp: toTimestamp(cheaperListing.updatedAt || cheaperListing.createdAt),
+      })
+    }
+
+    const recentMatch = matchingListings
+      .filter((listing) => toTimestamp(listing.createdAt) >= recentWindow)
+      .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt))[0]
+
+    if (recentMatch) {
+      liveAlerts.push({
+        type: "blue",
+        text: `New ${formatListingName(recentMatch)} listing matched your alert`,
+        time: formatRelativeDate(recentMatch.createdAt),
+        timestamp: toTimestamp(recentMatch.createdAt),
+      })
+    }
+
+    const soldMatch = soldListings
+      .filter((listing) => alertMatchesListing(alert, listing))
+      .sort((a, b) => toTimestamp(b.updatedAt || b.createdAt) - toTimestamp(a.updatedAt || a.createdAt))[0]
+
+    if (soldMatch) {
+      liveAlerts.push({
+        type: "green",
+        text: `${formatListingName(soldMatch)} was marked sold in the marketplace`,
+        time: formatRelativeDate(soldMatch.updatedAt || soldMatch.createdAt),
+        timestamp: toTimestamp(soldMatch.updatedAt || soldMatch.createdAt),
+      })
+    }
+  })
+
+  const uniqueAlerts = Array.from(
+    new Map(liveAlerts.map((alert) => [`${alert.type}-${alert.text}`, alert])).values()
+  )
+
+  return uniqueAlerts.sort((a, b) => b.timestamp - a.timestamp).slice(0, 3)
 }
 
 function normalizeLocalPrediction(row) {
@@ -164,6 +323,25 @@ function buildNotificationTimeLabel(value) {
   })
 }
 
+async function loadPlatformBrandActivity() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/dashboard/brand-activity?limit=8`)
+    if (!response.ok) return []
+
+    const payload = await response.json()
+    const topBrands = Array.isArray(payload?.top_brands) ? payload.top_brands : []
+    return topBrands
+      .map((item) => ({
+        label: String(item.label || "").trim(),
+        count: Number(item.count || 0),
+      }))
+      .filter((item) => item.label && item.count > 0)
+  } catch (error) {
+    console.error("Unable to load platform brand activity", error)
+    return []
+  }
+}
+
 function Dashboard() {
   const navigate = useNavigate()
   const { t } = useTranslation()
@@ -173,6 +351,8 @@ function Dashboard() {
     user: null,
     predictions: [],
     listings: [],
+    platformBrandActivity: [],
+    userAlerts: [],
     alertsCount: 0,
     source: "local",
   })
@@ -180,60 +360,94 @@ function Dashboard() {
   useEffect(() => {
     let isActive = true
 
-    const loadDashboard = async () => {
-      setIsLoading(true)
+    const loadDashboard = async ({ showLoading = true } = {}) => {
+      if (showLoading) {
+        setIsLoading(true)
+      }
 
-      const user = await getCurrentUser()
-      const alerts = loadUserAlerts(user || { email: "guest@example.com", username: "Guest" })
-      let predictions = []
-      let listings = []
-      let source = "local"
+      try {
+        const user = await getCurrentUser()
+        const alerts = loadUserAlerts(user || { email: "guest@example.com", username: "Guest" })
+        let predictions = []
+        let listings = []
+        let platformBrandActivity = []
+        let source = "local"
 
-      if (user?.id) {
-        const { data, error } = await supabase
-          .from("predictions")
-          .select("id, brand, model, year, predicted_price_lkr, created_at")
-          .eq("user_id", user.id)
+        if (user?.id) {
+          const { data, error } = await supabase
+            .from("predictions")
+            .select("id, brand, model, year, predicted_price_lkr, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(12)
+
+          if (!error && Array.isArray(data)) {
+            predictions = data.map(normalizeCloudPrediction)
+            source = "supabase"
+          }
+        }
+
+        if (!user && predictions.length === 0) {
+          predictions = loadPredictionHistory().map(normalizeLocalPrediction).slice(0, 12)
+          source = "local"
+        }
+
+        const { data: marketplaceData } = await supabase
+          .from("marketplace_listings")
+          .select("id, brand, model, price, created_at, updated_at, status, vehicle_location, is_spotlight, is_urgent, is_bumped")
+          .in("status", ["approved", "sold"])
           .order("created_at", { ascending: false })
-          .limit(12)
 
-        if (!error && Array.isArray(data)) {
-          predictions = data.map(normalizeCloudPrediction)
-          source = "supabase"
+        if (Array.isArray(marketplaceData)) {
+          listings = marketplaceData.map(normalizeMarketplaceListing)
+        }
+
+        platformBrandActivity = await loadPlatformBrandActivity()
+
+        if (!isActive) return
+
+        setDashboardData({
+          user,
+          predictions,
+          listings,
+          platformBrandActivity,
+          userAlerts: alerts,
+          alertsCount: alerts.length,
+          source,
+        })
+      } catch (error) {
+        console.error("Unable to load dashboard data", error)
+      } finally {
+        if (isActive) {
+          setIsLoading(false)
         }
       }
-
-      if (!user && predictions.length === 0) {
-        predictions = loadPredictionHistory().map(normalizeLocalPrediction).slice(0, 12)
-        source = "local"
-      }
-
-      const { data: marketplaceData } = await supabase
-        .from("marketplace_listings")
-        .select("id, brand, model, price, created_at, status, is_spotlight, is_urgent, is_bumped")
-        .eq("status", "approved")
-        .order("created_at", { ascending: false })
-        .limit(24)
-
-      if (Array.isArray(marketplaceData)) {
-        listings = marketplaceData.map(normalizeMarketplaceListing)
-      }
-
-      if (!isActive) return
-
-      setDashboardData({
-        user,
-        predictions,
-        listings,
-        alertsCount: alerts.length,
-        source,
-      })
-      setIsLoading(false)
     }
 
     loadDashboard()
+    const liveRefreshTimer = window.setInterval(() => {
+      loadDashboard({ showLoading: false })
+    }, 15000)
+
+    let realtimeChannel = null
+    if (typeof supabase.channel === "function") {
+      realtimeChannel = supabase
+        .channel("dashboard-live-data")
+        .on("postgres_changes", { event: "*", schema: "public", table: "marketplace_listings" }, () => {
+          loadDashboard({ showLoading: false })
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "predictions" }, () => {
+          loadDashboard({ showLoading: false })
+        })
+        .subscribe()
+    }
+
     return () => {
       isActive = false
+      window.clearInterval(liveRefreshTimer)
+      if (realtimeChannel && typeof supabase.removeChannel === "function") {
+        supabase.removeChannel(realtimeChannel)
+      }
     }
   }, [])
 
@@ -545,6 +759,7 @@ function Dashboard() {
     const months = getLastSixMonths()
     const predictions = dashboardData.predictions
     const listings = dashboardData.listings
+    const activeListings = listings.filter((listing) => listing.status === "approved")
     const latestPrediction = predictions[0] || null
     const previousAverage = average(predictions.slice(4, 8).map((item) => item.predictedPrice))
     const currentAverage = average(predictions.slice(0, 4).map((item) => item.predictedPrice))
@@ -569,46 +784,28 @@ function Dashboard() {
       return average(monthValues) || fallbackBase * (0.9 + index * 0.025)
     })
 
-    const marketBase = average(listings.map((item) => item.price)) || average(userTrend) || 4_800_000
+    const marketBase = average(activeListings.map((item) => item.price)) || average(userTrend) || 4_800_000
     const marketTrend = months.map((month, index) => {
-      const monthValues = listings
+      const monthValues = activeListings
         .filter((item) => getMonthKey(item.createdAt) === month.key)
         .map((item) => item.price)
       return average(monthValues) || marketBase * (0.94 + index * 0.018)
     })
 
-    const brandCounts = predictions.reduce((acc, item) => {
-      const brand = String(item.brand || "").trim() || "Unknown"
-      acc[brand] = (acc[brand] || 0) + 1
-      return acc
-    }, {})
-    const topBrands = Object.entries(brandCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 6)
-      .map(([brand, count]) => ({ label: brand, count }))
-    if (topBrands.length === 0) {
-      ;["Toyota", "Honda", "Suzuki", "Nissan"].forEach((brand, index) => {
-        topBrands.push({ label: brand, count: Math.max(1, 4 - index) })
-      })
-    }
+    const topBrands = dashboardData.platformBrandActivity
 
     const startOfToday = new Date()
     startOfToday.setHours(0, 0, 0, 0)
     const todayTimestamp = startOfToday.getTime()
     const weekTimestamp = Date.now() - 7 * 24 * 60 * 60 * 1000
     const predictionsToday = predictions.filter((item) => toTimestamp(item.predictedAt) >= todayTimestamp).length
-    const listingsToday = listings.filter((item) => toTimestamp(item.createdAt) >= todayTimestamp).length
-    const priceDrops = listings.filter((item) => toTimestamp(item.createdAt) >= weekTimestamp && item.price < marketBase).length
-    const totalAdViews = listings.reduce((sum, item) => sum + Number(item.view_count || item.views || 0), 0)
+    const listingsToday = activeListings.filter((item) => toTimestamp(item.createdAt) >= todayTimestamp).length
+    const priceDrops = activeListings.filter((item) => toTimestamp(item.createdAt) >= weekTimestamp && item.price < marketBase).length
+    const totalAdViews = activeListings.reduce((sum, item) => sum + Number(item.view_count || item.views || 0), 0)
 
-    const districtPercentages = [
-      ["Colombo", 34],
-      ["Gampaha", 22],
-      ["Kandy", 15],
-      ["Kalutara", 11],
-      ["Galle", 8],
-      ["Other", 10],
-    ]
+    const districtDistribution = buildDistrictDistribution(activeListings)
+    const mostActiveDistrict = districtDistribution[0]?.label || "No listings"
+    const liveAlerts = buildLivePriceAlerts(dashboardData.userAlerts, listings)
 
     const recentVehicle = latestPrediction || {
       brand: "Vehicle",
@@ -629,22 +826,18 @@ function Dashboard() {
       marketTrend,
       topBrands,
       pulse: [
-        { label: "Listings today", value: listingsToday || listings.length, color: "#3fb950" },
+        { label: "Listings today", value: listingsToday || activeListings.length, color: "#3fb950" },
         { label: "Predictions today", value: predictionsToday || predictions.length, color: "#58a6ff" },
         { label: "Avg days to sell", value: "18 days", color: "#d29922" },
-        { label: "Most active city", value: "Colombo", color: "#a371f7" },
+        { label: "Most active district", value: mostActiveDistrict, color: "#a371f7" },
         { label: "Price drops this week", value: priceDrops, color: "#f85149" },
       ],
-      districts: districtPercentages.map(([label, percent]) => ({ label, percent })),
-      alerts: [
-        { type: "amber", text: "Price drop detected on similar hybrid listings", time: "12 min ago" },
-        { type: "blue", text: "New listing matched your recent search profile", time: "34 min ago" },
-        { type: "green", text: "A listed vehicle was marked sold in the marketplace", time: "2 hr ago" },
-      ],
+      districts: districtDistribution,
+      alerts: liveAlerts,
       depreciationLabels: ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"],
       depreciationValues,
     }
-  }, [dashboardData.listings, dashboardData.predictions])
+  }, [dashboardData.listings, dashboardData.platformBrandActivity, dashboardData.predictions, dashboardData.userAlerts])
 
   const chartOptions = useMemo(
     () => ({
@@ -749,7 +942,7 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d1117] p-5 text-[#f0f6fc] md:p-8">
+    <div className="page-dashboard dashboard-page min-h-screen bg-[#0d1117] p-5 text-[#f0f6fc] md:p-8">
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Saved Predictions" value={summary.totalPredictions} subLabel={dashboardData.source === "supabase" ? "Cloud history" : "Local history"} icon={<Bookmark className="h-4 w-4" />} />
         <MetricCard label="Avg Estimate" value={summary.totalPredictions > 0 ? formatCompactCurrency(summary.averagePrice) : "LKR 0"} subLabel="Recent saved valuations" trend={dashboardView.avgChange} icon={<Coins className="h-4 w-4" />} />
@@ -764,7 +957,7 @@ function Dashboard() {
           </div>
         </Panel>
 
-        <Panel icon={<TrendingUp className="h-4 w-4" />} title="Top Searched Brands" subtitle="Based on your saved predictions">
+        <Panel icon={<TrendingUp className="h-4 w-4" />} title="Top Searched Brands" subtitle="Live platform-wide prediction searches">
           <HorizontalList items={dashboardView.topBrands} colors={["#58a6ff", "#a371f7", "#39c5cf", "#3fb950", "#d29922", "#f85149"]} />
         </Panel>
       </section>
@@ -795,15 +988,22 @@ function Dashboard() {
 
         <Panel icon={<AlertCircle className="h-4 w-4" />} title="Price Alerts" subtitle="Recent alert activity">
           <div className="space-y-3">
-            {dashboardView.alerts.map((alert) => (
-              <div
-                key={`${alert.type}-${alert.text}`}
-                className={`border-l-2 bg-[#0d1117] px-3 py-2 ${alert.type === "amber" ? "border-[#d29922]" : alert.type === "blue" ? "border-[#58a6ff]" : "border-[#3fb950]"}`}
-              >
-                <p className="text-xs font-medium text-[#c9d1d9]">{alert.text}</p>
-                <p className="mt-1 text-[10px] text-[#7d8590]">{alert.time}</p>
+            {dashboardView.alerts.length > 0 ? (
+              dashboardView.alerts.map((alert) => (
+                <div
+                  key={`${alert.type}-${alert.text}`}
+                  className={`border-l-2 bg-[#0d1117] px-3 py-2 ${alert.type === "amber" ? "border-[#d29922]" : alert.type === "blue" ? "border-[#58a6ff]" : "border-[#3fb950]"}`}
+                >
+                  <p className="text-xs font-medium text-[#c9d1d9]">{alert.text}</p>
+                  <p className="mt-1 text-[10px] text-[#7d8590]">{alert.time}</p>
+                </div>
+              ))
+            ) : (
+              <div className="rounded-lg border border-dashed border-[#21262d] bg-[#0d1117] px-4 py-8 text-center">
+                <p className="text-xs font-medium text-[#7d8590]">No live price alerts yet</p>
+                <p className="mt-1 text-[11px] text-[#484f58]">Save a prediction to Analytics to track matching listings.</p>
               </div>
-            ))}
+            )}
           </div>
         </Panel>
       </section>
@@ -814,7 +1014,7 @@ function Dashboard() {
           title="Recent Predictions"
           subtitle="Latest saved vehicle valuations"
           action={
-            <button type="button" onClick={() => navigate("/analytics")} className="text-[10px] font-medium text-[#58a6ff]">
+            <button type="button" onClick={() => navigate("/analytics")} className="btn-ghost btn-compact">
               View all
             </button>
           }
@@ -824,7 +1024,7 @@ function Dashboard() {
               <p className="py-8 text-center text-xs text-[#7d8590]">Loading dashboard...</p>
             ) : recentPredictions.length > 0 ? (
               recentPredictions.map((item, index) => (
-                <button key={item.id} type="button" onClick={() => navigate("/analytics")} className="flex w-full items-center gap-3 rounded-md border border-[#21262d] bg-[#0d1117] px-3 py-3 text-left">
+                <button key={item.id} type="button" onClick={() => navigate("/analytics")} className="panel panel-interactive flex w-full items-center gap-3 px-3 py-3 text-left">
                   <span className="flex h-9 w-9 items-center justify-center rounded-md" style={{ backgroundColor: ["#1f6feb", "#8957e5", "#0891b2", "#238636"][index % 4] }}>
                     <CarFront className="h-4 w-4 text-white" />
                   </span>
@@ -859,7 +1059,7 @@ function Dashboard() {
 
 function Panel({ icon, title, subtitle, action, children }) {
   return (
-    <section className="rounded-[10px] border border-[#21262d] bg-[#161b22] p-[14px]">
+    <section className="dashboard-page-panel panel">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-[13px] font-medium text-[#f0f6fc]">
@@ -878,7 +1078,7 @@ function Panel({ icon, title, subtitle, action, children }) {
 function MetricCard({ label, value, subLabel, trend, icon, accent = "#58a6ff" }) {
   const isNegative = Number(trend) < 0
   return (
-    <section className="rounded-[10px] border border-[#21262d] bg-[#161b22] p-[14px]">
+    <section className="dashboard-page-panel metric-card blue">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-[10px] font-medium uppercase tracking-[0.08em] text-[#7d8590]">{label}</p>
@@ -900,6 +1100,11 @@ function MetricCard({ label, value, subLabel, trend, icon, accent = "#58a6ff" })
 
 function HorizontalList({ items, colors }) {
   const max = Math.max(...items.map((item) => item.count), 1)
+  const total = items.reduce((sum, item) => sum + Number(item.count || 0), 0)
+  if (!items.length) {
+    return <p className="py-8 text-center text-xs text-[#7d8590]">No platform search activity yet.</p>
+  }
+
   return (
     <div className="space-y-3">
       {items.map((item, index) => {
@@ -908,7 +1113,9 @@ function HorizontalList({ items, colors }) {
           <div key={item.label}>
             <div className="mb-1 flex items-center justify-between text-xs">
               <span className="font-medium text-[#c9d1d9]">{item.label}</span>
-              <span className="text-[#7d8590]">{item.count}</span>
+              <span className="text-[#7d8590]">
+                {item.count} · {total ? Math.round((Number(item.count || 0) / total) * 100) : 0}%
+              </span>
             </div>
             <div className="h-2 rounded-full bg-[#0d1117]">
               <div className="h-2 rounded-full" style={{ width: `${Math.max(6, (item.count / max) * 100)}%`, backgroundColor: color }} />
@@ -921,10 +1128,22 @@ function HorizontalList({ items, colors }) {
 }
 
 function PercentList({ items }) {
+  const [showAll, setShowAll] = useState(false)
   const colors = ["#58a6ff", "#4694e8", "#388bfd", "#1f6feb", "#1158c7", "#0d419d"]
+  if (!items.length) {
+    return (
+      <div className="rounded-lg border border-dashed border-[#21262d] bg-[#0d1117] px-4 py-8 text-center">
+        <p className="text-xs font-medium text-[#7d8590]">No district data yet</p>
+        <p className="mt-1 text-[11px] text-[#484f58]">Approved listings need a saved location to appear here.</p>
+      </div>
+    )
+  }
+
+  const visibleItems = showAll ? items : items.slice(0, 5)
+
   return (
     <div className="space-y-3">
-      {items.map((item, index) => (
+      {visibleItems.map((item, index) => (
         <div key={item.label}>
           <div className="mb-1 flex items-center justify-between text-xs">
             <span className="font-medium text-[#c9d1d9]">{item.label}</span>
@@ -935,6 +1154,11 @@ function PercentList({ items }) {
           </div>
         </div>
       ))}
+      {items.length > 5 && (
+        <button type="button" className="btn-ghost mt-1 w-full justify-center !py-2 !text-[11px]" onClick={() => setShowAll((value) => !value)}>
+          {showAll ? "Show less" : `Show all districts (${items.length})`}
+        </button>
+      )}
     </div>
   )
 }

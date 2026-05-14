@@ -18,6 +18,8 @@ import {
   Edit2,
   BellOff,
   Plus,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { getCurrentUser, logout, updatePassword } from "../utils/auth";
 import { useNavigate } from "react-router-dom";
@@ -520,72 +522,57 @@ function Settings() {
                     <form onSubmit={handlePasswordUpdate} className="mt-8 space-y-5">
                       <div className="space-y-2">
                         <label className="label">{t("settings_page.security.current_password")}</label>
-                        <div className="relative group">
+                        <div className="input-wrapper settings-credential-input">
+                          <Lock className="input-icon" />
                           <input
                             type={showPassword ? "text" : "password"}
                             value={passwordForm.currentPassword}
                             onChange={(e) => handlePasswordFieldChange("currentPassword", e.target.value)}
                             placeholder={t("settings_page.security.current_placeholder")}
-                            className="input pl-12 pr-12"
+                            className="input"
                             autoComplete="current-password"
                             required
                           />
-                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                            <Lock size={18} />
-                          </div>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
                           <label className="label">{t("settings_page.security.new_password")}</label>
-                          <div className="relative group">
+                          <div className="input-wrapper settings-credential-input">
+                            <Shield className="input-icon" />
                             <input
                               type={showPassword ? "text" : "password"}
                               value={passwordForm.newPassword}
                               onChange={(e) => handlePasswordFieldChange("newPassword", e.target.value)}
                               placeholder={t("settings_page.security.new_placeholder")}
-                              className="input pl-12 pr-12"
+                              className="input"
                               autoComplete="new-password"
                               required
                             />
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                              <Shield size={18} />
-                            </div>
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <label className="label">{t("settings_page.security.confirm_password")}</label>
-                          <div className="relative group">
+                          <div className="input-wrapper has-right-icon settings-credential-input">
+                            <CheckCircle className="input-icon" />
                             <input
                               type={showPassword ? "text" : "password"}
                               value={passwordForm.confirmPassword}
                               onChange={(e) => handlePasswordFieldChange("confirmPassword", e.target.value)}
                               placeholder={t("settings_page.security.confirm_placeholder")}
-                              className="input pl-12 pr-12"
+                              className="input"
                               autoComplete="new-password"
                               required
                             />
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                              <CheckCircle size={18} />
-                            </div>
                             <button
                               type="button"
                               onClick={() => setShowPassword((prev) => !prev)}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                              className="input-icon-right"
                               aria-label={showPassword ? t("settings_page.security.hide_passwords") : t("settings_page.security.show_passwords")}
                             >
-                              {showPassword ? (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                </svg>
-                              ) : (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                              )}
+                              {showPassword ? <EyeOff /> : <Eye />}
                             </button>
                           </div>
                         </div>

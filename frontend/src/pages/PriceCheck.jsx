@@ -104,33 +104,37 @@ function StepIndicator({ step, total }) {
   )
 }
 
-const marketSnapshotRows = [
-  { icon: List, label: "Active listings", value: "2,847", color: "#e6edf3" },
-  { icon: TrendingUp, label: "Avg price this week", value: "LKR 8.4M", color: "#58a6ff" },
-  { icon: Clock, label: "Avg days to sell", value: "14 days", color: "#d29922" },
-  { icon: Zap, label: "Most searched", value: "Toyota", color: "#3fb950" },
-]
+const FUEL_BAR_COLORS = {
+  Petrol: "#1d4ed8",
+  Hybrid: "#059669",
+  Diesel: "#d97706",
+  Electric: "#7c3aed",
+}
 
-const fuelPriceRanges = [
-  { label: "Petrol", width: "85%", color: "#1d4ed8", value: "LKR 9.2M" },
-  { label: "Hybrid", width: "72%", color: "#059669", value: "LKR 12.8M" },
-  { label: "Diesel", width: "58%", color: "#d97706", value: "LKR 7.6M" },
-  { label: "Electric", width: "40%", color: "#7c3aed", value: "LKR 18.4M" },
-]
-
-const trendingModels = [
-  { model: "Toyota Aqua", brand: "Toyota", count: "312 predictions" },
-  { model: "Honda Vezel", brand: "Honda", count: "287 predictions" },
-  { model: "Suzuki Alto", brand: "Suzuki", count: "241 predictions" },
-  { model: "Toyota Prius", brand: "Toyota", count: "198 predictions" },
-  { model: "Nissan Dayz", brand: "Nissan", count: "156 predictions" },
-]
+const EMPTY_PRICE_CHECK_INSIGHTS = {
+  marketSnapshotRows: [
+    { icon: List, label: "Active listings", value: "0", color: "#e6edf3" },
+    { icon: TrendingUp, label: "Avg price this week", value: "No data", color: "#58a6ff" },
+    { icon: Clock, label: "Avg days to sell", value: "No data", color: "#d29922" },
+    { icon: Zap, label: "Most searched", value: "No data", color: "#3fb950" },
+  ],
+  fuelPriceRanges: [],
+  trendingModels: [],
+}
 
 function formatRecentPrice(value) {
   const numeric = Number(value)
   if (!Number.isFinite(numeric) || numeric <= 0) return "LKR 0"
   if (numeric >= 1_000_000) return `LKR ${(numeric / 1_000_000).toFixed(1)}M`
   return `LKR ${Math.round(numeric).toLocaleString()}`
+}
+
+function formatCompactPrice(value) {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) return "No data"
+  if (numeric >= 1_000_000) return `LKR ${(numeric / 1_000_000).toFixed(1)}M`
+  if (numeric >= 1_000) return `LKR ${(numeric / 1_000).toFixed(0)}K`
+  return `LKR ${Math.round(numeric).toLocaleString("en-LK")}`
 }
 
 function formatPredictionAge(timestamp) {
@@ -140,6 +144,115 @@ function formatPredictionAge(timestamp) {
   if (days === 0) return "today"
   if (days === 1) return "1 day ago"
   return `${days} days ago`
+}
+
+function toTimestamp(value) {
+  const timestamp = new Date(value).getTime()
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+function average(values) {
+  const valid = values.map(Number).filter((value) => Number.isFinite(value) && value > 0)
+  if (!valid.length) return 0
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length
+}
+
+function normalizeRecentPrediction(row) {
+  return {
+    id: `db-${row.id}`,
+    brand: row.brand,
+    model: row.model,
+    year: row.year,
+    predictedPrice: Number(row.predicted_price_lkr) || 0,
+    predictedAt: new Date(row.created_at).getTime(),
+  }
+}
+
+async function loadRecentPredictions() {
+  const localPredictions = loadPredictionHistory().slice(0, 3)
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session?.access_token || !session?.user?.id) {
+    return localPredictions
+  }
+
+  const { data, error } = await supabase
+    .from("predictions")
+    .select("id, brand, model, year, predicted_price_lkr, created_at")
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false })
+    .limit(3)
+
+  if (error) {
+    console.error("Failed to load recent cloud predictions:", error)
+    return localPredictions
+  }
+
+  return Array.isArray(data) ? data.map(normalizeRecentPrediction) : localPredictions
+}
+
+async function loadPriceCheckInsights() {
+  const [listingsResult, predictionInsightsResult] = await Promise.allSettled([
+    supabase
+      .from("marketplace_listings")
+      .select("id, price, status, created_at, updated_at")
+      .in("status", ["approved", "sold"]),
+    fetch(`${API_BASE_URL}/api/price-check/insights?limit=5`),
+  ])
+
+  const listingsPayload = listingsResult.status === "fulfilled" ? listingsResult.value : {}
+  const listings = Array.isArray(listingsPayload?.data) ? listingsPayload.data : []
+  const approvedListings = listings.filter((listing) => listing.status === "approved")
+  const soldListings = listings.filter((listing) => listing.status === "sold")
+  const weekTimestamp = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const weeklyApproved = approvedListings.filter((listing) => toTimestamp(listing.created_at) >= weekTimestamp)
+  const avgPriceThisWeek = average((weeklyApproved.length ? weeklyApproved : approvedListings).map((listing) => listing.price))
+  const soldDurations = soldListings
+    .map((listing) => {
+      const start = toTimestamp(listing.created_at)
+      const end = toTimestamp(listing.updated_at)
+      return start && end && end >= start ? Math.max(1, Math.round((end - start) / 86_400_000)) : 0
+    })
+    .filter(Boolean)
+  const avgDaysToSell = average(soldDurations)
+
+  let predictionInsights = {}
+  if (predictionInsightsResult.status === "fulfilled" && predictionInsightsResult.value.ok) {
+    predictionInsights = await predictionInsightsResult.value.json()
+  }
+
+  const rawFuelRanges = Array.isArray(predictionInsights?.fuel_price_ranges) ? predictionInsights.fuel_price_ranges : []
+  const maxFuelMedian = Math.max(...rawFuelRanges.map((item) => Number(item.median_price_lkr || 0)), 1)
+  const fuelPriceRanges = rawFuelRanges.map((item) => {
+    const median = Number(item.median_price_lkr || 0)
+    return {
+      label: item.label,
+      width: `${Math.max(8, Math.round((median / maxFuelMedian) * 100))}%`,
+      color: FUEL_BAR_COLORS[item.label] || "#58a6ff",
+      value: formatCompactPrice(median),
+    }
+  })
+
+  const trendingModels = Array.isArray(predictionInsights?.trending_models)
+    ? predictionInsights.trending_models.map((item) => ({
+        model: item.model,
+        brand: item.brand,
+        count: `${Number(item.count || 0).toLocaleString("en-LK")} prediction${Number(item.count || 0) === 1 ? "" : "s"}`,
+      }))
+    : []
+
+  return {
+    marketSnapshotRows: [
+      { icon: List, label: "Active listings", value: approvedListings.length.toLocaleString("en-LK"), color: "#e6edf3" },
+      { icon: TrendingUp, label: "Avg price this week", value: formatCompactPrice(avgPriceThisWeek), color: "#58a6ff" },
+      { icon: Clock, label: "Avg days to sell", value: avgDaysToSell ? `${Math.round(avgDaysToSell)} days` : "No data", color: "#d29922" },
+      { icon: Zap, label: "Most searched", value: predictionInsights?.top_brand || "No data", color: "#3fb950" },
+    ],
+    fuelPriceRanges,
+    trendingModels,
+  }
 }
 
 function PriceCheckPanelHeader({ icon: Icon, iconColor, title, subtitle, action }) {
@@ -157,7 +270,7 @@ function PriceCheckPanelHeader({ icon: Icon, iconColor, title, subtitle, action 
   )
 }
 
-function PriceCheckInsights({ recentPredictions, onViewAnalytics }) {
+function PriceCheckInsights({ insights, recentPredictions, onViewAnalytics }) {
   return (
     <aside className="pc-insights" aria-label="Live price insights">
       <section className="pc-insight-panel">
@@ -168,7 +281,7 @@ function PriceCheckInsights({ recentPredictions, onViewAnalytics }) {
           subtitle="Sri Lankan used car market - today"
         />
         <div className="pc-market-list">
-          {marketSnapshotRows.map(({ icon: Icon, label, value, color }) => (
+          {insights.marketSnapshotRows.map(({ icon: Icon, label, value, color }) => (
             <div className="pc-market-row" key={label}>
               <span className="pc-market-label"><Icon />{label}</span>
               <span className="pc-market-value" style={{ color }}>{value}</span>
@@ -185,15 +298,23 @@ function PriceCheckInsights({ recentPredictions, onViewAnalytics }) {
           subtitle="Median estimates from saved predictions"
         />
         <div className="pc-fuel-bars">
-          {fuelPriceRanges.map((item) => (
-            <div className="pc-fuel-row" key={item.label}>
-              <span className="pc-fuel-label">{item.label}</span>
-              <span className="pc-fuel-track">
-                <span className="pc-fuel-fill" style={{ width: item.width, background: item.color }} />
-              </span>
-              <span className="pc-fuel-value">{item.value}</span>
+          {insights.fuelPriceRanges.length > 0 ? (
+            insights.fuelPriceRanges.map((item) => (
+              <div className="pc-fuel-row" key={item.label}>
+                <span className="pc-fuel-label">{item.label}</span>
+                <span className="pc-fuel-track">
+                  <span className="pc-fuel-fill" style={{ width: item.width, background: item.color }} />
+                </span>
+                <span className="pc-fuel-value">{item.value}</span>
+              </div>
+            ))
+          ) : (
+            <div className="pc-empty-state">
+              <Search />
+              <p>No fuel data yet</p>
+              <span>Saved predictions will appear here by fuel type</span>
             </div>
-          ))}
+          )}
         </div>
       </section>
 
@@ -205,14 +326,22 @@ function PriceCheckInsights({ recentPredictions, onViewAnalytics }) {
           subtitle="Most predicted on AutoValueLK this week"
         />
         <div className="pc-trending-list">
-          {trendingModels.map((item, index) => (
-            <div className="pc-trending-row" key={item.model}>
-              <span className={`pc-rank pc-rank--${Math.min(index + 1, 4)}`}>{index + 1}</span>
-              <span className="pc-trending-model">{item.model}</span>
-              <span className="pc-trending-brand">{item.brand}</span>
-              <span className="pc-count-badge">{item.count}</span>
+          {insights.trendingModels.length > 0 ? (
+            insights.trendingModels.map((item, index) => (
+              <div className="pc-trending-row" key={`${item.brand}-${item.model}`}>
+                <span className={`pc-rank pc-rank--${Math.min(index + 1, 4)}`}>{index + 1}</span>
+                <span className="pc-trending-model">{item.model}</span>
+                <span className="pc-trending-brand">{item.brand}</span>
+                <span className="pc-count-badge">{item.count}</span>
+              </div>
+            ))
+          ) : (
+            <div className="pc-empty-state">
+              <Search />
+              <p>No weekly trends yet</p>
+              <span>Predictions made this week will appear here</span>
             </div>
-          ))}
+          )}
         </div>
       </section>
 
@@ -275,7 +404,53 @@ function PriceCheck() {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [dialog, setDialog] = useState(null)
-  const recentPredictions = useMemo(() => loadPredictionHistory().slice(0, 3), [])
+  const [recentPredictions, setRecentPredictions] = useState([])
+  const [insights, setInsights] = useState(EMPTY_PRICE_CHECK_INSIGHTS)
+
+  const refreshInsights = useCallback(async () => {
+    const [nextInsights, nextRecentPredictions] = await Promise.all([
+      loadPriceCheckInsights().catch((error) => {
+        console.error("Failed to load live price check insights:", error)
+        return EMPTY_PRICE_CHECK_INSIGHTS
+      }),
+      loadRecentPredictions().catch((error) => {
+        console.error("Failed to load recent predictions:", error)
+        return loadPredictionHistory().slice(0, 3)
+      }),
+    ])
+
+    setInsights(nextInsights)
+    setRecentPredictions(nextRecentPredictions)
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const load = async () => {
+      if (!isMounted) return
+      await refreshInsights()
+    }
+
+    load()
+    const refreshTimer = window.setInterval(load, 15000)
+
+    let realtimeChannel = null
+    if (typeof supabase.channel === "function") {
+      realtimeChannel = supabase
+        .channel("price-check-live-insights")
+        .on("postgres_changes", { event: "*", schema: "public", table: "marketplace_listings" }, load)
+        .on("postgres_changes", { event: "*", schema: "public", table: "predictions" }, load)
+        .subscribe()
+    }
+
+    return () => {
+      isMounted = false
+      window.clearInterval(refreshTimer)
+      if (realtimeChannel && typeof supabase.removeChannel === "function") {
+        supabase.removeChannel(realtimeChannel)
+      }
+    }
+  }, [refreshInsights])
 
   const gearTypeOptions = useMemo(() => ([
     { label: t("price_check_page.options.automatic"), value: "automatic" },
@@ -603,7 +778,7 @@ function PriceCheck() {
             </form>
           </div>
         </div>
-        <PriceCheckInsights recentPredictions={recentPredictions} onViewAnalytics={() => navigate("/analytics")} />
+        <PriceCheckInsights insights={insights} recentPredictions={recentPredictions} onViewAnalytics={() => navigate("/analytics")} />
       </div>
     </div>
   )

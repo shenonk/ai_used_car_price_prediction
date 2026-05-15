@@ -14812,3 +14812,127 @@ html[data-theme="light"] .marketplace-publish-modal .rounded-\[26px\] .text-lg.t
 html[data-theme="light"] .marketplace-publish-modal .rounded-\[26px\] span:last-child {
   color: #2563eb !important;
 }
+
+/* Final homepage light-mode polish: keep the page fully light, including
+   dark hero widgets and inline-styled icon blocks. */
+html[data-theme="light"] .home-ds,
+html[data-theme="light"] .home-page {
+  background:
+    radial-gradient(circle at 16% 4%, rgba(37, 99, 235, 0.1), transparent 28rem),
+    radial-gradient(circle at 92% 70%, rgba(22, 163, 74, 0.08), transparent 24rem),
+    linear-gradient(180deg, #f8fafc 0%, #eef4fb 52%, #f8fafc 100%) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .home-ds :is(
+  .home-ds-nav,
+  .home-ds-ticker-section,
+  .home-ds-steps-band,
+  .home-ds-testimonials-band,
+  .home-ds-footer
+) {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .home-ds :is(
+  .home-ds-live-panel,
+  .home-ds-estimate-card,
+  .home-ds-trust-pills span,
+  .home-ds-proof-list div,
+  .home-ds-market-card,
+  .home-ds-cta,
+  .home-ds-stats,
+  .home-ds-stats article,
+  .home-ds-feature-grid article,
+  .home-ds-steps-grid article,
+  .home-ds-testimonial-grid article
+) {
+  background: #ffffff !important;
+  background-image: none !important;
+  border-color: rgba(148, 163, 184, 0.32) !important;
+  color: #0f172a !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.88) inset,
+    0 16px 36px rgba(15, 23, 42, 0.11) !important;
+}
+
+html[data-theme="light"] .home-ds :is(.home-ds-icon-block, .home-ds-step-icon) {
+  background: #eff6ff !important;
+  border: 0.5px solid #bfdbfe !important;
+  color: #2563eb !important;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.12) !important;
+}
+
+html[data-theme="light"] .home-ds .home-ds-feature-grid article:nth-child(3) .home-ds-icon-block,
+html[data-theme="light"] .home-ds .home-ds-proof-list svg {
+  color: #16a34a !important;
+}
+
+html[data-theme="light"] .home-ds .home-ds-feature-grid article:nth-child(4) .home-ds-icon-block,
+html[data-theme="light"] .home-ds .home-ds-steps-grid article:nth-child(3) .home-ds-step-icon {
+  background: #fffbeb !important;
+  border-color: #fde68a !important;
+  color: #d97706 !important;
+}
+
+html[data-theme="light"] .home-ds .home-ds-feature-grid article:nth-child(5) .home-ds-icon-block,
+html[data-theme="light"] .home-ds .home-ds-steps-grid article:nth-child(4) .home-ds-step-icon {
+  background: #f5f3ff !important;
+  border-color: #ddd6fe !important;
+  color: #7c3aed !important;
+}
+
+html[data-theme="light"] .home-ds :is(
+  .home-ds-hero h1,
+  .home-ds-section-head h2,
+  .home-ds-about h2,
+  .home-ds-cta h2,
+  .home-ds-feature-grid h3,
+  .home-ds-steps-grid h3,
+  .home-ds-panel-head span,
+  .home-ds-estimate-row strong,
+  .home-ds-stat-list strong,
+  .home-ds-author strong,
+  .home-ds-brand strong
+) {
+  color: #0f172a !important;
+}
+
+html[data-theme="light"] .home-ds :is(
+  .home-ds-hero-copy > p,
+  .home-ds-feature-grid p,
+  .home-ds-steps-grid p,
+  .home-ds-testimonial-grid p,
+  .home-ds-stat-list span,
+  .home-ds-meta-pills span,
+  .home-ds-mini-label,
+  .home-ds-mini-stats span,
+  .home-ds-mini-stats small,
+  .home-ds-district-list small,
+  .home-ds-district-list > div > div,
+  .home-ds-brand small,
+  .home-ds-footer-bottom
+) {
+  color: #64748b !important;
+}
+
+html[data-theme="light"] .home-ds .home-ds-meta-pills span,
+html[data-theme="light"] .home-ds .home-ds-step-badge,
+html[data-theme="light"] .home-ds .home-ds-author > span {
+  background: #f1f5f9 !important;
+  border-color: rgba(148, 163, 184, 0.34) !important;
+  color: #475569 !important;
+}
+
+html[data-theme="light"] .home-ds .home-ds-panel-divider,
+html[data-theme="light"] .home-ds .home-ds-stat-list > div,
+html[data-theme="light"] .home-ds .home-ds-author,
+html[data-theme="light"] .home-ds .home-ds-footer-bottom {
+  border-color: rgba(148, 163, 184, 0.32) !important;
+}
+
+html[data-theme="light"] .home-ds :is(.home-ds-confidence i, .home-ds-district-list i) {
+  background: #e2e8f0 !important;
+}

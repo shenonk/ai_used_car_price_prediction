@@ -588,6 +588,21 @@ function Dashboard() {
     source: "local",
   })
   const [financeProduct, setFinanceProduct] = useState("loan")
+  const [activeTheme, setActiveTheme] = useState(() => {
+    if (typeof document === "undefined") return "dark"
+    return document.documentElement.dataset.theme === "light" ? "light" : "dark"
+  })
+
+  useEffect(() => {
+    const syncTheme = (event) => {
+      const nextTheme = event?.detail || document.documentElement.dataset.theme
+      setActiveTheme(nextTheme === "light" ? "light" : "dark")
+    }
+
+    syncTheme()
+    window.addEventListener("carpriceai-theme-change", syncTheme)
+    return () => window.removeEventListener("carpriceai-theme-change", syncTheme)
+  }, [])
 
   useEffect(() => {
     let isActive = true
@@ -1089,6 +1104,38 @@ function Dashboard() {
     }
   }, [dashboardData.listings, dashboardData.platformBrandActivity, dashboardData.predictions, dashboardData.userAlerts])
 
+  const isLightDashboard = activeTheme === "light"
+  const chartTheme = useMemo(
+    () => (
+      isLightDashboard
+        ? {
+            text: "#475569",
+            muted: "#64748b",
+            grid: "rgba(148, 163, 184, 0.3)",
+            tooltipBg: "#ffffff",
+            tooltipTitle: "#0f172a",
+            tooltipBody: "#475569",
+            tooltipBorder: "rgba(148, 163, 184, 0.32)",
+            financeGrid: "rgba(217, 119, 6, 0.16)",
+            financeText: "#92400e",
+            financePointBorder: "#ffffff",
+          }
+        : {
+            text: "#7d8590",
+            muted: "#c9d1d9",
+            grid: "#21262d",
+            tooltipBg: "#161b22",
+            tooltipTitle: "#f0f6fc",
+            tooltipBody: "#c9d1d9",
+            tooltipBorder: "#21262d",
+            financeGrid: "rgba(210, 153, 34, 0.12)",
+            financeText: "#c9a45f",
+            financePointBorder: "#0d1117",
+          }
+    ),
+    [isLightDashboard]
+  )
+
   const chartOptions = useMemo(
     () => ({
       responsive: true,
@@ -1096,37 +1143,37 @@ function Dashboard() {
       plugins: {
         legend: {
           labels: {
-            color: "#7d8590",
+            color: chartTheme.text,
             boxWidth: 10,
             boxHeight: 10,
             font: { size: 10 },
           },
         },
         tooltip: {
-          backgroundColor: "#161b22",
-          titleColor: "#f0f6fc",
-          bodyColor: "#c9d1d9",
-          borderColor: "#21262d",
+          backgroundColor: chartTheme.tooltipBg,
+          titleColor: chartTheme.tooltipTitle,
+          bodyColor: chartTheme.tooltipBody,
+          borderColor: chartTheme.tooltipBorder,
           borderWidth: 0.5,
           displayColors: false,
         },
       },
       scales: {
         x: {
-          grid: { color: "#21262d" },
-          ticks: { color: "#7d8590", font: { size: 10 } },
+          grid: { color: chartTheme.grid },
+          ticks: { color: chartTheme.text, font: { size: 10 } },
         },
         y: {
-          grid: { color: "#21262d" },
+          grid: { color: chartTheme.grid },
           ticks: {
-            color: "#7d8590",
+            color: chartTheme.text,
             font: { size: 10 },
             callback: (value) => `${Number(value) / 1_000_000}M`,
           },
         },
       },
     }),
-    []
+    [chartTheme]
   )
 
   const priceTrendData = useMemo(
@@ -1192,12 +1239,12 @@ function Dashboard() {
             if (financeRateSummary.highest?.id === item.id) return "#f85149"
             return "#d29922"
           }),
-          pointBorderColor: "#0d1117",
+          pointBorderColor: chartTheme.financePointBorder,
           pointBorderWidth: 2,
         },
       ],
     }),
-    [financeRateRows, financeRateSummary.highest, financeRateSummary.lowest, selectedFinanceProduct]
+    [chartTheme.financePointBorder, financeRateRows, financeRateSummary.highest, financeRateSummary.lowest, selectedFinanceProduct]
   )
 
   const financeRateOptions = useMemo(
@@ -1207,9 +1254,9 @@ function Dashboard() {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: "#161b22",
-          titleColor: "#f0f6fc",
-          bodyColor: "#c9d1d9",
+          backgroundColor: chartTheme.tooltipBg,
+          titleColor: chartTheme.tooltipTitle,
+          bodyColor: chartTheme.tooltipBody,
           borderColor: "#d29922",
           borderWidth: 0.5,
           displayColors: false,
@@ -1220,9 +1267,9 @@ function Dashboard() {
       },
       scales: {
         x: {
-          grid: { color: "rgba(210, 153, 34, 0.09)" },
+          grid: { color: chartTheme.financeGrid },
           ticks: {
-            color: "#c9a45f",
+            color: chartTheme.financeText,
             font: { size: 9 },
             maxRotation: 0,
             minRotation: 0,
@@ -1233,16 +1280,16 @@ function Dashboard() {
           },
         },
         y: {
-          grid: { color: "rgba(210, 153, 34, 0.12)" },
+          grid: { color: chartTheme.financeGrid },
           ticks: {
-            color: "#c9a45f",
+            color: chartTheme.financeText,
             font: { size: 10 },
             callback: (value) => `${Number(value).toFixed(1)}%`,
           },
         },
       },
     }),
-    []
+    [chartTheme]
   )
 
   const depreciationData = useMemo(

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
 
 import ChatBot from "./components/ChatBot";
 import MainLayout from "./layout/MainLayout";
@@ -19,8 +20,13 @@ import Settings from "./pages/Settings";
 import VehicleFinancingOptions from "./pages/VehicleFinancingOptions";
 import HelpCenter from "./pages/HelpCenter";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import { applyTheme, getStoredTheme } from "./utils/theme";
 
 function App() {
+  useEffect(() => {
+    applyTheme(getStoredTheme());
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getCurrentUser } from "../utils/auth";
 import { supabase } from "../utils/supabaseClient";
-import logoUrl from "../assets/logo/autovaluelk-logo-pdf.png";
 import AppModal from "../components/AppModal";
 import {
     FINANCE_PRODUCTS,
@@ -29,6 +28,8 @@ import {
     Tag,
     Wallet,
 } from "lucide-react";
+
+const logoUrl = new URL("../assets/logo/autovaluelk-logo-pdf.png", import.meta.url).href;
 
 function VehicleFinancingOptions() {
     const location = useLocation();

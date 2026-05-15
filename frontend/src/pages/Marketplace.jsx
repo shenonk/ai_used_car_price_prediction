@@ -2453,6 +2453,7 @@ function DistrictCityPicker({
   onSelectCity,
   allowAll = true,
 }) {
+  const { t } = useTranslation();
   const selectedRegion = regions.find((region) => region.key === selectedRegionKey) || null;
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);

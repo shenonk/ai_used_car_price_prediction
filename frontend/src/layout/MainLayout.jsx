@@ -1,10 +1,45 @@
 import { useState, useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Home, LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, Settings, HelpCircle, Menu, X, LogIn, LogOut } from "lucide-react";
+import { Home, LayoutDashboard, ShoppingBag, Search, FileText, HandCoins, BarChart3, Bell, BellRing, Settings, HelpCircle, Menu, X, LogIn, LogOut } from "lucide-react";
 import { isLoggedIn, logout, getCurrentUser } from "../utils/auth";
 import logo from "../assets/logo/autovaluelk-logo.png";
 import { useTranslation } from "react-i18next";
 import { applyTheme, getStoredTheme } from "../utils/theme";
+import AppRouteBoundary from "../components/AppRouteBoundary";
+import { supabase } from "../utils/supabaseClient";
+import {
+  inferNotificationType,
+  loadDismissedNotificationIds,
+  loadReadNotificationIds,
+  markNotificationAsRead,
+} from "../utils/notifications";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const SESSION_SHOWN_NOTIFICATIONS_KEY = "autovaluelk_session_shown_notifications";
+
+function toTimestamp(value) {
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function loadSessionShownNotificationIds(user) {
+  try {
+    const key = `${SESSION_SHOWN_NOTIFICATIONS_KEY}_${user?.id || user?.email || "guest"}`;
+    const value = JSON.parse(window.sessionStorage.getItem(key) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSessionShownNotificationIds(user, ids) {
+  try {
+    const key = `${SESSION_SHOWN_NOTIFICATIONS_KEY}_${user?.id || user?.email || "guest"}`;
+    window.sessionStorage.setItem(key, JSON.stringify([...new Set(ids)]));
+  } catch {
+    // Session storage is best-effort only; notifications still render without it.
+  }
+}
 
 const MainLayout = () => {
   const { t, i18n } = useTranslation();
@@ -13,6 +48,7 @@ const MainLayout = () => {
   const [loggedIn, setLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState({ email: null, username: null });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [notificationPopups, setNotificationPopups] = useState([]);
 
   useEffect(() => {
     if (i18n.resolvedLanguage === "si" || i18n.resolvedLanguage === "ta") {
@@ -41,13 +77,105 @@ const MainLayout = () => {
   }, [location.pathname]);
 
   useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setLoggedIn(Boolean(session));
+      if (session?.user) {
+        setUserInfo({
+          id: session.user.id,
+          email: session.user.email,
+          username: session.user.user_metadata?.username,
+          avatar_url: session.user.user_metadata?.avatar_url,
+        });
+      } else {
+        setUserInfo({ email: null, username: null });
+        setNotificationPopups([]);
+      }
+    });
+
+    return () => {
+      data?.subscription?.unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadUnreadNotificationPopups = async () => {
+      if (!loggedIn) {
+        setNotificationPopups([]);
+        return;
+      }
+
+      try {
+        const user = await getCurrentUser();
+        if (!user) {
+          if (isActive) setNotificationPopups([]);
+          return;
+        }
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to load notifications");
+        }
+
+        const payload = await response.json();
+        const readIds = loadReadNotificationIds(user);
+        const dismissedIds = loadDismissedNotificationIds(user);
+        const shownIds = loadSessionShownNotificationIds(user);
+
+        const unreadItems = (payload.notifications || [])
+          .filter((item) => !readIds.includes(item.id) && !dismissedIds.includes(item.id) && !shownIds.includes(item.id))
+          .sort((a, b) => toTimestamp(b.created_at) - toTimestamp(a.created_at))
+          .slice(0, 3)
+          .map((item) => ({
+            id: item.id,
+            title: item.title,
+            message: item.message,
+            type: inferNotificationType(item.title),
+            createdAt: item.created_at,
+          }));
+
+        if (!isActive) return;
+
+        if (unreadItems.length > 0) {
+          saveSessionShownNotificationIds(user, [...shownIds, ...unreadItems.map((item) => item.id)]);
+        }
+        setNotificationPopups(unreadItems);
+      } catch (error) {
+        if (isActive) {
+          console.error("Unable to load unread notification popups:", error);
+          setNotificationPopups([]);
+        }
+      }
+    };
+
+    loadUnreadNotificationPopups();
+
+    const intervalId = window.setInterval(loadUnreadNotificationPopups, 30000);
+    window.addEventListener("focus", loadUnreadNotificationPopups);
+
+    return () => {
+      isActive = false;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", loadUnreadNotificationPopups);
+    };
+  }, [loggedIn]);
+
+  useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
   const navItems = [
     {
       path: "/",
-      label: "Home",
+      label: t("home"),
       icon: <Home className="w-5 h-5" />,
     },
     {
@@ -55,8 +183,8 @@ const MainLayout = () => {
       label: t("dashboard"),
       icon: <LayoutDashboard className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Please log in to access this page.",
-      authSubMessage: "Dashboard, saved activity, and account insights are available only for logged-in users.",
+      authMessage: t("auth.login_required"),
+      authSubMessage: t("auth.dashboard_sub"),
     },
     {
       path: "/marketplace",
@@ -83,24 +211,24 @@ const MainLayout = () => {
       label: t("analytics"),
       icon: <BarChart3 className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Please log in to access this page.",
-      authSubMessage: "Saved prediction trends and deeper account analytics are available only for logged-in users.",
+      authMessage: t("auth.login_required"),
+      authSubMessage: t("auth.analytics_sub"),
     },
     {
       path: "/notifications",
       label: t("notifications"),
       icon: <Bell className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Please log in to access this page.",
-      authSubMessage: "Personal notifications and alert activity are available only for logged-in users.",
+      authMessage: t("auth.login_required"),
+      authSubMessage: t("auth.notifications_sub"),
     },
     {
       path: "/settings",
       label: t("settings"),
       icon: <Settings className="w-5 h-5" />,
       requiresAuth: true,
-      authMessage: "Please log in to access this page.",
-      authSubMessage: "Profile, password, alerts, and notification settings are available only for logged-in users.",
+      authMessage: t("auth.login_required"),
+      authSubMessage: t("auth.settings_sub"),
     },
     {
       path: "/help",
@@ -121,6 +249,19 @@ const MainLayout = () => {
     } else {
       navigate("/login");
     }
+  };
+
+  const closeNotificationPopup = async (id, markAsRead = false) => {
+    const user = await getCurrentUser();
+    if (markAsRead && user) {
+      markNotificationAsRead(user, id);
+    }
+    setNotificationPopups((current) => current.filter((item) => item.id !== id));
+  };
+
+  const openNotificationPopup = async (id) => {
+    await closeNotificationPopup(id, true);
+    navigate("/notifications");
   };
 
   const handleNavClick = (event, item) => {
@@ -160,28 +301,29 @@ const MainLayout = () => {
       )}
 
       <div
-        className={`theme-sidebar fixed left-0 top-0 z-40 flex h-screen w-72 flex-col border-r backdrop-blur-xl transition-transform duration-300 ease-out lg:translate-x-0 ${
+        className={`theme-sidebar sidebar fixed left-0 top-0 z-40 flex h-screen w-[200px] flex-col border-r transition-transform duration-300 ease-out lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="theme-divider border-b p-6">
-          <div className="flex items-center gap-3">
-            <div className="sidebar-brand-logo flex h-11 w-11 items-center justify-center rounded-2xl">
-              <img src={logo} alt="AutoValueLK" className="h-8 object-contain" />
+        <div className="theme-divider sidebar-logo border-b px-4 py-4">
+          <div className="flex items-center gap-2">
+            <div className="sidebar-brand-logo sidebar-logo-icon flex h-9 w-9 items-center justify-center rounded-lg">
+              <img src={logo} alt="AutoValueLK" className="h-7 object-contain" />
             </div>
-            <div>
-              <h1 className="heading-display theme-text-primary text-lg font-bold tracking-tight">AutoValueLK</h1>
-              <p className="theme-text-muted text-xs uppercase tracking-[0.24em]">Sri Lankan Market</p>
+            <div className="sidebar-logo-text">
+              <h1 className="heading-display theme-text-primary sidebar-logo-name text-[13px] font-medium tracking-normal">AutoValueLK</h1>
+              <p className="theme-text-muted sidebar-logo-sub text-[10px] uppercase tracking-[0.05em]">{t("app.sidebar_market")}</p>
             </div>
           </div>
         </div>
 
-        <nav className="sidebar-nav flex-1 space-y-1.5 px-4 pb-3 pt-3">
+        <nav className="sidebar-nav flex-1 space-y-0.5 px-0 pb-3 pt-2">
+          <div className="sidebar-section-label">{t("app.navigation")}</div>
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`nav-link ${isActive(item.path) ? "active" : ""}`}
+              className={`nav-link nav-item ${isActive(item.path) ? "active" : ""}`}
               onClick={(event) => handleNavClick(event, item)}
             >
               <span className="nav-icon">{item.icon}</span>
@@ -196,21 +338,21 @@ const MainLayout = () => {
           ))}
         </nav>
 
-        <div className="theme-divider border-t p-4">
+        <div className="theme-divider sidebar-user-area border-t p-3">
           <button
             onClick={handleAuthAction}
-            className="sidebar-account-card flex w-full items-center gap-3 rounded-[20px] px-4 py-3 text-left transition-all duration-300"
+            className="sidebar-account-card sidebar-user flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-all duration-150"
           >
             {loggedIn && userInfo.avatar_url ? (
               <img
                 src={userInfo.avatar_url}
                 alt="Profile"
-                className="theme-divider h-11 w-11 rounded-full border object-cover"
+                className="theme-divider sidebar-avatar h-8 w-8 rounded-full border object-cover"
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="sidebar-account-avatar flex h-11 w-11 items-center justify-center rounded-full">
-                <span className="text-lg font-semibold text-slate-950">
+              <div className="sidebar-account-avatar sidebar-avatar flex h-8 w-8 items-center justify-center rounded-full">
+                <span className="text-xs font-medium">
                   {loggedIn
                     ? (userInfo.username || userInfo.email || "U").trim().charAt(0).toUpperCase()
                     : "A"}
@@ -219,26 +361,65 @@ const MainLayout = () => {
             )}
 
             <div className="min-w-0 flex-1">
-              <p className="theme-text-primary truncate text-sm font-semibold">
+              <p className="theme-text-primary sidebar-user-name truncate text-xs font-medium">
                 {loggedIn ? userInfo.username || "Account" : "Account access"}
               </p>
-              <p className="theme-text-muted truncate text-xs">
+              <p className="theme-text-muted sidebar-user-email truncate text-[11px]">
                 {loggedIn ? userInfo.email || "Signed in" : "Login / Register"}
               </p>
             </div>
 
-            <span className="sidebar-account-action flex h-9 w-9 items-center justify-center rounded-xl" aria-hidden="true">
+            <span className="sidebar-account-action sidebar-logout flex h-7 w-7 items-center justify-center rounded-md" aria-hidden="true">
               {loggedIn ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}
             </span>
           </button>
         </div>
+        <div className="sidebar-bottom-glow" aria-hidden="true" />
+        <div className="sidebar-edge" aria-hidden="true" />
       </div>
 
-      <div className="min-h-screen w-full lg:ml-72 lg:w-[calc(100%-18rem)]">
-        <div className="min-h-screen pt-20 lg:pt-0">
-          <Outlet />
+      <div className="min-h-screen w-full lg:ml-[200px] lg:w-[calc(100%-200px)]">
+        <div className="app-main-content min-h-screen pt-20 lg:pt-0">
+          <AppRouteBoundary locationKey={location.key}>
+            <Outlet />
+          </AppRouteBoundary>
         </div>
       </div>
+
+      {notificationPopups.length > 0 && (
+        <div className="fixed bottom-24 right-5 z-[80] flex w-[min(360px,calc(100vw-24px))] flex-col gap-3">
+          {notificationPopups.map((notification) => (
+            <article
+              key={notification.id}
+              className={`notification-popup notification-popup--${notification.type}`}
+              role="status"
+              aria-live="polite"
+            >
+              <button
+                type="button"
+                className="notification-popup__body"
+                onClick={() => openNotificationPopup(notification.id)}
+              >
+                <span className="notification-popup__icon">
+                  <BellRing className="h-4 w-4" />
+                </span>
+                <span className="notification-popup__copy">
+                  <strong>{notification.title}</strong>
+                  <span>{notification.message}</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="notification-popup__close"
+                aria-label="Mark notification as read"
+                onClick={() => closeNotificationPopup(notification.id, true)}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

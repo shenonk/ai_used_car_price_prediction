@@ -18,7 +18,7 @@ const Sidebar = () => {
               <h1 className="heading-display text-lg font-bold text-white tracking-tight">
                 AutoValueLK
               </h1>
-              <p className="text-[0.65rem] text-gray-500 uppercase tracking-[0.15em]">Sri Lankan Market</p>
+              <p className="text-[0.65rem] text-gray-500 uppercase tracking-[0.15em]">{t("app.sidebar_market")}</p>
             </div>
           </div>
         </div>

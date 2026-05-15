@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { supabase } from "../../utils/supabaseClient";
 
 function ProtectedRoute({
@@ -7,6 +8,7 @@ function ProtectedRoute({
   authMessage = "Please sign in to continue.",
   authSubMessage = "This feature is available only for logged-in users.",
 }) {
+  const { t } = useTranslation();
   const location = useLocation();
   const [authState, setAuthState] = useState("loading");
 
@@ -14,12 +16,19 @@ function ProtectedRoute({
     let isActive = true;
 
     const syncSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      if (isActive) {
-        setAuthState(session ? "authorized" : "unauthorized");
+        if (isActive) {
+          setAuthState(session ? "authorized" : "unauthorized");
+        }
+      } catch (error) {
+        console.error("Unable to read auth session", error);
+        if (isActive) {
+          setAuthState("unauthorized");
+        }
       }
     };
 
@@ -35,14 +44,15 @@ function ProtectedRoute({
 
     return () => {
       isActive = false;
-      subscription.unsubscribe();
+      subscription?.unsubscribe?.();
     };
   }, []);
 
   if (authState === "loading") {
     return (
-      <div className="theme-app-bg flex min-h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500" />
+      <div className="protected-route-loading">
+        <div className="protected-route-spinner" />
+        <p>{t("app.protected_loading")}</p>
       </div>
     );
   }

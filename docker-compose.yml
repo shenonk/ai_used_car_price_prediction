@@ -36,7 +36,7 @@ services:
       - autovalue-network
     restart: unless-stopped
 
-  # ── Backend API (Flask + Gunicorn) ──
+  # ── Backend API (FastAPI + Uvicorn) ──
   backend-api:
     build:
       context: .

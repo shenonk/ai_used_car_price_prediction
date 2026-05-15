@@ -185,6 +185,12 @@
   animation: logo-float 3s ease-in-out infinite;
 }
 
+.auth-logo-icon img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
 /* --- Gradient text shimmer overlay --- */
 @keyframes text-shimmer {
   0%   { background-position: -200% center; }
@@ -384,4 +390,41 @@
 
 .auth-card-accent-purple::before {
   background: linear-gradient(90deg, #8b5cf6, #6366f1, #a78bfa, #8b5cf6) !important;
+}
+
+/* Final auth input safety override.
+   This file loads after index.css, so these rules prevent text from typing under icons. */
+.auth-page .input-wrapper {
+  position: relative !important;
+  width: 100% !important;
+}
+
+.auth-page .input-wrapper .input-icon {
+  position: absolute !important;
+  left: 14px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 15px !important;
+  height: 15px !important;
+  color: #484f58 !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}
+
+.auth-page .input-wrapper input {
+  padding-left: 44px !important;
+  padding-right: 12px !important;
+}
+
+.auth-page .input-wrapper.has-right-icon input {
+  padding-left: 44px !important;
+  padding-right: 44px !important;
+}
+
+.auth-page .input-wrapper .input-icon-right {
+  position: absolute !important;
+  right: 14px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 3 !important;
 }

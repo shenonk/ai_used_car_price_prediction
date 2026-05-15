@@ -13,7 +13,13 @@ import {
   Clock,
   LogOut,
   Moon,
-  Lock
+  Lock,
+  TrendingUp,
+  Edit2,
+  BellOff,
+  Plus,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { getCurrentUser, logout, updatePassword } from "../utils/auth";
 import { useNavigate } from "react-router-dom";
@@ -36,7 +42,6 @@ function Settings() {
   });
   const [alerts, setAlerts] = useState([]);
   const [saved, setSaved] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -64,11 +69,13 @@ function Settings() {
   const isLightTheme = theme === "light";
 
   useEffect(() => {
+    let isActive = true;
+
     const initSettings = async () => {
-      setIsLoading(true);
       // Fetch user info
       const user = await getCurrentUser();
       const resolvedUser = user || { email: 'guest@example.com', username: 'Guest' };
+      if (!isActive) return;
       setUserInfo(resolvedUser);
 
       // Fetch prefs
@@ -78,10 +85,12 @@ function Settings() {
       // Fetch alerts
       const storedAlerts = loadUserAlerts(resolvedUser);
       setAlerts(storedAlerts);
-      
-      setIsLoading(false);
     };
     initSettings();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   const togglePref = (key) => {
@@ -241,23 +250,15 @@ function Settings() {
   };
 
   const tabs = [
-    { id: "profile", label: t("profile"), icon: <User size={20} /> },
-    { id: "notifications", label: t("notification_preferences"), icon: <Bell size={20} /> },
-    { id: "alerts", label: t("manage_alerts"), icon: <Zap size={20} /> },
-    { id: "security", label: t("settings_page.security.tab"), icon: <Lock size={20} /> },
-    { id: "general", label: t("language_preferences"), icon: <Globe size={20} /> },
+    { id: "profile", label: "Profile", icon: <User size={15} /> },
+    { id: "notifications", label: "Notification Preferences", icon: <Bell size={15} /> },
+    { id: "alerts", label: "Manage Price Alerts", icon: <TrendingUp size={15} /> },
+    { id: "security", label: "Security", icon: <Lock size={15} /> },
+    { id: "general", label: "Language & Region", icon: <Globe size={15} /> },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="theme-app-bg min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="app-page-shell animate-fade-in">
+    <div className="settings-page app-page-shell animate-fade-in">
       <SuccessToast
         isOpen={toast.isOpen && toast.type === "success"}
         message={toast.message}
@@ -290,47 +291,48 @@ function Settings() {
           </div>
         </div>
       )}
-      <div className="w-full">
-        <div className="dashboard-page-hero mb-10">
-          <div className="dashboard-page-eyebrow mb-4">{t("settings")}</div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white mb-2">{t("settings")}</h1>
-          <p className="text-sm text-slate-300 max-w-2xl">{t("settings_page.subtitle")}</p>
+      <div className="settings-page-inner">
+        <div className="settings-hero">
+          <div>
+            <div className="settings-hero-eyebrow">{t("settings")}</div>
+            <h1>{t("settings")}</h1>
+            <p>{t("settings_page.subtitle")}</p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="settings-layout">
           
           {/* Sidebar Tabs */}
-          <div className="lg:col-span-1 space-y-2">
+          <div className="settings-nav-panel">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl transition-all duration-300 ${
+                className={`settings-nav-item ${
                   activeTab === tab.id 
-                    ? 'settings-tab-button active border' 
-                    : 'settings-tab-button'
+                    ? 'active' 
+                    : ''
                 }`}
               >
                 {tab.icon}
-                <span className="font-semibold">{tab.label}</span>
-                {activeTab === tab.id && <ChevronRight size={16} className="ml-auto" />}
+                <span>{tab.label}</span>
               </button>
             ))}
             
-            <div className="theme-divider pt-4 mt-4 border-t">
+            <div className="settings-nav-divider">
                 <button 
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-rose-400 hover:bg-rose-500/10 transition-all duration-300"
+                  className="settings-nav-logout"
                 >
-                  <LogOut size={20} />
-                  <span className="font-semibold">{t("logout")}</span>
+                  <LogOut size={15} />
+                  <span>{t("logout")}</span>
                 </button>
             </div>
           </div>
 
           {/* Content Area */}
-          <div className="lg:col-span-3">
-            <div className="dashboard-page-panel min-h-[500px]">
+          <div className="settings-content-wrap">
+            <div className="settings-content-panel">
               
               {/* Profile Tab */}
               {activeTab === "profile" && (
@@ -341,15 +343,19 @@ function Settings() {
                         {userInfo.avatar_url ? (
                             <img src={userInfo.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                         ) : (
-                            <User size={40} className="text-slate-500" />
+                            <span className="settings-avatar-initial">{(userInfo.username || userInfo.email || "U").charAt(0).toUpperCase()}</span>
                         )}
                       </div>
                     </div>
                     <div>
                       <h2 className="text-2xl font-bold text-white mb-1">{userInfo.username || "Guest User"}</h2>
                       <p className="text-slate-400">{userInfo.email}</p>
-                      <span className="badge badge-info mt-2">Personal Account</span>
+                      <span className="badge badge-info mt-2">{t("settings_page.personal_account", { defaultValue: "Personal Account" })}</span>
                     </div>
+                    <button type="button" className="settings-edit-profile">
+                      <Edit2 size={13} />
+                      Edit Profile
+                    </button>
                   </div>
 
                   <div className="grid gap-6">
@@ -359,11 +365,11 @@ function Settings() {
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800/50">
-                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">Username</p>
+                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">{t("settings_page.username", { defaultValue: "Username" })}</p>
                         <p className="text-white">{userInfo.username || "Not set"}</p>
                       </div>
                       <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-800/50">
-                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">Email Address</p>
+                        <p className="text-xs text-slate-500 uppercase font-bold mb-1">{t("settings_page.email_address", { defaultValue: "Email Address" })}</p>
                         <p className="text-white">{userInfo.email}</p>
                       </div>
                     </div>
@@ -371,8 +377,8 @@ function Settings() {
                     <div className="p-6 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex items-start gap-4">
                         <Clock className="text-blue-400 mt-1" size={20} />
                         <div>
-                            <p className="font-semibold text-white">Member since 2026</p>
-                            <p className="text-sm text-slate-400">You joined AutoValueLK on March 27, 2026. Keep track of your car price history here.</p>
+                            <p className="font-semibold text-white">{t("settings_page.member_since", { defaultValue: "Member since 2026" })}</p>
+                            <p className="text-sm text-slate-400">{t("settings_page.member_hint", { defaultValue: "You joined AutoValueLK on March 27, 2026. Keep track of your car price history here." })}</p>
                         </div>
                     </div>
                   </div>
@@ -384,7 +390,7 @@ function Settings() {
                 <div className="space-y-8 animate-slide-up">
                   <div>
                     <h2 className="text-2xl font-bold text-white mb-2">{t("notification_preferences")}</h2>
-                    <p className="text-slate-400">Choose how you want to be notified about market changes.</p>
+                    <p className="text-slate-400">{t("settings_page.notifications_hint", { defaultValue: "Choose how you want to be notified about market changes." })}</p>
                   </div>
 
                   <div className="space-y-4">
@@ -438,7 +444,7 @@ function Settings() {
                   <div className="flex justify-between items-end">
                     <div>
                         <h2 className="text-2xl font-bold text-white mb-2">{t("manage_alerts")}</h2>
-                        <p className="text-slate-400">Track and manage your saved price alerts.</p>
+                        <p className="text-slate-400">{t("settings_page.alerts_hint", { defaultValue: "Track and manage your saved price alerts." })}</p>
                     </div>
                     {alerts.length > 0 && (
                         <span className="badge badge-warning">{alerts.length} Active Alerts</span>
@@ -448,10 +454,13 @@ function Settings() {
                   {alerts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-center space-y-4 bg-slate-800/10 rounded-3xl border border-dashed border-slate-700">
                       <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center text-slate-500">
-                        <Zap size={30} />
+                        <BellOff size={28} />
                       </div>
-                      <p className="text-slate-400">{t("no_alerts")}</p>
-                      <button onClick={() => navigate('/price-check')} className="text-blue-400 hover:underline text-sm font-semibold">Start tracking now</button>
+                      <p className="text-slate-400">{t("settings_page.no_price_alerts", { defaultValue: "No price alerts set" })}</p>
+                      <button onClick={() => navigate('/price-check')} className="settings-add-alert-button">
+                        <Plus size={13} />
+                        Add price alert
+                      </button>
                     </div>
                   ) : (
                     <div className="grid gap-4">
@@ -508,72 +517,57 @@ function Settings() {
                     <form onSubmit={handlePasswordUpdate} className="mt-8 space-y-5">
                       <div className="space-y-2">
                         <label className="label">{t("settings_page.security.current_password")}</label>
-                        <div className="relative group">
+                        <div className="input-wrapper settings-credential-input">
+                          <Lock className="input-icon" />
                           <input
                             type={showPassword ? "text" : "password"}
                             value={passwordForm.currentPassword}
                             onChange={(e) => handlePasswordFieldChange("currentPassword", e.target.value)}
                             placeholder={t("settings_page.security.current_placeholder")}
-                            className="input pl-12 pr-12"
+                            className="input"
                             autoComplete="current-password"
                             required
                           />
-                          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                            <Lock size={18} />
-                          </div>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div className="space-y-2">
                           <label className="label">{t("settings_page.security.new_password")}</label>
-                          <div className="relative group">
+                          <div className="input-wrapper settings-credential-input">
+                            <Shield className="input-icon" />
                             <input
                               type={showPassword ? "text" : "password"}
                               value={passwordForm.newPassword}
                               onChange={(e) => handlePasswordFieldChange("newPassword", e.target.value)}
                               placeholder={t("settings_page.security.new_placeholder")}
-                              className="input pl-12 pr-12"
+                              className="input"
                               autoComplete="new-password"
                               required
                             />
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                              <Shield size={18} />
-                            </div>
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <label className="label">{t("settings_page.security.confirm_password")}</label>
-                          <div className="relative group">
+                          <div className="input-wrapper has-right-icon settings-credential-input">
+                            <CheckCircle className="input-icon" />
                             <input
                               type={showPassword ? "text" : "password"}
                               value={passwordForm.confirmPassword}
                               onChange={(e) => handlePasswordFieldChange("confirmPassword", e.target.value)}
                               placeholder={t("settings_page.security.confirm_placeholder")}
-                              className="input pl-12 pr-12"
+                              className="input"
                               autoComplete="new-password"
                               required
                             />
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-blue-400 transition-colors">
-                              <CheckCircle size={18} />
-                            </div>
                             <button
                               type="button"
                               onClick={() => setShowPassword((prev) => !prev)}
-                              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                              className="input-icon-right"
                               aria-label={showPassword ? t("settings_page.security.hide_passwords") : t("settings_page.security.show_passwords")}
                             >
-                              {showPassword ? (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                </svg>
-                              ) : (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                              )}
+                              {showPassword ? <EyeOff /> : <Eye />}
                             </button>
                           </div>
                         </div>
@@ -615,7 +609,7 @@ function Settings() {
                 <div className="space-y-8 animate-slide-up">
                   <div>
                     <h2 className="theme-text-primary text-2xl font-bold mb-2">{t("language_preferences")}</h2>
-                    <p className="theme-text-secondary">Configure your interface language and preferences.</p>
+                    <p className="theme-text-secondary">{t("settings_page.language_hint", { defaultValue: "Configure your interface language and preferences." })}</p>
                   </div>
 
                   <div className="space-y-6">
@@ -699,7 +693,7 @@ function Settings() {
                             {t("danger_zone")}
                         </h3>
                         <div className="space-y-4 rounded-2xl border border-rose-500/20 bg-rose-500/5 p-6">
-                            <p className="theme-text-secondary text-sm">Once you clear your local data, there is no going back. This includes preferences and alerts.</p>
+                            <p className="theme-text-secondary text-sm">{t("settings_page.clear_data_warning", { defaultValue: "Once you clear your local data, there is no going back. This includes preferences and alerts." })}</p>
                             <button 
                                 onClick={clearAllData}
                                 className="btn-danger"

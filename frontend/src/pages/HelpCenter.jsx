@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Search,
@@ -9,6 +9,12 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
+  ExternalLink,
+  HelpCircle,
+  MessageCircle,
+  Reply,
+  Send,
+  X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../utils/supabaseClient";
@@ -27,14 +33,52 @@ const HelpCenter = () => {
     email: "",
     message: "",
   });
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState("");
   const [submitError, setSubmitError] = useState("");
-  const [replyEmail, setReplyEmail] = useState("");
   const [adminReplies, setAdminReplies] = useState([]);
   const [isLoadingReplies, setIsLoadingReplies] = useState(false);
   const [replyLookupError, setReplyLookupError] = useState("");
   const [hasCheckedReplies, setHasCheckedReplies] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSessionUser = async () => {
+      setAuthLoading(true);
+      const { data } = await supabase.auth.getUser();
+      const user = data?.user || null;
+
+      if (!isMounted) return;
+
+      setCurrentUser(user);
+      setFormData((prev) => ({
+        ...prev,
+        full_name: prev.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || "",
+        email: user?.email || "",
+      }));
+      setAuthLoading(false);
+    };
+
+    loadSessionUser();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user || null;
+      setCurrentUser(user);
+      setFormData((prev) => ({
+        ...prev,
+        full_name: prev.full_name || user?.user_metadata?.full_name || user?.user_metadata?.username || "",
+        email: user?.email || "",
+      }));
+    });
+
+    return () => {
+      isMounted = false;
+      listener?.subscription?.unsubscribe();
+    };
+  }, []);
 
   const categories = [
     {
@@ -137,10 +181,16 @@ const HelpCenter = () => {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
+    if (name === "email") return;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+  };
+
+  const getAccessToken = async () => {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || "";
   };
 
   const handleSubmit = async (event) => {
@@ -149,39 +199,33 @@ const HelpCenter = () => {
     setSubmitError("");
     setIsSubmitting(true);
 
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setSubmitError("Please sign in before sending a support message.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const payload = {
       user_name: formData.full_name.trim(),
-      user_email: formData.email.trim(),
       message: formData.message.trim(),
       status: "open",
     };
 
     try {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/support-ticket`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
+      const response = await fetch(`${API_BASE_URL}/api/support-ticket`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
-        const result = await response.json();
+      const result = await response.json();
 
-        if (!response.ok) {
-          throw new Error(result.error || t("help_center_page.errors.submit_failed"));
-        }
-      } catch {
-        const { error } = await supabase.from("support_tickets").insert({
-          user_name: payload.user_name,
-          user_email: payload.user_email,
-          message: payload.message,
-          status: payload.status,
-        });
-
-        if (error) {
-          throw new Error(error.message || t("help_center_page.errors.submit_failed"));
-        }
+      if (!response.ok) {
+        throw new Error(result.error || t("help_center_page.errors.submit_failed"));
       }
     } catch (error) {
       setSubmitError(error.message || t("help_center_page.errors.submit_retry"));
@@ -191,11 +235,10 @@ const HelpCenter = () => {
 
     setFormData({
       full_name: "",
-      email: "",
+      email: currentUser?.email || "",
       message: "",
     });
-    setReplyEmail(payload.user_email);
-    fetchAdminReplies(payload.user_email);
+    fetchAdminReplies();
     setSubmitSuccess(t("help_center_page.success"));
     setIsSubmitting(false);
     window.setTimeout(() => {
@@ -208,10 +251,10 @@ const HelpCenter = () => {
     formData.email.trim() &&
     formData.message.trim();
 
-  const fetchAdminReplies = async (emailOverride = replyEmail) => {
-    const email = emailOverride.trim();
-    if (!email) {
-      setReplyLookupError("Please enter the email address you used when contacting us.");
+  const fetchAdminReplies = async () => {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setReplyLookupError("Please sign in to view your admin replies.");
       return;
     }
 
@@ -220,29 +263,18 @@ const HelpCenter = () => {
     setHasCheckedReplies(true);
 
     try {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/support-ticket-replies?email=${encodeURIComponent(email)}`);
-        const result = await response.json();
+      const response = await fetch(`${API_BASE_URL}/api/support-ticket-replies`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const result = await response.json();
 
-        if (!response.ok) {
-          throw new Error(result.error || "Unable to load admin replies.");
-        }
-
-        setAdminReplies(result.replies || []);
-      } catch {
-        const { data, error } = await supabase
-          .from("support_tickets")
-          .select("id, message, admin_reply, admin_replied_at, status, created_at")
-          .eq("user_email", email)
-          .not("admin_reply", "is", null)
-          .order("admin_replied_at", { ascending: false });
-
-        if (error) {
-          throw new Error(error.message || "Unable to load admin replies.");
-        }
-
-        setAdminReplies((data || []).filter((item) => String(item.admin_reply || "").trim()));
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to load admin replies.");
       }
+
+      setAdminReplies(result.replies || []);
     } catch (error) {
       setAdminReplies([]);
       setReplyLookupError(error.message || "Unable to load admin replies right now.");
@@ -250,6 +282,210 @@ const HelpCenter = () => {
       setIsLoadingReplies(false);
     }
   };
+
+  return (
+    <div className="help-page animate-fade-in">
+      <header className="help-hero">
+        <div>
+          <div className="help-eyebrow">{t("help_center")}</div>
+          <h1>{t("help_center_page.title_prefix")} {t("help_center_page.title_highlight")}</h1>
+          <p>{t("help_center_page.search_placeholder")}</p>
+        </div>
+        <button type="button" className="help-ghost-button" onClick={() => navigate("/settings")}>
+          <ShieldCheck className="h-[13px] w-[13px]" />
+          Account Settings
+        </button>
+      </header>
+
+      <section className="help-search-panel">
+        <div className="help-search-wrap">
+          <Search className="h-[14px] w-[14px]" />
+          <input
+            type="text"
+            placeholder={t("help_center_page.search_placeholder")}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+        {selectedCategory !== "all" && (
+          <div className="help-active-filter">
+            <span>{t("help_center_page.filtering_by")} {categories.find((cat) => cat.id === selectedCategory)?.title}</span>
+            <button type="button" onClick={() => setSelectedCategory("all")}>
+              <X className="h-3 w-3" />
+              {t("help_center_page.clear_filter")}
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section className="help-category-grid">
+        {filteredCategories.map((cat) => (
+          <article
+            key={cat.id}
+            role="button"
+            tabIndex={0}
+            onClick={() => handleCategoryClick(cat)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleCategoryClick(cat);
+              }
+            }}
+            className={`help-category-card ${selectedCategory === cat.id ? "is-selected" : ""}`}
+          >
+            <div className="help-category-icon">{cat.icon}</div>
+            <h2>{cat.title}</h2>
+            <p>{cat.description}</p>
+            <div className="help-category-actions">
+              <span>{t("help_center_page.filter_faqs")}</span>
+              <button type="button" onClick={(event) => handleCategoryOpen(event, cat.route)}>
+                <ExternalLink className="h-3 w-3" />
+                {t("help_center_page.open_page")}
+              </button>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section ref={faqSectionRef} className="help-panel">
+        <div className="help-panel-header">
+          <div>
+            <div className="help-panel-title">
+              <HelpCircle className="h-[14px] w-[14px]" />
+              <h2>{t("help_center_page.faq_title")}</h2>
+            </div>
+            <p>{t("help_center_page.faq_subtitle")}</p>
+          </div>
+        </div>
+
+        <div className="help-faq-list">
+          {filteredFaqs.length === 0 ? (
+            <div className="help-empty-state">
+              <Search className="h-8 w-8" />
+              <p>{t("help_center_page.no_matches_title")}</p>
+              <span>{t("help_center_page.no_matches_subtitle")}</span>
+            </div>
+          ) : (
+            filteredFaqs.map((faq) => (
+              <div key={faq.id} className={`help-faq-item ${openFaq === faq.id ? "is-open" : ""}`}>
+                <button type="button" onClick={() => toggleFaq(faq.id)}>
+                  <span>{faq.question}</span>
+                  {openFaq === faq.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+                <div className="help-faq-answer">
+                  <p>{faq.answer}</p>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section id="contact-us-section" className="help-contact-layout">
+        <div className="help-panel help-contact-panel">
+          <div className="help-panel-header">
+            <div>
+              <div className="help-panel-title">
+                <MessageCircle className="h-[14px] w-[14px]" />
+                <h2>{t("help_center_page.contact_title")}</h2>
+              </div>
+              <p>{t("help_center_page.contact_subtitle")}</p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="help-form">
+            <div className="help-form-grid">
+              <input
+                type="text"
+                name="full_name"
+                value={formData.full_name}
+                onChange={handleInputChange}
+                placeholder={t("help_center_page.full_name")}
+                required
+              />
+              <input
+                type="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                placeholder={t("help_center_page.email")}
+                readOnly
+                required
+              />
+            </div>
+            <textarea
+              name="message"
+              value={formData.message}
+              onChange={handleInputChange}
+              placeholder={t("help_center_page.message")}
+              required
+              rows="6"
+            />
+            {!authLoading && !currentUser && (
+              <p className="help-error-text">{t("help_center_page.signed_in_required")}</p>
+            )}
+            <button type="submit" disabled={isSubmitting || !isFormValid || !currentUser} className="help-primary-button">
+              <Send className="h-[13px] w-[13px]" />
+              {isSubmitting ? t("help_center_page.sending") : t("help_center_page.send")}
+            </button>
+            {submitSuccess && <p className="help-success-text">{submitSuccess}</p>}
+            {submitError && <p className="help-error-text">{submitError}</p>}
+          </form>
+        </div>
+
+        <div className="help-panel help-replies-panel">
+          <div className="help-panel-header">
+            <div>
+              <div className="help-panel-title">
+                <Reply className="h-[14px] w-[14px]" />
+                <h2>{t("help_center_page.my_inquiries")}</h2>
+              </div>
+              <p>{t("help_center_page.replies_subtitle")}</p>
+            </div>
+            <span className="help-badge">{t("help_center_page.admin_reply_badge")}</span>
+          </div>
+
+          <div className="help-reply-search">
+            <input type="email" value={formData.email} readOnly placeholder="Signed-in email" />
+            <button type="button" onClick={() => fetchAdminReplies()} disabled={isLoadingReplies || !currentUser} className="help-ghost-button">
+              {isLoadingReplies ? "Checking..." : "Refresh my replies"}
+            </button>
+          </div>
+
+          {replyLookupError && <p className="help-error-text">{replyLookupError}</p>}
+
+          <div className="help-reply-list">
+            {isLoadingReplies ? (
+              <div className="help-empty-state help-empty-state--small">{t("help_center_page.loading_replies")}</div>
+            ) : adminReplies.length > 0 ? (
+              adminReplies.map((reply) => (
+                <article key={reply.id} className="help-reply-card">
+                  <div className="help-reply-head">
+                    <span>{t("help_center_page.reply_from_admins")}</span>
+                    <time>
+                      {reply.admin_replied_at
+                        ? new Date(reply.admin_replied_at).toLocaleString()
+                        : "Recently replied"}
+                    </time>
+                  </div>
+                  <div className="help-reply-block">
+                    <span>{t("help_center_page.your_message")}</span>
+                    <p>{reply.message}</p>
+                  </div>
+                  <div className="help-reply-block help-reply-block--admin">
+                    <span>{t("help_center_page.admin_reply")}</span>
+                    <p>{reply.admin_reply}</p>
+                  </div>
+                </article>
+              ))
+            ) : hasCheckedReplies ? (
+              <div className="help-empty-state help-empty-state--small">{t("help_center_page.no_admin_replies")}</div>
+            ) : null}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 
   return (
     <div className="app-page-shell animate-fade-in">
@@ -448,7 +684,7 @@ const HelpCenter = () => {
           <div className="w-full max-w-2xl rounded-3xl border border-blue-400/20 bg-[#1e293b]/45 p-6 backdrop-blur-md">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h3 className="theme-text-primary text-xl font-bold">Replies from AutoValueLK Admins</h3>
+                <h3 className="theme-text-primary text-xl font-bold">{t("help_center_page.replies_title")}</h3>
                 <p className="theme-text-secondary mt-2 text-sm leading-6">
                   Enter the same email you used in the contact form to check admin replies.
                 </p>
@@ -461,18 +697,18 @@ const HelpCenter = () => {
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <input
                 type="email"
-                value={replyEmail}
-                onChange={(event) => setReplyEmail(event.target.value)}
-                placeholder="Your email address"
+                value={formData.email}
+                readOnly
+                placeholder="Signed-in email"
                 className="w-full rounded-xl border border-slate-700/50 bg-[#0f172a]/60 px-5 py-3 outline-none transition focus:border-[#3B82F6] focus:ring-4 focus:ring-[#3B82F6]/20"
               />
               <button
                 type="button"
                 onClick={() => fetchAdminReplies()}
-                disabled={isLoadingReplies}
+                disabled={isLoadingReplies || !currentUser}
                 className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {isLoadingReplies ? "Checking..." : "Check replies"}
+                {isLoadingReplies ? "Checking..." : "Refresh my replies"}
               </button>
             </div>
 
@@ -497,11 +733,11 @@ const HelpCenter = () => {
                       </span>
                     </div>
                     <div className="rounded-xl border border-slate-700/50 bg-slate-950/35 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Your message</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{t("help_center_page.your_message")}</p>
                       <p className="mt-2 text-sm leading-6 text-slate-300 whitespace-pre-wrap">{reply.message}</p>
                     </div>
                     <div className="mt-4 rounded-xl border border-emerald-300/20 bg-slate-950/45 p-4">
-                      <p className="text-xs uppercase tracking-[0.16em] text-emerald-200">Admin reply</p>
+                      <p className="text-xs uppercase tracking-[0.16em] text-emerald-200">{t("help_center_page.admin_reply")}</p>
                       <p className="mt-2 text-sm leading-6 text-emerald-50 whitespace-pre-wrap">{reply.admin_reply}</p>
                     </div>
                   </div>

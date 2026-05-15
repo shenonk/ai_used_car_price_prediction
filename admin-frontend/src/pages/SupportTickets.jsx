@@ -180,8 +180,8 @@ function SupportTickets() {
                   key={ticket.id}
                   type="button"
                   onClick={() => setSelectedTicketId(ticket.id)}
-                  className={`w-full text-left px-6 py-4 transition-colors ${
-                    selectedTicketId === ticket.id ? 'bg-blue-500/10' : 'hover:bg-white/[0.03]'
+                  className={`contact-message-row w-full text-left px-6 py-4 transition-colors ${
+                    selectedTicketId === ticket.id ? 'contact-message-row-selected' : 'hover:bg-white/[0.03]'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">

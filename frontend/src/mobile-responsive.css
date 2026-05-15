@@ -1,0 +1,579 @@
+/* Final user-side responsive layer. Loaded last so it can normalize older page styles. */
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+.theme-app-bg,
+.app-main-content,
+.app-page-shell,
+.page-dashboard,
+.marketplace-page,
+.pc-page,
+.results-page,
+.financing-page,
+.analytics-page,
+.notifications-page,
+.help-page,
+.settings-page {
+  width: 100%;
+  min-width: 0;
+}
+
+.dashboard-page-panel,
+.dashboard-page-hero,
+.marketplace-panel,
+.results-panel,
+.analytics-trend-panel,
+.analytics-history-section,
+.financing-section,
+.notifications-panel,
+.settings-content-panel,
+.card,
+.card-glass,
+.glass {
+  min-width: 0;
+}
+
+.table-modern,
+.analytics-table,
+.financing-table {
+  width: 100%;
+}
+
+.table-modern th,
+.table-modern td,
+.analytics-table th,
+.analytics-table td,
+.financing-table th,
+.financing-table td {
+  white-space: nowrap;
+}
+
+.app-dropdown,
+.app-dropdown__wrap,
+.app-dropdown__control,
+.marketplace-field,
+.input,
+.pc-input {
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .theme-sidebar.sidebar {
+    width: min(82vw, 300px) !important;
+    max-width: 300px;
+  }
+
+  .theme-sidebar.sidebar .sidebar-user-name,
+  .theme-sidebar.sidebar .sidebar-user-email {
+    max-width: none;
+  }
+
+  .app-main-content {
+    padding-top: 64px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .page-dashboard,
+  .marketplace-page.app-page-shell,
+  .marketplace-page.theme-app-bg,
+  .pc-page,
+  .results-page,
+  .financing-page,
+  .analytics-page,
+  .notifications-page,
+  .help-page,
+  .settings-page {
+    padding: 16px !important;
+  }
+
+  .dashboard-page-hero,
+  .marketplace-redesign-hero,
+  .results-hero,
+  .financing-hero,
+  .analytics-hero,
+  .notifications-hero,
+  .settings-hero {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 14px !important;
+    padding: 18px !important;
+  }
+
+  .dashboard-page-hero h1,
+  .marketplace-redesign-hero h1,
+  .results-hero h1,
+  .financing-hero h1,
+  .analytics-hero h1,
+  .notifications-hero h1,
+  .settings-hero h1 {
+    font-size: clamp(1.45rem, 8vw, 2rem) !important;
+    line-height: 1.15 !important;
+    overflow-wrap: anywhere;
+  }
+
+  .marketplace-redesign-hero-actions,
+  .results-hero-actions,
+  .financing-actions,
+  .financing-hero-actions,
+  .analytics-hero-actions,
+  .notifications-hero-actions,
+  .settings-hero-actions {
+    width: 100% !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .marketplace-redesign-ghost-button,
+  .marketplace-redesign-primary-button,
+  .marketplace-redesign-cta-button,
+  .marketplace-primary-button,
+  .marketplace-secondary-button,
+  .results-ghost-button,
+  .results-primary-button,
+  .results-valuation-pdf-button,
+  .financing-ghost-button,
+  .financing-primary-button,
+  .analytics-ghost-button,
+  .analytics-primary-button,
+  .notifications-ghost-button,
+  .notifications-primary-button,
+  .settings-add-alert-button,
+  .settings-content-panel .btn-primary,
+  .settings-content-panel .btn-danger {
+    width: 100% !important;
+    min-height: 44px;
+  }
+
+  .dashboard-page-panel,
+  .marketplace-redesign-filter-panel,
+  .results-panel,
+  .analytics-trend-panel,
+  .analytics-history-section,
+  .financing-section,
+  .notifications-panel,
+  .settings-content-panel,
+  .help-page .glass {
+    padding: 16px !important;
+    border-radius: 12px !important;
+  }
+
+  .marketplace-redesign-filter-bar {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .marketplace-compact-dropdown,
+  .marketplace-sort-dropdown,
+  .marketplace-results-pill {
+    width: 100% !important;
+    max-width: none !important;
+    flex: none !important;
+    margin-left: 0 !important;
+  }
+
+  .marketplace-filter-divider {
+    display: none !important;
+  }
+
+  .marketplace-redesign-search,
+  .marketplace-redesign-cta,
+  .marketplace-redesign-section-heading,
+  .analytics-filter-row,
+  .analytics-trend-header,
+  .analytics-history-header,
+  .financing-comparison-heading,
+  .financing-actions,
+  .results-cta-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .marketplace-redesign-search-button,
+  .marketplace-redesign-clear-button,
+  .marketplace-show-more-button {
+    width: 100% !important;
+  }
+
+  .marketplace-redesign-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .marketplace-redesign-card-media {
+    height: auto !important;
+    aspect-ratio: 16 / 10;
+  }
+
+  .marketplace-publish-modal,
+  .marketplace-location-modal,
+  .marketplace-detail-modal {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: 88vh !important;
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+
+  .analytics-table-shell,
+  .financing-table-shell,
+  .overflow-x-auto {
+    max-width: 100%;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .analytics-chart-shell,
+  .results-bar-wrap,
+  .results-donut-wrap,
+  .chart-container {
+    min-height: 260px;
+    padding: 12px !important;
+  }
+
+  .analytics-summary-grid,
+  .analytics-trend-info-grid,
+  .financing-metrics,
+  .financing-type-grid,
+  .financing-bank-grid,
+  .results-top-grid,
+  .results-three-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .home-ds {
+    overflow-x: clip;
+  }
+
+  .home-ds-nav {
+    position: sticky;
+    top: 0;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 10px;
+    height: auto !important;
+    min-height: 56px;
+    padding: 12px 16px !important;
+  }
+
+  .home-ds-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .home-ds-brand strong {
+    max-width: 116px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .home-ds-brand small,
+  .home-ds-links {
+    display: none !important;
+  }
+
+  .home-ds-actions {
+    display: flex !important;
+    flex: 0 0 auto;
+    gap: 6px !important;
+  }
+
+  .home-ds-btn {
+    display: inline-flex !important;
+    width: auto !important;
+    white-space: nowrap;
+    min-height: 38px;
+    padding: 8px 11px !important;
+    font-size: 12px !important;
+  }
+
+  .home-ds-btn--ghost {
+    display: inline-flex !important;
+  }
+
+  .home-ds .home-ds-hero {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    padding: 32px 16px 22px !important;
+    gap: 22px !important;
+  }
+
+  .home-ds-hero h1 {
+    font-size: clamp(2.2rem, 13vw, 3.25rem) !important;
+    line-height: 0.98 !important;
+    overflow-wrap: anywhere;
+  }
+
+  .home-ds-hero-copy > p,
+  .home-ds-section-head h2,
+  .home-ds-about h2,
+  .home-ds-cta h2 {
+    overflow-wrap: anywhere;
+  }
+
+  .home-ds-hero-buttons,
+  .home-ds-cta > div:last-child {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .home-ds-large-btn,
+  .home-ds-panel-cta {
+    width: 100%;
+    justify-content: center;
+    min-height: 46px;
+  }
+
+  .home-ds-trust-pills,
+  .home-ds-meta-pills {
+    align-items: stretch;
+  }
+
+  .home-ds-trust-pills span,
+  .home-ds-meta-pills span {
+    width: 100%;
+  }
+
+  .home-ds-live-panel,
+  .home-ds-market-card,
+  .home-ds-cta {
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  .home-ds .home-ds-stats,
+  .home-ds-feature-grid,
+  .home-ds-steps-grid,
+  .home-ds-testimonial-grid,
+  .home-ds-about,
+  .home-ds-footer-top {
+    grid-template-columns: 1fr !important;
+  }
+
+  .home-ds .home-ds-section,
+  .home-ds .home-ds-about,
+  .home-ds .home-ds-cta-wrap,
+  .home-ds .home-ds-footer {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+
+  .home-ds .home-ds-stats {
+    margin-left: 16px !important;
+    margin-right: 16px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .auth-page {
+    justify-content: flex-start !important;
+    min-height: 100svh;
+    padding: 18px 12px !important;
+    overflow-y: auto !important;
+  }
+
+  .auth-logo-block {
+    margin-bottom: 14px !important;
+  }
+
+  .auth-card {
+    max-width: none !important;
+    padding: 24px 16px !important;
+    border-radius: 14px !important;
+  }
+
+  .auth-options-row {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .auth-bottom-link,
+  .auth-security-note,
+  .auth-footer-copy {
+    text-align: center;
+  }
+
+  .pc-page {
+    overflow: visible !important;
+  }
+
+  .pc-hero__title {
+    font-size: clamp(1.9rem, 10vw, 2.4rem) !important;
+  }
+
+  .pc-progress-wrap,
+  .pc-form-header,
+  .pc-info-note {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .pc-steps {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pc-step__line {
+    width: clamp(16px, 8vw, 28px) !important;
+  }
+
+  .pc-form-card {
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+
+  .app-dropdown__control,
+  .pc-input,
+  .input {
+    min-height: 46px !important;
+    font-size: 16px !important;
+  }
+
+  .app-dropdown__menu,
+  .pc-dropdown {
+    max-height: min(48vh, 18rem) !important;
+  }
+
+  .results-price {
+    font-size: clamp(2rem, 13vw, 3rem) !important;
+    overflow-wrap: anywhere;
+  }
+
+  .results-pill-row,
+  .results-loan-top,
+  .results-loan-bottom,
+  .results-market-row,
+  .results-legend-row,
+  .results-bar-legend {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+
+  .results-spec-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .analytics-table,
+  .financing-table,
+  .table-modern {
+    min-width: 680px !important;
+  }
+
+  .analytics-summary-card strong,
+  .analytics-trend-info-grid strong,
+  .financing-metric-card strong {
+    overflow-wrap: anywhere;
+  }
+
+  .notification-popup__body {
+    padding-right: 38px;
+  }
+
+  .fixed.bottom-24.right-5 {
+    right: 12px !important;
+    bottom: 92px !important;
+    width: calc(100vw - 24px) !important;
+  }
+
+  .chatbot-shell {
+    right: 10px !important;
+    bottom: 12px !important;
+    left: 10px;
+    align-items: flex-end;
+  }
+
+  .chatbot-panel {
+    width: 100% !important;
+    max-height: calc(100svh - 96px);
+  }
+
+  .chatbot-messages {
+    max-height: min(42vh, 260px) !important;
+  }
+
+  .chatbot-input-row {
+    align-items: stretch !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .page-dashboard,
+  .marketplace-page.app-page-shell,
+  .marketplace-page.theme-app-bg,
+  .pc-page,
+  .results-page,
+  .financing-page,
+  .analytics-page,
+  .notifications-page,
+  .help-page,
+  .settings-page {
+    padding: 12px !important;
+  }
+
+  .home-ds-actions {
+    width: auto;
+    display: flex !important;
+    grid-template-columns: none;
+  }
+
+  .home-ds-btn {
+    justify-content: center;
+    min-height: 34px;
+    padding: 7px 9px !important;
+    font-size: 11px !important;
+  }
+
+  .home-ds-logo {
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .home-ds-brand {
+    gap: 8px !important;
+  }
+
+  .home-ds-brand strong {
+    max-width: 104px;
+  }
+
+  .marketplace-redesign-card-body .marketplace-meta {
+    width: 100%;
+  }
+
+  .marketplace-redesign-card-footer {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+  }
+
+  .results-range-values {
+    gap: 10px;
+    flex-direction: column;
+  }
+}

@@ -174,7 +174,7 @@ class SupportTicketStatusPayload(BaseModel):
 
 class SupportTicketCreatePayload(BaseModel):
     user_name: str = Field(..., min_length=1)
-    user_email: str = Field(..., min_length=3)
+    user_email: str | None = Field(default=None, min_length=3)
     message: str = Field(..., min_length=1)
     status: str = Field(default="open", pattern="^(open|read|closed)$")
 
@@ -216,9 +216,12 @@ class MarketplaceDescriptionRequest(BaseModel):
 
 
 class AdminFinancingOptionUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1)
+    type: str | None = Field(default=None, min_length=1)
     status: str | None = Field(default=None, pattern="^(Active|Inactive)$")
     fixed_rate: float | None = Field(default=None, ge=0)
     floating_rate: float | None = Field(default=None, ge=0)
+    max_ltv: float | None = Field(default=None, ge=0)
 
 
 def normalize_input(data: dict[str, Any]) -> dict[str, Any]:
@@ -298,11 +301,14 @@ def get_default_admin_store() -> dict[str, Any]:
     return {
         "stats": {
             "total_predictions": 0,
-            "r2_score": 0.9234,
-            "mae": 285000,
+            "r2_score": 0.9875,
+            "mae": 616608.99,
             "last_training_date": "2026-02-28",
         },
         "prediction_daily_counts": {},
+        "brand_activity": {},
+        "model_activity": {},
+        "fuel_price_activity": {},
         "loan_rate": {
             "interest_rate": 12.5,
             "min_down_payment": 20,
@@ -366,6 +372,7 @@ def get_default_admin_store() -> dict[str, Any]:
                 "is_urgent": False,
                 "is_spotlight": False,
                 "is_bumped": False,
+                "view_count": 0,
                 "created_at": "2026-03-31T08:00:00Z",
                 "user_id": "user_104",
             },
@@ -391,6 +398,7 @@ def get_default_admin_store() -> dict[str, Any]:
                 "is_urgent": False,
                 "is_spotlight": True,
                 "is_bumped": False,
+                "view_count": 0,
                 "created_at": "2026-03-29T10:30:00Z",
                 "user_id": "user_087",
             },
@@ -427,6 +435,9 @@ def ensure_admin_store_shape(store: dict[str, Any]) -> dict[str, Any]:
     merged["marketplace_listings"] = store.get("marketplace_listings", defaults["marketplace_listings"])
     merged["payments"] = store.get("payments", defaults["payments"])
     merged["prediction_daily_counts"] = store.get("prediction_daily_counts", defaults["prediction_daily_counts"])
+    merged["brand_activity"] = store.get("brand_activity", defaults["brand_activity"])
+    merged["model_activity"] = store.get("model_activity", defaults["model_activity"])
+    merged["fuel_price_activity"] = store.get("fuel_price_activity", defaults["fuel_price_activity"])
     return merged
 
 
@@ -609,6 +620,31 @@ def resolve_requester_identity(authorization: str | None = None) -> dict[str, An
 
 def get_requester_identity(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     return resolve_requester_identity(authorization)
+
+
+def require_authenticated_requester(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    requester_token = get_requester_token(authorization)
+    if requester_token == "anonymous":
+        raise admin_error("Please sign in before contacting support.", status_code=401)
+
+    user_payload = fetch_supabase_user(requester_token)
+    user_id = str(user_payload.get("id") or "").strip()
+    email = str(user_payload.get("email") or "").strip()
+    if not user_id:
+        raise admin_error("Invalid or expired session. Please sign in again.", status_code=401)
+
+    metadata = user_payload.get("user_metadata") or {}
+    username = str(metadata.get("username") or metadata.get("user_name") or "").strip()
+    full_name = str(metadata.get("full_name") or metadata.get("name") or "").strip()
+
+    return {
+        "access_token": requester_token,
+        "is_authenticated": True,
+        "user_id": user_id,
+        "email": email,
+        "username": username,
+        "display_name": full_name or username or (email.split("@")[0] if email else ""),
+    }
 
 
 def make_supabase_rest_request(
@@ -1590,7 +1626,29 @@ def get_stored_prediction_count(stats: dict[str, Any]) -> int:
     return max(0, value)
 
 
-def record_prediction_metric() -> None:
+def normalize_brand_activity_label(value: Any) -> str:
+    brand = str(value or "").strip()
+    return brand.upper() if brand else ""
+
+
+def normalize_model_activity_label(value: Any) -> str:
+    model = str(value or "").strip()
+    return model.upper() if model else ""
+
+
+def normalize_fuel_activity_label(value: Any) -> str:
+    fuel = str(value or "").strip().lower()
+    return fuel.capitalize() if fuel else ""
+
+
+def record_prediction_metric(
+    brand: Any = "",
+    *,
+    model: Any = "",
+    fuel_type: Any = "",
+    predicted_price_lkr: Any = 0,
+    include_brand_activity: bool = True,
+) -> None:
     with price_model_state.admin_lock:
         stats = price_model_state.admin_store.setdefault("stats", {})
         stats["total_predictions"] = get_stored_prediction_count(stats) + 1
@@ -1601,7 +1659,91 @@ def record_prediction_metric() -> None:
         except (TypeError, ValueError):
             current_day_count = 0
         daily_counts[today_key] = current_day_count + 1
+
+        normalized_brand = normalize_brand_activity_label(brand)
+        if include_brand_activity and normalized_brand:
+            brand_activity = price_model_state.admin_store.setdefault("brand_activity", {})
+            try:
+                current_brand_count = int(brand_activity.get(normalized_brand) or 0)
+            except (TypeError, ValueError):
+                current_brand_count = 0
+            brand_activity[normalized_brand] = current_brand_count + 1
+
+            normalized_model = normalize_model_activity_label(model)
+            if normalized_model:
+                model_key = f"{normalized_brand}|||{normalized_model}"
+                model_activity = price_model_state.admin_store.setdefault("model_activity", {})
+                try:
+                    current_model_count = int(model_activity.get(model_key) or 0)
+                except (TypeError, ValueError):
+                    current_model_count = 0
+                model_activity[model_key] = current_model_count + 1
+
+            normalized_fuel = normalize_fuel_activity_label(fuel_type)
+            try:
+                predicted_price = float(predicted_price_lkr or 0)
+            except (TypeError, ValueError):
+                predicted_price = 0
+            if normalized_fuel and predicted_price > 0:
+                fuel_activity = price_model_state.admin_store.setdefault("fuel_price_activity", {})
+                fuel_prices = fuel_activity.setdefault(normalized_fuel, [])
+                if isinstance(fuel_prices, list):
+                    fuel_prices.append(round(predicted_price, 2))
+                    fuel_activity[normalized_fuel] = fuel_prices[-500:]
+
         persist_admin_store()
+
+
+def fetch_prediction_brand_counts_from_supabase() -> dict[str, int]:
+    try:
+        rows = make_supabase_rest_request(
+            "/rest/v1/predictions?select=brand&order=created_at.desc",
+            method="GET",
+            headers={
+                "Range-Unit": "items",
+                "Range": "0-9999",
+            },
+        )
+    except Exception as error:
+        log_warning(f"Unable to load prediction brand activity from Supabase: {error}")
+        return {}
+
+    counts: dict[str, int] = {}
+    for row in rows if isinstance(rows, list) else []:
+        brand = normalize_brand_activity_label((row or {}).get("brand"))
+        if not brand:
+            continue
+        counts[brand] = counts.get(brand, 0) + 1
+
+    return counts
+
+
+def fetch_prediction_insight_rows_from_supabase() -> list[dict[str, Any]]:
+    try:
+        rows = make_supabase_rest_request(
+            "/rest/v1/predictions?select=brand,model,fuel_type,predicted_price_lkr,created_at&order=created_at.desc",
+            method="GET",
+            headers={
+                "Range-Unit": "items",
+                "Range": "0-9999",
+            },
+        )
+    except Exception as error:
+        log_warning(f"Unable to load prediction insights from Supabase: {error}")
+        return []
+
+    return rows if isinstance(rows, list) else []
+
+
+def median_number(values: list[float]) -> float:
+    valid_values = sorted(value for value in values if isinstance(value, (int, float)) and value > 0)
+    if not valid_values:
+        return 0
+
+    midpoint = len(valid_values) // 2
+    if len(valid_values) % 2:
+        return float(valid_values[midpoint])
+    return float((valid_values[midpoint - 1] + valid_values[midpoint]) / 2)
 
 
 def get_recent_prediction_date_keys(days: int) -> list[str]:
@@ -2096,23 +2238,159 @@ def health_check() -> dict[str, Any]:
 
 
 @app.get("/api/notifications")
-def get_public_notifications() -> dict[str, Any]:
+def get_public_notifications(authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    requester_user_id = ""
+    requester_token = get_requester_token(authorization)
+    if requester_token != "anonymous":
+        user_payload = fetch_supabase_user(requester_token)
+        requester_user_id = str(user_payload.get("id") or "").strip()
+
     notifications = sorted(
-        [item for item in price_model_state.admin_store.get("notifications", []) if item.get("active", True)],
+        [
+            item
+            for item in price_model_state.admin_store.get("notifications", [])
+            if item.get("active", True)
+            and (
+                not item.get("user_id")
+                or (requester_user_id and str(item.get("user_id")) == requester_user_id)
+            )
+        ],
         key=lambda item: item.get("created_at", ""),
         reverse=True,
     )
     return {"notifications": notifications}
 
 
+@app.get("/api/dashboard/brand-activity")
+def get_dashboard_brand_activity(limit: int = Query(default=8, ge=1, le=20)) -> dict[str, Any]:
+    counts = fetch_prediction_brand_counts_from_supabase()
+
+    local_counts = price_model_state.admin_store.get("brand_activity", {})
+    if isinstance(local_counts, dict):
+        for brand, count in local_counts.items():
+            normalized_brand = normalize_brand_activity_label(brand)
+            if not normalized_brand:
+                continue
+            try:
+                normalized_count = int(count or 0)
+            except (TypeError, ValueError):
+                normalized_count = 0
+            counts[normalized_brand] = counts.get(normalized_brand, 0) + max(0, normalized_count)
+
+    top_brands = [
+        {"label": brand, "count": count}
+        for brand, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
+        if count > 0
+    ]
+
+    return {
+        "top_brands": top_brands,
+        "total_events": sum(counts.values()),
+        "source": "supabase_and_local_prediction_activity",
+    }
+
+
+@app.get("/api/price-check/insights")
+def get_price_check_insights(limit: int = Query(default=5, ge=1, le=10)) -> dict[str, Any]:
+    rows = fetch_prediction_insight_rows_from_supabase()
+    week_cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+    brand_counts: dict[str, int] = {}
+    model_counts: dict[str, int] = {}
+    fuel_prices: dict[str, list[float]] = {}
+
+    for row in rows:
+        brand = normalize_brand_activity_label((row or {}).get("brand"))
+        model = normalize_model_activity_label((row or {}).get("model"))
+        fuel = normalize_fuel_activity_label((row or {}).get("fuel_type"))
+        try:
+            price = float((row or {}).get("predicted_price_lkr") or 0)
+        except (TypeError, ValueError):
+            price = 0
+
+        if brand:
+            brand_counts[brand] = brand_counts.get(brand, 0) + 1
+        if fuel and price > 0:
+            fuel_prices.setdefault(fuel, []).append(price)
+
+        timestamp = parse_record_timestamp((row or {}).get("created_at"))
+        if brand and model and timestamp and timestamp >= week_cutoff:
+            model_key = f"{brand}|||{model}"
+            model_counts[model_key] = model_counts.get(model_key, 0) + 1
+
+    local_brand_counts = price_model_state.admin_store.get("brand_activity", {})
+    if isinstance(local_brand_counts, dict):
+        for brand, count in local_brand_counts.items():
+            normalized_brand = normalize_brand_activity_label(brand)
+            if not normalized_brand:
+                continue
+            try:
+                normalized_count = int(count or 0)
+            except (TypeError, ValueError):
+                normalized_count = 0
+            brand_counts[normalized_brand] = brand_counts.get(normalized_brand, 0) + max(0, normalized_count)
+
+    local_model_counts = price_model_state.admin_store.get("model_activity", {})
+    if isinstance(local_model_counts, dict):
+        for model_key, count in local_model_counts.items():
+            if "|||" not in str(model_key):
+                continue
+            try:
+                normalized_count = int(count or 0)
+            except (TypeError, ValueError):
+                normalized_count = 0
+            model_counts[str(model_key)] = model_counts.get(str(model_key), 0) + max(0, normalized_count)
+
+    local_fuel_prices = price_model_state.admin_store.get("fuel_price_activity", {})
+    if isinstance(local_fuel_prices, dict):
+        for fuel, prices in local_fuel_prices.items():
+            normalized_fuel = normalize_fuel_activity_label(fuel)
+            if not normalized_fuel or not isinstance(prices, list):
+                continue
+            for price in prices:
+                try:
+                    normalized_price = float(price or 0)
+                except (TypeError, ValueError):
+                    normalized_price = 0
+                if normalized_price > 0:
+                    fuel_prices.setdefault(normalized_fuel, []).append(normalized_price)
+
+    top_brand = sorted(brand_counts.items(), key=lambda item: (-item[1], item[0]))[0][0] if brand_counts else ""
+    fuel_order = ["Petrol", "Hybrid", "Diesel", "Electric"]
+    fuel_price_ranges = [
+        {
+            "label": fuel,
+            "median_price_lkr": round(median_number(fuel_prices.get(fuel, [])), 2),
+            "count": len(fuel_prices.get(fuel, [])),
+        }
+        for fuel in fuel_order
+        if fuel_prices.get(fuel)
+    ]
+
+    trending_models = []
+    for key, count in sorted(model_counts.items(), key=lambda item: (-item[1], item[0]))[:limit]:
+        brand, model = str(key).split("|||", 1)
+        trending_models.append({"brand": brand, "model": model, "count": count})
+
+    return {
+        "top_brand": top_brand,
+        "fuel_price_ranges": fuel_price_ranges,
+        "trending_models": trending_models,
+        "source": "supabase_and_local_prediction_activity",
+    }
+
+
 @app.post("/api/support-ticket")
-def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]:
+def create_support_ticket(
+    payload: SupportTicketCreatePayload,
+    requester: dict[str, Any] = Depends(require_authenticated_requester),
+) -> dict[str, Any]:
     with price_model_state.admin_lock:
         tickets = price_model_state.admin_store["support_tickets"]
         ticket = {
             "id": get_next_numeric_id(tickets),
+            "user_id": requester["user_id"],
             "user_name": payload.user_name.strip(),
-            "user_email": payload.user_email.strip(),
+            "user_email": requester["email"],
             "message": payload.message.strip(),
             "status": payload.status,
             "admin_reply": "",
@@ -2126,11 +2404,14 @@ def create_support_ticket(payload: SupportTicketCreatePayload) -> dict[str, Any]
 
 
 @app.get("/api/support-ticket-replies")
-def get_support_ticket_replies(email: str = Query(..., min_length=3)) -> dict[str, Any]:
-    normalized_email = email.strip().lower()
+def get_support_ticket_replies(
+    requester: dict[str, Any] = Depends(require_authenticated_requester),
+) -> dict[str, Any]:
+    requester_user_id = requester["user_id"]
     replies = [
         {
             "id": item.get("id"),
+            "user_id": item.get("user_id"),
             "message": item.get("message", ""),
             "admin_reply": item.get("admin_reply", ""),
             "admin_replied_at": item.get("admin_replied_at"),
@@ -2138,7 +2419,7 @@ def get_support_ticket_replies(email: str = Query(..., min_length=3)) -> dict[st
             "created_at": item.get("created_at"),
         }
         for item in price_model_state.admin_store.get("support_tickets", [])
-        if str(item.get("user_email", "")).strip().lower() == normalized_email
+        if str(item.get("user_id", "")).strip() == requester_user_id
         and str(item.get("admin_reply", "")).strip()
     ]
     replies.sort(key=lambda item: item.get("admin_replied_at") or item.get("created_at") or "", reverse=True)
@@ -2214,6 +2495,7 @@ async def create_marketplace_listing(
             "is_urgent": parse_boolean_flag(is_urgent),
             "is_spotlight": parse_boolean_flag(is_spotlight),
             "is_bumped": parse_boolean_flag(is_bumped),
+            "view_count": 0,
             "created_at": created_at,
             "updated_at": created_at,
             "user_id": requester["user_id"],
@@ -2226,6 +2508,21 @@ async def create_marketplace_listing(
 
     sync_marketplace_listing_to_supabase(listing)
     return {"message": "Marketplace listing created successfully.", "listing": listing}
+
+
+@app.post("/api/marketplace/listings/{listing_id}/view")
+def record_marketplace_listing_view(listing_id: str) -> dict[str, Any]:
+    with price_model_state.admin_lock:
+        listing = get_marketplace_listing_by_id(listing_id)
+        if listing is None:
+            raise admin_error("Marketplace listing not found.", status_code=404)
+
+        current_count = int(float(listing.get("view_count") or 0))
+        listing["view_count"] = current_count + 1
+        listing["updated_at"] = utc_now_iso()
+        persist_admin_store()
+
+    return {"view_count": listing["view_count"], "listing": listing}
 
 
 @app.post("/api/marketplace/generate-description")
@@ -2533,6 +2830,21 @@ def update_support_ticket(
             ticket["admin_replied_at"] = utc_now_iso() if reply else None
             if reply:
                 ticket["status"] = "closed"
+                user_id = str(ticket.get("user_id") or "").strip()
+                if user_id:
+                    notifications = price_model_state.admin_store.setdefault("notifications", [])
+                    notifications.append(
+                        {
+                            "id": get_next_numeric_id(notifications),
+                            "user_id": user_id,
+                            "title": "Admin replied to your inquiry",
+                            "message": "AutoValueLK admins have replied to your Help Center message.",
+                            "active": True,
+                            "source": "support_ticket",
+                            "support_ticket_id": ticket["id"],
+                            "created_at": utc_now_iso(),
+                        }
+                    )
 
         persist_admin_store()
 
@@ -2827,9 +3139,14 @@ def predict_price(
         raise HTTPException(status_code=500, detail=f"Prediction failed: {error}") from error
 
     prediction_warning = get_prediction_warning(raw_features, predicted_price)
-    record_prediction_metric()
-
     cloud_saved = sync_prediction_to_supabase(raw_features, predicted_price, requester)
+    record_prediction_metric(
+        raw_features.get("brand"),
+        model=raw_features.get("model"),
+        fuel_type=raw_features.get("fuel_type"),
+        predicted_price_lkr=predicted_price,
+        include_brand_activity=not cloud_saved,
+    )
     save_status = "cloud" if cloud_saved else "local_only"
     save_message = (
         "Prediction saved to your account."

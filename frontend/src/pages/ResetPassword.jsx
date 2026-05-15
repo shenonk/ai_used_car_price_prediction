@@ -1,298 +1,192 @@
-import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
-import { updatePassword } from "../utils/auth"
-import { supabase } from "../utils/supabaseClient"
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Check, CheckCircle, Eye, EyeOff, Key, Loader2, Lock, Shield } from "lucide-react";
+import { updatePassword } from "../utils/auth";
+import { supabase } from "../utils/supabaseClient";
+import logo from "../assets/logo/autovaluelk-logo.png";
 
-function ResetPassword() {
-    const navigate = useNavigate()
-    const [step, setStep] = useState(1) // 1 = form, 2 = success
-    const [newPassword, setNewPassword] = useState("")
-    const [confirmPassword, setConfirmPassword] = useState("")
-    const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState("")
-    const [showPassword, setShowPassword] = useState(false)
-    const [isValidSession, setIsValidSession] = useState(false)
-
-    useEffect(() => {
-        const checkSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session) {
-                setIsValidSession(true)
-            }
-        }
-        checkSession()
-        
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            if (session) {
-                setIsValidSession(true)
-                setError("")
-            }
-        })
-        
-        return () => subscription.unsubscribe()
-    }, [])
-
-    const handlePasswordReset = async (e) => {
-        e.preventDefault()
-        setError("")
-
-        if (newPassword.length < 6) {
-            setError("Password must be at least 6 characters.")
-            return
-        }
-        if (newPassword !== confirmPassword) {
-            setError("Passwords do not match.")
-            return
-        }
-
-        setIsLoading(true)
-        try {
-            const result = await updatePassword(newPassword)
-
-            if (result.success) {
-                if (result.requiresRelogin) {
-                    navigate("/login", {
-                        replace: true,
-                        state: {
-                            authMessage: result.message || "Password updated, please log in again.",
-                            authSubMessage: "For security, your password reset ended the current session.",
-                        },
-                    })
-                    return
-                }
-
-                setStep(2)
-            } else {
-                setError(result.error)
-            }
-        } catch (err) {
-            const message = typeof err?.message === "string" && err.message.toLowerCase().includes("auth session missing")
-                ? "Auth session missing. Please refresh the page or log in again for security before updating your password."
-                : "Something went wrong while updating your password. Please refresh the page or log in again and try once more."
-            setError(message)
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
-    return (
-        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden auth-scanlines">
-            {/* Animated Background Elements */}
-            <div className="absolute inset-0 overflow-hidden">
-                {/* Aurora bands — purple palette */}
-                <div className="auth-aurora top-[10%] left-[-20%] bg-purple-500/15" style={{ animationDelay: '0s' }}></div>
-                <div className="auth-aurora bottom-[5%] right-[-20%] bg-indigo-500/12" style={{ animationDelay: '4s' }}></div>
-                <div className="auth-aurora top-[50%] left-[10%] bg-violet-500/10" style={{ animationDelay: '8s', height: '30%' }}></div>
-
-                {/* Floating orbs */}
-                <div className="absolute top-1/4 -left-20 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-float"></div>
-                <div className="absolute bottom-1/4 -right-20 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-float" style={{ animationDelay: '1.5s' }}></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-600/10 rounded-full blur-3xl"></div>
-
-                {/* Grid overlay */}
-                <div className="absolute inset-0 opacity-[0.03]"
-                    style={{
-                        backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), 
-                             linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-                        backgroundSize: '50px 50px'
-                    }}>
-                </div>
-
-                {/* Floating geometric shapes */}
-                <div className="auth-geo-shape top-20 left-20 w-16 h-16 border border-purple-500/10 rounded-2xl" style={{ animationDelay: '0s', animationDuration: '14s' }}></div>
-                <div className="auth-geo-shape top-40 right-32 w-12 h-12 border border-indigo-500/10 rounded-full" style={{ animationDelay: '3s', animationDuration: '12s' }}></div>
-                <div className="auth-geo-shape bottom-32 left-32 w-20 h-20 border border-violet-500/10 rounded-3xl" style={{ animationDelay: '6s', animationDuration: '16s' }}></div>
-                <div className="auth-geo-shape bottom-20 right-20 w-14 h-14 border border-purple-500/10 rounded-xl" style={{ animationDelay: '2s', animationDuration: '11s' }}></div>
-
-                {/* Tiny particle dots */}
-                <div className="auth-particle w-1.5 h-1.5 bg-purple-400/50 top-[15%] left-[20%]" style={{ animationDelay: '0s' }}></div>
-                <div className="auth-particle w-1 h-1 bg-indigo-400/40 top-[60%] right-[15%]" style={{ animationDelay: '2s', animationDuration: '10s' }}></div>
-                <div className="auth-particle w-2 h-2 bg-violet-300/30 bottom-[25%] left-[45%]" style={{ animationDelay: '4s', animationDuration: '12s' }}></div>
-                <div className="auth-particle w-1 h-1 bg-purple-400/40 top-[35%] right-[35%]" style={{ animationDelay: '1s', animationDuration: '9s' }}></div>
-
-                {/* Radial spotlight */}
-                <div className="auth-spotlight top-1/2 left-1/2 bg-purple-500/8" style={{ filter: 'blur(60px)' }}></div>
-            </div>
-
-            {/* Main Card */}
-            <div className="relative z-10 w-full max-w-md animate-fade-in">
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-blue-500 mb-6 shadow-lg shadow-purple-500/30 auth-logo-float">
-                        {step === 2 ? (
-                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        ) : (
-                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                            </svg>
-                        )}
-                    </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">
-                        {step === 1 && <>Create New <span className="auth-gradient-text-shimmer">Password</span></>}
-                        {step === 2 && <><span className="auth-gradient-text-shimmer">Password Reset</span> Complete</>}
-                    </h1>
-                </div>
-
-                {/* Glass Card */}
-                <div className="card-glass p-8 auth-card-glow-purple auth-card-accent auth-card-accent-purple">
-                    {step === 1 && !isValidSession && !error && (
-                        <div className="text-center text-slate-300 auth-field-enter">
-                           <div className="flex justify-center mb-4">
-                               <svg className="animate-spin h-8 w-8 text-purple-400" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                               </svg>
-                           </div>
-                           <p>Validating secure link...</p>
-                        </div>
-                    )}
-
-                    {step === 1 && !isValidSession && error && (
-                         <div className="text-center auth-field-enter">
-                            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm mb-6">
-                                {error}
-                            </div>
-                            <button
-                                onClick={() => navigate("/forgot-password")}
-                                className="w-full btn-primary auth-btn-neon-purple py-3"
-                            >
-                                Request New Link
-                            </button>
-                        </div>
-                    )}
-
-                    {step === 1 && isValidSession && (
-                        <form onSubmit={handlePasswordReset} className="space-y-6">
-                            {error && (
-                                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-sm flex items-center gap-2 auth-field-enter">
-                                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    {error}
-                                </div>
-                            )}
-
-                            {/* New Password Field */}
-                            <div className="space-y-2 auth-field-enter" style={{ animationDelay: '0.1s' }}>
-                                <label className="label text-center">New Password</label>
-                                <div className="relative group auth-input-wrap">
-                                    <input
-                                        type={showPassword ? "text" : "password"}
-                                        value={newPassword}
-                                        onChange={(e) => setNewPassword(e.target.value)}
-                                        placeholder="Create a new password"
-                                        className="input pl-12 pr-12 auth-input-glow"
-                                        required
-                                    />
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-purple-400 transition-colors auth-icon">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                        </svg>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
-                                    >
-                                        {showPassword ? (
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                            </svg>
-                                        ) : (
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                            </svg>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Confirm Password Field */}
-                            <div className="space-y-2 auth-field-enter" style={{ animationDelay: '0.2s' }}>
-                                <label className="label text-center">Confirm New Password</label>
-                                <div className="relative group auth-input-wrap">
-                                    <input
-                                        type={showPassword ? "text" : "password"}
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        placeholder="Confirm your new password"
-                                        className="input pl-12 auth-input-glow"
-                                        required
-                                    />
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-purple-400 transition-colors auth-icon">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                        </svg>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="auth-field-enter" style={{ animationDelay: '0.3s' }}>
-                                <button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="w-full btn-primary auth-btn-neon-purple flex items-center justify-center gap-3 py-4 text-lg disabled:opacity-70 disabled:cursor-not-allowed"
-                                >
-                                    {isLoading ? (
-                                        <>
-                                            <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            <span>Resetting password...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span>Reset Password</span>
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </form>
-                    )}
-
-                    {/* Step 2: Success */}
-                    {step === 2 && (
-                        <div className="text-center space-y-6 auth-field-enter">
-                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/30 mb-2" style={{ boxShadow: '0 0 30px rgba(16, 185, 129, 0.15), 0 0 60px rgba(16, 185, 129, 0.05)' }}>
-                                <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-semibold text-white mb-2">All Done!</h3>
-                                <p className="text-slate-400 text-sm">
-                                    Your password has been successfully reset. You can now sign in with your new password.
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => navigate("/login")}
-                                className="w-full btn-primary auth-btn-neon-purple flex items-center justify-center gap-3 py-4 text-lg"
-                            >
-                                <span>Go to Sign In</span>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                </svg>
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div className="text-center mt-8 space-y-2 auth-field-enter" style={{ animationDelay: '0.4s' }}>
-                    <p className="text-slate-600 text-xs">
-                        © 2026 AutoValueLK. All rights reserved.
-                    </p>
-                </div>
-
-            </div>
-        </div>
-    )
+function AuthLogo() {
+  return (
+    <div className="auth-logo-block">
+      <div className="auth-logo-icon"><img src={logo} alt="AutoValueLK" /></div>
+      <strong>AutoValueLK</strong>
+      <span>Sri Lankan vehicle intelligence</span>
+    </div>
+  );
 }
 
-export default ResetPassword
+function ResetPassword() {
+  const navigate = useNavigate();
+  const [step, setStep] = useState(1);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isValidSession, setIsValidSession] = useState(false);
+  const hasConfirmValue = Boolean(newPassword && confirmPassword);
+  const passwordsMatch = hasConfirmValue && newPassword === confirmPassword;
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsValidSession(true);
+      }
+    };
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        setIsValidSession(true);
+        setError("");
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    setError("");
+
+    if (newPassword.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await updatePassword(newPassword);
+
+      if (result.success) {
+        if (result.requiresRelogin) {
+          navigate("/login", {
+            replace: true,
+            state: {
+              authMessage: result.message || "Password updated, please log in again.",
+              authSubMessage: "For security, your password reset ended the current session.",
+            },
+          });
+          return;
+        }
+
+        setStep(2);
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      const message = typeof err?.message === "string" && err.message.toLowerCase().includes("auth session missing")
+        ? "Auth session missing. Please refresh the page or log in again for security before updating your password."
+        : "Something went wrong while updating your password. Please refresh the page or log in again and try once more.";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="auth-page">
+      <AuthLogo />
+
+      <div className={step === 2 ? "auth-success-ring" : "auth-page-icon"}>
+        {step === 2 ? <span><Check /></span> : <Key />}
+      </div>
+
+      <div className="auth-card">
+        <div className="auth-card-heading">
+          <h1>{step === 1 ? "Create new password" : "Password reset complete"}</h1>
+          <p>{step === 1 ? "Choose a secure password for your account" : "You can now sign in with your new password."}</p>
+        </div>
+
+        {step === 1 && !isValidSession && !error && (
+          <div className="auth-loading-state">
+            <Loader2 className="spin" />
+            <p>Validating secure link...</p>
+          </div>
+        )}
+
+        {step === 1 && !isValidSession && error && (
+          <div className="auth-success-content">
+            <div className="auth-error-box">{error}</div>
+            <button type="button" onClick={() => navigate("/forgot-password")} className="auth-primary-button">
+              <span>Request New Link</span>
+              <ArrowRight />
+            </button>
+          </div>
+        )}
+
+        {step === 1 && isValidSession && (
+          <form onSubmit={handlePasswordReset} className="auth-form">
+            {error && <div className="auth-error-box">{error}</div>}
+
+            <div className="auth-field" style={{ animationDelay: "0.1s" }}>
+              <label>NEW PASSWORD</label>
+              <div className="input-wrapper has-right-icon">
+                <Lock className="input-icon" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Create a new password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="input-icon-right"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff /> : <Eye />}
+                </button>
+              </div>
+            </div>
+
+            <div className="auth-field" style={{ animationDelay: "0.2s" }}>
+              <label>CONFIRM NEW PASSWORD</label>
+              <div className={`input-wrapper has-right-icon ${hasConfirmValue ? passwordsMatch ? "is-valid" : "is-invalid" : ""}`}>
+                <Shield className="input-icon" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your new password"
+                  required
+                />
+                <span className="input-icon-right auth-match-icon">
+                  {hasConfirmValue ? passwordsMatch ? <CheckCircle /> : null : null}
+                </span>
+              </div>
+            </div>
+
+            <button type="submit" disabled={isLoading} className="auth-primary-button">
+              <span>Reset Password</span>
+              {isLoading ? <Loader2 className="spin" /> : <Check />}
+            </button>
+          </form>
+        )}
+
+        {step === 2 && (
+          <div className="auth-success-content">
+            <div className="auth-success-note">
+              <CheckCircle />
+              <span>Your password has been successfully reset.</span>
+            </div>
+            <button type="button" onClick={() => navigate("/login")} className="auth-primary-button auth-primary-button--success">
+              <span>Go to Sign In</span>
+              <ArrowRight />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <p className="auth-footer-copy">© 2026 AutoValueLK. All rights reserved.</p>
+    </div>
+  );
+}
+
+export default ResetPassword;

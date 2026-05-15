@@ -142,6 +142,9 @@ vite.config.ts.timestamp-*
 __pycache__/
 *.pyc
 
+# Local backend runtime data
+backend/data/admin_store.json
+
 # ML model artifacts
 *.joblib
 *.pkl

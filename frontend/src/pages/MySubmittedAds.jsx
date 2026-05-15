@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { CheckCircle2, Clock3, Store, XCircle } from "lucide-react";
+import { BarChart3, CheckCircle2, Clock3, Eye, Store, TrendingUp, XCircle } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
 
@@ -141,14 +141,34 @@ function MySubmittedAds() {
     };
   }, [t]);
 
-  const summary = useMemo(
-    () => ({
-      pending: myListings.filter((listing) => listing.status === "pending").length,
-      approved: myListings.filter((listing) => listing.status === "approved").length,
-      rejected: myListings.filter((listing) => listing.status === "rejected").length,
-    }),
-    [myListings]
-  );
+  const summary = useMemo(() => {
+    const statusCounts = myListings.reduce(
+      (acc, listing) => {
+        const status = String(listing.status || "pending").toLowerCase();
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+      },
+      { pending: 0, approved: 0, rejected: 0, sold: 0 }
+    );
+    const totalViews = myListings.reduce((sum, listing) => sum + getListingViews(listing), 0);
+    const topViewedAd = [...myListings].sort((a, b) => getListingViews(b) - getListingViews(a))[0] || null;
+    const maxViews = Math.max(...myListings.map(getListingViews), 1);
+    const leaderboard = [...myListings]
+      .sort((a, b) => getListingViews(b) - getListingViews(a))
+      .slice(0, 4)
+      .map((listing) => ({
+        ...listing,
+        viewWidth: `${Math.max(8, (getListingViews(listing) / maxViews) * 100)}%`,
+      }));
+
+    return {
+      ...statusCounts,
+      totalViews,
+      topViewedAd,
+      leaderboard,
+      totalAds: myListings.length,
+    };
+  }, [myListings]);
 
   return (
     <div className="marketplace-page theme-app-bg min-h-screen px-6 py-8 md:px-8">
@@ -177,6 +197,109 @@ function MySubmittedAds() {
             <StatCard label={t("marketplace.my_ads.stats.pending")} value={summary.pending} />
             <StatCard label={t("marketplace.my_ads.stats.approved")} value={summary.approved} />
             <StatCard label={t("marketplace.my_ads.stats.rejected")} value={summary.rejected} />
+          </div>
+        </div>
+      </section>
+
+      <section className="marketplace-panel card mt-6 animate-fade-in overflow-hidden">
+        <div className="relative p-5 md:p-6">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(20,184,166,0.12),_transparent_30%)]" />
+          <div className="relative">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">{t("marketplace.my_ads.performance", { defaultValue: "Ad performance" })}</p>
+                <h2 className="mt-2 text-2xl font-bold text-white">{t("marketplace.my_ads.insights_title", { defaultValue: "Your listing insights" })}</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                  Track buyer views, review status, and which ads are getting the most attention.
+                </p>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-slate-700/70 bg-slate-950/40 px-4 py-2 text-sm text-slate-300">
+                <BarChart3 className="h-4 w-4 text-cyan-300" />
+                {summary.totalAds} submitted ads
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <PerformanceCard
+                icon={<Store className="h-5 w-5" />}
+                label="Approved ads"
+                value={summary.approved}
+                meta="Visible in the public marketplace"
+                tone="text-emerald-300 bg-emerald-500/10"
+              />
+              <PerformanceCard
+                icon={<Eye className="h-5 w-5" />}
+                label="Total views"
+                value={summary.totalViews.toLocaleString("en-LK")}
+                meta="Buyer opens across your ads"
+                tone="text-cyan-300 bg-cyan-500/10"
+              />
+              <PerformanceCard
+                icon={<Clock3 className="h-5 w-5" />}
+                label="Pending review"
+                value={summary.pending}
+                meta="Waiting for admin approval"
+                tone="text-amber-300 bg-amber-500/10"
+              />
+              <PerformanceCard
+                icon={<TrendingUp className="h-5 w-5" />}
+                label="Top viewed"
+                value={summary.topViewedAd ? `${summary.topViewedAd.brand} ${summary.topViewedAd.model}` : "No data"}
+                meta={summary.topViewedAd ? `${getListingViews(summary.topViewedAd).toLocaleString("en-LK")} views` : "Views appear after buyers open ads"}
+                tone="text-blue-300 bg-blue-500/10"
+              />
+            </div>
+
+            <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-[24px] border border-slate-800/80 bg-slate-950/35 p-5">
+                <h3 className="text-lg font-semibold text-white">{t("marketplace.my_ads.views_leaderboard", { defaultValue: "Views leaderboard" })}</h3>
+                <p className="mt-1 text-sm text-slate-500">{t("marketplace.my_ads.views_leaderboard_subtitle", { defaultValue: "Your strongest ads by buyer interest." })}</p>
+                <div className="mt-5 space-y-3">
+                  {summary.leaderboard.length > 0 ? (
+                    summary.leaderboard.map((listing) => (
+                      <div key={listing.id} className="rounded-2xl border border-slate-800/80 bg-slate-900/45 p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-white">
+                              {listing.brand} {listing.model}
+                            </p>
+                            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{listing.status || "pending"}</p>
+                          </div>
+                          <p className="shrink-0 text-sm font-semibold text-cyan-300">
+                            {getListingViews(listing).toLocaleString("en-LK")} views
+                          </p>
+                        </div>
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+                          <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-300" style={{ width: listing.viewWidth }} />
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-700/80 px-5 py-8 text-center text-sm text-slate-400">
+                      Publish an ad to start tracking buyer views.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-slate-800/80 bg-slate-950/35 p-5">
+                <h3 className="text-lg font-semibold text-white">{t("marketplace.my_ads.review_label")}</h3>
+                <p className="mt-1 text-sm text-slate-500">{t("marketplace.my_ads.review_subtitle", { defaultValue: "Submitted ads by current stage." })}</p>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  {[
+                    ["Approved", summary.approved, "text-emerald-300"],
+                    ["Pending", summary.pending, "text-amber-300"],
+                    ["Rejected", summary.rejected, "text-rose-300"],
+                    ["Sold", summary.sold || 0, "text-blue-300"],
+                  ].map(([label, value, tone]) => (
+                    <div key={label} className="rounded-2xl border border-slate-800/80 bg-slate-900/45 p-4">
+                      <p className={`text-2xl font-bold ${tone}`}>{value}</p>
+                      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -257,6 +380,10 @@ function MyListingCard({ listing, locale, t }) {
             {listing.year || "-"} • {listing.vehicle_location || t("marketplace.fallbacks.location_not_listed")}
           </p>
           <p className="mt-3 text-xl font-semibold text-white">{formatCurrency(listing.price, locale)}</p>
+          <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-slate-400">
+            <Eye className="h-4 w-4 text-emerald-400" />
+            {getListingViews(listing).toLocaleString("en-LK")} views
+          </p>
         </div>
       </div>
 
@@ -284,6 +411,21 @@ function StatCard({ label, value }) {
       <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
     </div>
   );
+}
+
+function PerformanceCard({ icon, label, value, meta, tone }) {
+  return (
+    <div className="rounded-[24px] border border-slate-800/80 bg-slate-950/35 p-5">
+      <div className={`inline-flex rounded-2xl p-3 ${tone}`}>{icon}</div>
+      <p className="mt-5 text-xs uppercase tracking-[0.2em] text-slate-500">{label}</p>
+      <p className="mt-2 truncate text-2xl font-bold text-white">{value}</p>
+      <p className="mt-1 text-sm text-slate-400">{meta}</p>
+    </div>
+  );
+}
+
+function getListingViews(listing) {
+  return Number(listing?.view_count || listing?.views || 0);
 }
 
 function getListingImagesForCard(listing) {

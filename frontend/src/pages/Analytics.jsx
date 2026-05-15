@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useState } from "react"
 import { Line } from "react-chartjs-2"
-import { BarChart3, Search, Sparkles, Trash2 } from "lucide-react"
+import {
+  BarChart2,
+  Car,
+  Check,
+  Clock,
+  Cpu,
+  Database,
+  Download,
+  Eye,
+  Plus,
+  Search,
+  Trash2,
+  TrendingUp,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router-dom"
 import {
@@ -16,6 +29,7 @@ import {
 } from "chart.js"
 import SuccessToast from "../components/auth/SuccessToast"
 import AppModal from "../components/AppModal"
+import AppDropdown from "../components/AppDropdown"
 import { deletePredictionHistoryEntry, loadPredictionHistory } from "../utils/predictionHistory"
 import { supabase } from "../utils/supabaseClient"
 import analyticsTrends from "../data/analytics_trends.json"
@@ -402,14 +416,6 @@ function Analytics() {
     message: "",
     subMessage: "",
   })
-  const themeStyles =
-    typeof window !== "undefined"
-      ? getComputedStyle(document.documentElement)
-      : null
-  const themeTextPrimary = themeStyles?.getPropertyValue("--text-primary")?.trim() || "#f8fafc"
-  const themeTextSecondary = themeStyles?.getPropertyValue("--text-secondary")?.trim() || "#94a3b8"
-  const themeSurface = themeStyles?.getPropertyValue("--bg-surface")?.trim() || "#1e293b"
-  const themeBorder = themeStyles?.getPropertyValue("--border-color")?.trim() || "#334155"
   const depreciationAssumptionLabel = t("dashboard_page.depreciation_assumption_value")
 
   const showToast = (type, message, subMessage = "") => {
@@ -531,15 +537,15 @@ function Analytics() {
       {
         label: t("analytics_page.vehicle_value_label"),
         data: chartSeries.values,
-        borderColor: "#f97316",
-        backgroundColor: "rgba(249, 115, 22, 0.1)",
+        borderColor: "#d97706",
+        backgroundColor: "rgba(217, 119, 6, 0.08)",
         tension: 0.4,
         fill: true,
-        pointBackgroundColor: "#f97316",
-        pointBorderColor: "#fff",
+        pointBackgroundColor: "#d97706",
+        pointBorderColor: "#0d1117",
         pointBorderWidth: 2,
-        pointRadius: 5,
-        pointHoverRadius: 8,
+        pointRadius: 4,
+        pointHoverRadius: 6,
       },
     ],
   }
@@ -552,14 +558,14 @@ function Analytics() {
       mode: "index",
     },
     plugins: {
-      legend: { labels: { color: themeTextSecondary } },
+      legend: { display: false },
       tooltip: {
-        backgroundColor: themeSurface,
-        titleColor: themeTextPrimary,
-        bodyColor: themeTextSecondary,
-        borderColor: themeBorder,
-        borderWidth: 1,
-        cornerRadius: 12,
+        backgroundColor: "#161b22",
+        titleColor: "#e6edf3",
+        bodyColor: "#7d8590",
+        borderColor: "#21262d",
+        borderWidth: 0.5,
+        cornerRadius: 8,
         padding: 12,
         callbacks: {
           label: (context) => `LKR ${CURRENCY_FORMATTER.format(context.parsed.y)}`,
@@ -568,18 +574,20 @@ function Analytics() {
     },
     scales: {
       x: {
-        grid: { color: themeBorder },
+        grid: { color: "#21262d" },
         ticks: {
-          color: themeTextSecondary,
+          color: "#7d8590",
+          font: { size: 11 },
           maxRotation: 0,
           autoSkip: true,
           maxTicksLimit: 6,
         },
       },
       y: {
-        grid: { color: themeBorder },
+        grid: { color: "#21262d" },
         ticks: {
-          color: themeTextSecondary,
+          color: "#7d8590",
+          font: { size: 11 },
           maxTicksLimit: 5,
           callback: (value) => `LKR ${CURRENCY_FORMATTER.format(value)}`,
         },
@@ -672,7 +680,7 @@ function Analytics() {
   }
 
   return (
-    <div className="app-page-shell">
+    <div className="analytics-page">
       <SuccessToast
         isOpen={toast.isOpen && toast.type === "success"}
         message={toast.message}
@@ -728,110 +736,118 @@ function Analytics() {
         </div>
       )}
 
-      <div className="dashboard-page-hero mb-8 animate-fade-in">
-        <div className="dashboard-page-eyebrow mb-4">
-          <svg className="h-3.5 w-3.5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-          </svg>
-          {t("analytics_page.title")}
+      <header className="analytics-hero animate-fade-in">
+        <div>
+          <div className="analytics-eyebrow">{t("analytics_page.eyebrow")}</div>
+          <h1>{t("analytics_page.title")}</h1>
+          <p>{t("analytics_page.subtitle")}</p>
         </div>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-white">{t("analytics_page.title")}</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{t("analytics_page.subtitle")}</p>
-      </div>
+        <div className="analytics-hero-actions">
+          <button type="button" className="analytics-ghost-button">
+            <Download className="h-[13px] w-[13px]" />
+            {t("analytics_page.export_data", { defaultValue: "Export Data" })}
+          </button>
+          <Link to="/price-check" className="analytics-primary-button">
+            <Plus className="h-[13px] w-[13px]" />
+            {t("dashboard_page.quick_actions.new_prediction_title")}
+          </Link>
+        </div>
+      </header>
 
-      <div className="dashboard-page-panel mb-8 animate-fade-in animate-delay-100">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <section className="analytics-summary-grid animate-fade-in">
+        <article className="analytics-summary-card">
+          <Cpu className="analytics-summary-icon analytics-summary-icon--blue" />
+          <span>{t("analytics_page.total_predictions")}</span>
+          <strong>{savedPredictions.length}</strong>
+          <p>{historySource === "supabase" ? t("analytics_page.synced_cloud_history") : t("analytics_page.local_browser_history")}</p>
+        </article>
+        <article className="analytics-summary-card analytics-summary-card--blue">
+          <TrendingUp className="analytics-summary-icon analytics-summary-icon--green" />
+          <span>{t("analytics_page.estimated_current_value")}</span>
+          <strong>LKR {CURRENCY_FORMATTER.format(displayCurrentValue)}</strong>
+          <p>{t("analytics_page.selected_vehicle")}</p>
+        </article>
+        <article className="analytics-summary-card">
+          <Car className="analytics-summary-icon analytics-summary-icon--purple" />
+          <span>{t("analytics_page.selected_vehicle")}</span>
+          <strong className="analytics-summary-vehicle">{selectedPrediction ? buildVehicleLabel(selectedPrediction) : t("analytics_page.no_saved_predictions")}</strong>
+          <p>{t("analytics_page.from_prediction_history")}</p>
+        </article>
+      </section>
+
+      <section className="analytics-trend-panel animate-fade-in animate-delay-100">
+        <div className="analytics-trend-header">
           <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
-                {t("analytics_page.market_value_trend")}
-              </h2>
-              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${trendSourceMeta.tone}`}>
-                {trendSourceMeta.label}
-              </span>
+            <div className="analytics-trend-title-row">
+              <TrendingUp className="h-[14px] w-[14px]" />
+              <h2>{t("analytics_page.market_value_trend")}</h2>
+              <span>{trendSourceMeta.label}</span>
             </div>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">{trendSourceMeta.summary}</p>
+            <p>{trendSourceMeta.summary}</p>
           </div>
-          <select
-            className="input w-full text-sm py-2 sm:w-auto sm:min-w-64"
+          <AppDropdown
             value={selectedPrediction?.id || ""}
-            onChange={(e) => setSelectedPredictionId(e.target.value)}
+            onChange={setSelectedPredictionId}
             disabled={savedPredictions.length === 0}
-          >
-            {savedPredictions.length === 0 ? (
-              <option value="">{t("analytics_page.no_saved_predictions")}</option>
-            ) : (
-              savedPredictions.map((prediction) => (
-                <option key={prediction.id} value={prediction.id}>
-                  {buildVehicleLabel(prediction)}
-                </option>
-              ))
-            )}
-          </select>
+            placeholder={t("analytics_page.no_saved_predictions")}
+            options={savedPredictions.map((prediction) => ({
+              value: prediction.id,
+              label: buildVehicleLabel(prediction),
+            }))}
+            className="analytics-vehicle-select"
+          />
         </div>
         {selectedPrediction ? (
           <>
-            <div className="h-[22rem] min-h-72 overflow-hidden rounded-2xl border border-slate-800/70 bg-slate-950/25 p-3 sm:p-4">
+            <div className="analytics-chart-shell">
+              <div className="analytics-chart-legend">
+                <span />
+                <p>{t("analytics_page.vehicle_value_label")}</p>
+              </div>
               <Line data={data} options={options} />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-              <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("analytics_page.selected_vehicle")}</p>
-                <p className="mt-2 text-lg font-semibold text-white">{buildVehicleLabel(selectedPrediction)}</p>
-              </div>
-              <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("analytics_page.estimated_current_value")}</p>
-                <p className="mt-2 text-lg font-semibold text-amber-400">
-                  LKR {CURRENCY_FORMATTER.format(displayCurrentValue)}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-700/60 bg-slate-900/40 p-4">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">{t("analytics_page.depreciation_assumption")}</p>
-                <p className="mt-2 text-lg font-semibold text-white">
+            <div className="analytics-trend-info-grid">
+              <article>
+                <span>{t("analytics_page.selected_vehicle")}</span>
+                <strong>{buildVehicleLabel(selectedPrediction)}</strong>
+              </article>
+              <article>
+                <span>{t("analytics_page.estimated_current_value")}</span>
+                <strong className="analytics-info-blue">LKR {CURRENCY_FORMATTER.format(displayCurrentValue)}</strong>
+              </article>
+              <article>
+                <span>{t("analytics_page.depreciation_assumption")}</span>
+                <strong className="analytics-info-muted">
                   {chartSeries.source === "projection" ? depreciationAssumptionLabel : t("analytics_page.dataset_backed_market_values")}
-                </p>
-              </div>
+                </strong>
+              </article>
             </div>
           </>
         ) : (
-          <div className="rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 px-6 py-14 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-amber-400/20 bg-amber-400/10 text-amber-300">
-              <BarChart3 className="h-6 w-6" />
-            </div>
-            <p className="mt-5 text-lg font-semibold text-white">{t("analytics_page.no_saved_predictions")}</p>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-400">
-              {t("analytics_page.run_prediction_hint")}
-            </p>
-            <Link
-              to="/price-check"
-              className="mt-6 inline-flex items-center justify-center rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-amber-400"
-            >
-              {t("analytics_page.run_price_check", { defaultValue: "Run Price Check" })}
-            </Link>
+          <div className="analytics-empty-state">
+            <BarChart2 className="h-8 w-8" />
+            <p>{t("analytics_page.no_predictions_yet_short")}</p>
+            <span>{t("analytics_page.run_prediction_hint")}</span>
+            <Link to="/price-check" className="analytics-ghost-button">{t("analytics_page.start_price_check")} →</Link>
           </div>
         )}
-        <div className={`mt-6 rounded-xl border p-4 ${trendSourceMeta.tone}`}>
-          <div className="flex items-start gap-3">
-            <Sparkles className="mt-0.5 h-5 w-5 flex-shrink-0" />
-            <div>
-              <p className="font-semibold text-white">{trendSourceMeta.title}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-300">
-                {chartSeries.note || t("analytics_page.chart_guidance")}
-              </p>
-            </div>
+        <div className="analytics-dataset-banner">
+          <Database className="h-[14px] w-[14px]" />
+          <div>
+            <p>{trendSourceMeta.title}</p>
+            <span>{chartSeries.note || t("analytics_page.chart_guidance")}</span>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="dashboard-page-panel animate-fade-in animate-delay-200">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+      <section className="analytics-history-section animate-fade-in animate-delay-200">
+        <div className="analytics-history-header">
           <div>
-            <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-              <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
-              {t("analytics_page.prediction_history")}
-            </h2>
-            <p className="mt-2 text-sm text-slate-500">
+            <div className="analytics-history-title">
+              <Clock className="h-[14px] w-[14px]" />
+              <h2>{t("analytics_page.prediction_history")}</h2>
+            </div>
+            <p>
               {isHistoryLoading
                 ? t("analytics_page.loading_saved_predictions")
                 : historySource === "supabase"
@@ -839,104 +855,105 @@ function Analytics() {
                   : t("analytics_page.local_browser_history")}
             </p>
           </div>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-            <input
-              type="text"
-              placeholder={t("analytics_page.search_placeholder")}
-              className="input w-full text-sm py-2 sm:w-52"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            <select
-              className="input w-full text-sm py-2 sm:w-auto"
+          <div className="analytics-filter-row">
+            <label className="analytics-search-wrap">
+              <Search className="h-[13px] w-[13px]" />
+              <input
+                type="text"
+                placeholder={t("analytics_page.search_placeholder")}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
+            <AppDropdown
               value={brandFilter}
-              onChange={(e) => setBrandFilter(e.target.value)}
-            >
-              <option value="">{t("analytics_page.all_brands")}</option>
-              {brandOptions.map((brand) => (
-                <option key={brand} value={brand}>
-                  {brand}
-                </option>
-              ))}
-            </select>
+              onChange={setBrandFilter}
+              placeholder={t("analytics_page.all_brands")}
+              options={[
+                { value: "", label: t("analytics_page.all_brands") },
+                ...brandOptions.map((brand) => ({ value: brand, label: brand })),
+              ]}
+              className="analytics-brand-select"
+            />
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="table-modern">
-            <thead>
-              <tr>
-                <th>{t("analytics_page.date")}</th>
-                <th>{t("analytics_page.brand")}</th>
-                <th>{t("analytics_page.model")}</th>
-                <th>{t("analytics_page.year")}</th>
-                <th>{t("analytics_page.predicted_price")}</th>
-                <th>{t("analytics_page.status")}</th>
-                <th className="text-right">{t("analytics_page.actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedPredictions.length > 0 ? (
-                displayedPredictions.map((item) => (
+        <div className="analytics-table-shell">
+          {displayedPredictions.length > 0 ? (
+            <table className="analytics-table">
+              <thead>
+                <tr>
+                  <th>{t("analytics_page.date")}</th>
+                  <th>{t("analytics_page.brand")}</th>
+                  <th>{t("analytics_page.model")}</th>
+                  <th>{t("analytics_page.year")}</th>
+                  <th>{t("analytics_page.predicted_price")}</th>
+                  <th>{t("analytics_page.status")}</th>
+                  <th>{t("analytics_page.actions")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedPredictions.map((item) => (
                   <tr key={item.id}>
-                    <td className="text-slate-400">{item.date}</td>
-                    <td className="text-white font-medium">{item.brand}</td>
-                    <td className="text-slate-300">{item.model}</td>
-                    <td className="text-slate-400">{item.year}</td>
-                    <td className="text-blue-400 font-semibold">LKR {item.price}</td>
+                    <td className="analytics-date-cell">{item.date}</td>
+                    <td className="analytics-brand-cell">{item.brand}</td>
+                    <td className="analytics-model-cell">{item.model}</td>
+                    <td className="analytics-year-cell">{item.year}</td>
+                    <td className="analytics-price-cell">LKR {item.price}</td>
                     <td>
-                      <span className="badge badge-success">
-                        <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                      <span className="analytics-status-badge">
+                        <Check className="h-[11px] w-[11px]" />
                         {t("analytics_page.completed")}
                       </span>
                     </td>
-                    <td className="text-right">
-                      <button
-                        type="button"
-                        onClick={() => requestDeletePrediction(item)}
-                        disabled={deletingPredictionId === item.id}
-                        className="btn-danger p-2 disabled:cursor-not-allowed disabled:opacity-60"
-                        aria-label={t("analytics_page.delete_aria_label", {
-                          label: `${item.brand} ${item.model} ${item.year}`,
-                        })}
-                        title={t("analytics_page.delete_title")}
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                    <td>
+                      <div className="analytics-actions-cell">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPredictionId(item.id)}
+                          className="analytics-view-button"
+                        >
+                          <Eye className="h-3 w-3" />
+                          {t("analytics_page.view_all", { defaultValue: "View" })}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => requestDeletePrediction(item)}
+                          disabled={deletingPredictionId === item.id}
+                          className="analytics-delete-button"
+                          aria-label={t("analytics_page.delete_aria_label", {
+                            label: `${item.brand} ${item.model} ${item.year}`,
+                          })}
+                          title={t("analytics_page.delete_title")}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="py-12">
-                    <div className="flex flex-col items-center text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-700/70 bg-slate-900/60 text-slate-400">
-                        <Search className="h-5 w-5" />
-                      </div>
-                      <p className="mt-4 font-medium text-white">{t("analytics_page.no_matching_predictions")}</p>
-                      <p className="mt-1 max-w-sm text-sm text-slate-500">
-                        {t("analytics_page.no_matching_predictions_hint", {
-                          defaultValue: "Try clearing the search term or choosing All Brands.",
-                        })}
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="analytics-empty-state analytics-empty-state--table">
+              <BarChart2 className="h-8 w-8" />
+              <p>{t("analytics_page.no_predictions_yet_short")}</p>
+              <span>{t("analytics_page.run_prediction_hint")}</span>
+              <Link to="/price-check" className="analytics-ghost-button">{t("analytics_page.start_price_check")} →</Link>
+            </div>
+          )}
         </div>
 
-        <div className="mt-6 flex justify-between items-center text-sm text-slate-500">
+        <div className="analytics-history-footer">
           <span>{t("analytics_page.showing_count", { shown: displayedPredictions.length, total: filteredPredictions.length })}</span>
           {!showAll && filteredPredictions.length > 4 && (
-            <button onClick={() => setShowAll(true)} className="btn-text">{t("analytics_page.view_all")}</button>
+            <button onClick={() => setShowAll(true)} className="analytics-text-button">{t("analytics_page.view_all")}</button>
           )}
           {showAll && (
-            <button onClick={() => setShowAll(false)} className="btn-text">{t("analytics_page.show_less")}</button>
+            <button onClick={() => setShowAll(false)} className="analytics-text-button">{t("analytics_page.show_less")}</button>
           )}
         </div>
-      </div>
+      </section>
     </div>
   )
 }

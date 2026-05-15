@@ -1,20 +1,24 @@
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 
+const getEmptyFacilityForm = () => ({
+  name: '',
+  type: 'Leasing',
+  fixedRate: '',
+  floatingRate: '',
+  maxLtv: '',
+  status: 'Active',
+  logoFile: null
+});
+
 export default function Financing() {
   const [facilities, setFacilities] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingFacility, setEditingFacility] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [newFacility, setNewFacility] = useState({
-    name: '',
-    type: 'Leasing',
-    fixedRate: '',
-    floatingRate: '',
-    maxLtv: '',
-    logoFile: null
-  });
+  const [newFacility, setNewFacility] = useState(getEmptyFacilityForm);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -84,6 +88,36 @@ export default function Financing() {
     }
   };
 
+  const openCreateModal = () => {
+    setEditingFacility(null);
+    setNewFacility(getEmptyFacilityForm());
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (facility) => {
+    setEditingFacility(facility);
+    setNewFacility({
+      name: facility.name || '',
+      type: facility.type || 'Leasing',
+      fixedRate: facility.fixed_rate ?? '',
+      floatingRate: facility.floating_rate ?? '',
+      maxLtv: facility.max_ltv ?? '',
+      status: facility.status || 'Active',
+      logoFile: null
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setIsModalOpen(true);
+  };
+
+  const closeModal = (force = false) => {
+    if (isSubmitting && !force) return;
+    setIsModalOpen(false);
+    setEditingFacility(null);
+    setNewFacility(getEmptyFacilityForm());
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const saveFacility = async () => {
     if (!newFacility.name) {
       alert('Institution Name is required');
@@ -92,6 +126,26 @@ export default function Financing() {
     
     try {
       setIsSubmitting(true);
+
+      if (editingFacility) {
+        const payload = {
+          name: newFacility.name.trim(),
+          type: newFacility.type,
+          fixed_rate: parseFloat(newFacility.fixedRate) || 0,
+          floating_rate: parseFloat(newFacility.floatingRate) || 0,
+          max_ltv: parseFloat(newFacility.maxLtv) || 0,
+          status: newFacility.status
+        };
+
+        const { data } = await api.put(`/api/admin/financing-options/${editingFacility.id}`, payload);
+        const updatedFacility = data?.facility || { ...editingFacility, ...payload };
+        setFacilities(facilities.map((facility) => (
+          facility.id === editingFacility.id ? { ...facility, ...updatedFacility } : facility
+        )));
+        closeModal(true);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('name', newFacility.name);
       formData.append('type', newFacility.type);
@@ -109,16 +163,7 @@ export default function Financing() {
       });
 
       setFacilities([data.facility, ...facilities]);
-      setIsModalOpen(false);
-      setNewFacility({
-        name: '',
-        type: 'Leasing',
-        fixedRate: '',
-        floatingRate: '',
-        maxLtv: '',
-        logoFile: null
-      });
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      closeModal(true);
       
     } catch (error) {
       console.error('Error saving facility:', error);
@@ -136,7 +181,7 @@ export default function Financing() {
           <p className="text-sm text-gray-400 mt-1">Manage bank and lender financing rates</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openCreateModal}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-blue-500/20"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,6 +278,15 @@ export default function Financing() {
                     </td>
                     <td className="py-4 px-6 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEditModal(facility)}
+                          className="p-2 text-gray-400 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"
+                          title="Edit facility"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+                          </svg>
+                        </button>
                         <button 
                           onClick={() => handleDelete(facility.id, facility.logo_url)}
                           className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
@@ -252,12 +306,14 @@ export default function Financing() {
         )}
       </div>
 
-      {/* Add New Facility Modal */}
+      {/* Add/Edit Facility Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !isSubmitting && setIsModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeModal}></div>
           <div className="relative bg-gray-900 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
-            <h2 className="text-xl font-semibold text-white mb-6">Add New Bank/Lender</h2>
+            <h2 className="text-xl font-semibold text-white mb-6">
+              {editingFacility ? 'Edit Bank/Lender' : 'Add New Bank/Lender'}
+            </h2>
             
             <div className="space-y-4">
               <div>
@@ -284,6 +340,20 @@ export default function Financing() {
                   <option value="Draft">Draft</option>
                 </select>
               </div>
+
+              {editingFacility && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-1.5">Status *</label>
+                  <select
+                    value={newFacility.status}
+                    onChange={(e) => setNewFacility({...newFacility, status: e.target.value})}
+                    className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-2.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors [&>option]:bg-gray-900"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -324,6 +394,7 @@ export default function Financing() {
                 </div>
               </div>
 
+              {!editingFacility && (
               <div>
                 <label className="block text-sm font-medium text-gray-400 mb-1.5">Bank Logo (Optional)</label>
                 <div className="flex items-center justify-center w-full">
@@ -351,11 +422,12 @@ export default function Financing() {
                   </label>
                 </div>
               </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 mt-8">
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={closeModal}
                 disabled={isSubmitting}
                 className="px-5 py-2.5 text-sm font-medium text-gray-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors disabled:opacity-50"
               >
@@ -375,7 +447,7 @@ export default function Financing() {
                     Saving...
                   </>
                 ) : (
-                  'Save Facility'
+                  editingFacility ? 'Update Facility' : 'Save Facility'
                 )}
               </button>
             </div>

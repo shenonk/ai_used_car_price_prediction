@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './premium-polish.css'
 import './auth-premium.css'
+import './mobile-responsive.css'
 import App from './App.jsx'
 import { applyTheme, getStoredTheme } from './utils/theme'
 

@@ -8,17 +8,20 @@ import "leaflet/dist/leaflet.css";
 import {
   ArrowUp,
   CalendarRange,
-  ChevronDown,
+  Car,
+  Eye,
   Fuel,
   Gauge,
   MapPin,
   Move,
+  Plus,
   RotateCcw,
   Search,
+  SearchX,
   ShieldCheck,
-  ShoppingBag,
   Sparkles,
   Star,
+  Settings2,
   X,
   Zap,
   ZoomIn,
@@ -26,6 +29,7 @@ import {
 } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
+import AppDropdown from "../components/AppDropdown";
 import bumpedSticker from "../assets/marketplace-stickers/bumpup.png";
 import spotlightSticker from "../assets/marketplace-stickers/spotlight.png";
 import urgentSticker from "../assets/marketplace-stickers/urgent.png";
@@ -42,6 +46,7 @@ const ALL_MODELS = "__all_models__";
 const ALL_FUEL_TYPES = "__all_fuel_types__";
 const ALL_LOCATION_REGIONS = "__all_location_regions__";
 const ALL_LOCATION_CITIES = "__all_location_cities__";
+const MARKETPLACE_PAGE_SIZE = 25;
 
 const priceRangeValues = ["all", "under_3m", "3m_6m", "6m_10m", "above_10m"];
 
@@ -283,6 +288,8 @@ const formatCurrency = (value, locale) =>
 
 const formatNumber = (value, locale) => Number(value || 0).toLocaleString(locale);
 
+const getListingViewCount = (listing) => Number(listing?.view_count || listing?.views || 0);
+
 const normalizeImageCollection = (value) => {
   if (Array.isArray(value)) {
     return value.filter((item) => typeof item === "string" && item.trim());
@@ -303,16 +310,16 @@ const normalizeImageCollection = (value) => {
 };
 
 const getBoostSticker = (listing) => {
-  if (listing?.is_urgent) {
-    return { src: urgentSticker, alt: "Urgent ad sticker" };
-  }
-
   if (listing?.is_spotlight) {
     return { src: spotlightSticker, alt: "Spotlight ad sticker" };
   }
 
+  if (listing?.is_urgent) {
+    return { src: urgentSticker, alt: "Urgent ad sticker" };
+  }
+
   if (listing?.is_bumped) {
-    return { src: bumpedSticker, alt: "Bumped ad sticker" };
+    return { src: bumpedSticker, alt: "Bump up ad sticker" };
   }
 
   return null;
@@ -444,6 +451,7 @@ function Marketplace() {
   const [isSpotlight, setIsSpotlight] = useState(false);
   const [isBumped, setIsBumped] = useState(false);
   const [selectedCar, setSelectedCar] = useState(null);
+  const [visibleListingCount, setVisibleListingCount] = useState(MARKETPLACE_PAGE_SIZE);
   const [selectedCarImage, setSelectedCarImage] = useState("");
   const [lightboxImage, setLightboxImage] = useState("");
   const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -707,7 +715,32 @@ function Marketplace() {
           .map((value) => String(value || "").trim().toLowerCase())
           .join("|");
 
-        if (!seenKeys.has(key)) {
+        const existingIndex = mergedListings.findIndex((item) => {
+          const sameId = item.id && listing.id && String(item.id) === String(listing.id);
+          const sameKey =
+            [
+              item.brand,
+              item.model,
+              item.year,
+              item.price,
+              item.seller_name,
+              item.phone_number,
+            ]
+              .map((value) => String(value || "").trim().toLowerCase())
+              .join("|") === key;
+          return sameId || sameKey;
+        });
+
+        if (existingIndex >= 0) {
+          mergedListings[existingIndex] = {
+            ...mergedListings[existingIndex],
+            ...listing,
+            view_count: Math.max(
+              getListingViewCount(mergedListings[existingIndex]),
+              getListingViewCount(listing)
+            ),
+          };
+        } else if (!seenKeys.has(key)) {
           seenKeys.add(key);
           mergedListings.push(listing);
         }
@@ -726,6 +759,56 @@ function Marketplace() {
   useEffect(() => {
     fetchListings();
   }, [t]);
+
+  const openListingDetails = (car) => {
+    const nextViewCount = getListingViewCount(car) + 1;
+    const optimisticCar = { ...car, view_count: nextViewCount };
+
+    setSelectedCar(optimisticCar);
+    setSelectedCarImage(getListingImages(car)[0] || "");
+    setCars((current) =>
+      current.map((item) =>
+        String(item.id) === String(car.id) ? { ...item, view_count: nextViewCount } : item
+      )
+    );
+
+    fetch(`${API_BASE_URL}/api/marketplace/listings/${encodeURIComponent(car.id)}/view`, {
+      method: "POST",
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Unable to record listing view.");
+        }
+        return response.json();
+      })
+      .then((result) => {
+        const syncedCount = Number(result.view_count || nextViewCount);
+        setSelectedCar((current) =>
+          current && String(current.id) === String(car.id)
+            ? { ...current, view_count: syncedCount }
+            : current
+        );
+        setCars((current) =>
+          current.map((item) =>
+            String(item.id) === String(car.id) ? { ...item, view_count: syncedCount } : item
+          )
+        );
+      })
+      .catch(() => {
+        setSelectedCar((current) =>
+          current && String(current.id) === String(car.id)
+            ? { ...current, view_count: getListingViewCount(car) }
+            : current
+        );
+        setCars((current) =>
+          current.map((item) =>
+            String(item.id) === String(car.id)
+              ? { ...item, view_count: getListingViewCount(car) }
+              : item
+          )
+        );
+      });
+  };
 
   const approvedCars = useMemo(
     () =>
@@ -899,6 +982,16 @@ function Marketplace() {
     });
   }, [appliedSearch, approvedCars, filters, selectedLocationRegion]);
 
+  const visibleCars = useMemo(
+    () => filteredCars.slice(0, visibleListingCount),
+    [filteredCars, visibleListingCount]
+  );
+  const hasMoreListings = visibleListingCount < filteredCars.length;
+
+  useEffect(() => {
+    setVisibleListingCount(MARKETPLACE_PAGE_SIZE);
+  }, [appliedSearch, filters]);
+
   const handleFilterChange = (key, value) => {
     setFilters((current) => ({
       ...current,
@@ -909,9 +1002,11 @@ function Marketplace() {
   };
 
   const handleInputChange = (key, value) => {
+    const nextValue = key === "price" ? String(value).replace(/\D/g, "") : value;
+
     setForm((current) => ({
       ...current,
-      [key]: value,
+      [key]: nextValue,
     }));
 
     if (key === "vehicle_description" && descriptionState.error) {
@@ -1113,8 +1208,6 @@ function Marketplace() {
     [lightboxImage, selectedCarImages]
   );
 
-  const getCardBoostSticker = (car) => getBoostSticker(car);
-
   const openLightbox = (imageUrl) => {
     if (!imageUrl) return;
     setLightboxImage(imageUrl);
@@ -1311,151 +1404,119 @@ function Marketplace() {
 
   return (
     <div className="marketplace-page app-page-shell">
-      <div className="dashboard-page-hero mb-5 animate-fade-in">
-        <div className="dashboard-page-eyebrow mb-4">
-          <ShoppingBag className="h-3.5 w-3.5 text-blue-300" />
-          {t("marketplace.inventory.title")}
+      <div className="marketplace-redesign-hero animate-fade-in">
+        <div>
+          <div className="marketplace-redesign-eyebrow">{t("marketplace.redesigned.eyebrow")}</div>
+          <h1>{t("marketplace.redesigned.title")}</h1>
+          <p>{t("marketplace.redesigned.subtitle")}</p>
         </div>
-        <h1 className="text-3xl md:text-[2.6rem] font-bold tracking-tight" style={{ background: 'linear-gradient(135deg, #ffffff, #93c5fd, #67e8f9)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-          {t("marketplace.inventory.title")}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">
-          {t("marketplace.inventory.description")}
-        </p>
+        <div className="marketplace-redesign-hero-actions">
+          <Link
+            to="/marketplace/my-ads"
+            onClick={handleProtectedMarketplaceNavigation}
+            className="marketplace-redesign-ghost-button"
+          >
+            {t("marketplace.my_ads.title", { defaultValue: "My submitted ads" })}
+          </Link>
+          <button type="button" onClick={openPublishModal} className="marketplace-redesign-primary-button">
+            <Plus className="h-3.5 w-3.5" />
+            {t("marketplace.publish.button", { defaultValue: "Publish Ad" })}
+          </button>
+        </div>
       </div>
 
-      <section className="mb-4 animate-fade-in">
+      <section className="mb-3 animate-fade-in">
         <form onSubmit={handleSearchSubmit}>
-          <div className="marketplace-search-shell flex flex-col gap-2.5 rounded-[24px] border border-slate-700/70 bg-slate-950/70 p-2.5 shadow-[0_18px_42px_rgba(2,6,23,0.2)] backdrop-blur-xl md:flex-row md:items-center">
-              <div className="marketplace-search-input-group flex min-w-0 flex-1 items-center gap-3 rounded-[20px] border border-slate-800/80 bg-slate-900/85 px-4 py-3 transition duration-300">
-                <div className="marketplace-search-icon flex h-11 w-11 shrink-0 items-center justify-center rounded-[16px] text-cyan-100">
-                  <Search className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <label htmlFor="marketplace-vehicle-search" className="block text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                    {t("marketplace.search.input_label", { defaultValue: "Vehicle name" })}
-                  </label>
-                  <input
-                    id="marketplace-vehicle-search"
-                    type="text"
-                    value={searchInput}
-                    onChange={(event) => setSearchInput(event.target.value)}
-                    placeholder={t("marketplace.search.placeholder", {
-                      defaultValue: "Try Toyota Corolla, Honda Vezel, Prius...",
-                    })}
-                    className="mt-1 w-full bg-transparent text-base text-white outline-none placeholder:text-slate-500 md:text-lg"
-                  />
-                </div>
-                {searchInput && (
-                  <button
-                    type="button"
-                    onClick={handleSearchReset}
-                    className="marketplace-search-clear inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border border-slate-700/70 bg-slate-900/80 text-slate-300 transition"
-                    aria-label={t("marketplace.search.clear", { defaultValue: "Clear search" })}
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
+          <div className="marketplace-redesign-search">
+            <Search className="marketplace-redesign-search-icon" />
+            <input
+              id="marketplace-vehicle-search"
+              type="text"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder={t("marketplace.search.placeholder", {
+                defaultValue: "Try Toyota Corolla, Honda Vezel, Prius...",
+              })}
+              className="marketplace-redesign-search-input"
+            />
+            {searchInput && (
               <button
-                type="submit"
-                className="marketplace-search-submit marketplace-primary-button inline-flex items-center justify-center gap-2 rounded-[20px] border px-5 py-3.5 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5 md:min-w-[172px]"
+                type="button"
+                onClick={handleSearchReset}
+                className="marketplace-redesign-clear-button"
+                aria-label={t("marketplace.search.clear", { defaultValue: "Clear search" })}
               >
-                <Search className="h-4 w-4" />
-                {t("marketplace.search.submit", { defaultValue: "Search ads" })}
+                <X className="h-3.5 w-3.5" />
               </button>
+            )}
+            <button type="submit" className="marketplace-redesign-search-button">
+              <Search className="h-[13px] w-[13px]" />
+              {t("marketplace.search.submit", { defaultValue: "Search ads" })}
+            </button>
           </div>
         </form>
       </section>
 
       {!appliedSearch && (
-      <section className="marketplace-panel card mt-3 animate-fade-in animate-delay-200 overflow-hidden">
-        <div className="relative p-3.5">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.14),_transparent_30%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.12),_transparent_28%)]" />
-          <div className="relative flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-lg">
-              <h2 className="text-base font-semibold text-white md:text-lg">{t("marketplace.publish.title")}</h2>
-              <p className="mt-0.5 text-xs leading-4.5 text-slate-400">
-                {t("marketplace.publish.description")}
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Link
-                to="/marketplace/my-ads"
-                onClick={handleProtectedMarketplaceNavigation}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-700/70 bg-slate-900/80 px-3.5 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500/80 hover:text-white"
-              >
-                {t("marketplace.my_ads.title")}
-              </Link>
-
-              <button
-                type="button"
-                onClick={openPublishModal}
-                className="marketplace-primary-button marketplace-primary-cta group inline-flex items-center justify-center gap-2.5 rounded-xl border px-4 py-2 text-sm font-semibold transition-all duration-300 hover:-translate-y-0.5"
-                style={{
-                  background: "linear-gradient(135deg, #1d4ed8 0%, #0284c7 55%, #0f766e 100%)",
-                  color: "#ffffff",
-                  borderColor: "rgba(29, 78, 216, 0.42)",
-                  boxShadow:
-                    "0 18px 34px rgba(29, 78, 216, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16)",
-                }}
-              >
-                <span className="marketplace-primary-cta__glow" aria-hidden="true" />
-                <span className="marketplace-primary-cta__icon" aria-hidden="true">
-                  <Sparkles className="h-4 w-4" />
-                </span>
-                <span className="relative z-10 flex flex-col items-start leading-tight">
-                  <span>{t("marketplace.publish.button")}</span>
-                  <span className="marketplace-primary-cta__hint text-[10px] font-medium uppercase tracking-[0.18em]">
-                    Sell your vehicle
-                  </span>
-                </span>
-                <span className="marketplace-primary-cta__arrow relative z-10" aria-hidden="true">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14m-6-6 6 6-6 6" />
-                  </svg>
-                </span>
-              </button>
-            </div>
+      <section className="marketplace-redesign-cta animate-fade-in animate-delay-200">
+        <div className="marketplace-redesign-cta-copy">
+          <Car className="h-4 w-4" />
+          <div>
+            <h2>{t("marketplace.redesigned.cta_title")}</h2>
+            <p>{t("marketplace.redesigned.cta_subtitle")}</p>
           </div>
+        </div>
+
+        <button type="button" onClick={openPublishModal} className="marketplace-redesign-cta-button">
+          Submit a listing -&gt;
+        </button>
 
           {submitState.success && (
-            <div className="relative mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            <div className="marketplace-redesign-success">
               {submitState.success}
             </div>
           )}
-        </div>
       </section>
       )}
 
-      <section className="dashboard-page-panel mt-3 animate-fade-in animate-delay-100">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="marketplace-filter-panel marketplace-redesign-filter-panel animate-fade-in animate-delay-100">
+        <div className="marketplace-redesign-filter-bar">
           <FilterSelect
             label={t("marketplace.labels.brand")}
             value={filters.brand}
             options={brandOptions}
             onChange={(value) => handleFilterChange("brand", value)}
+            hideLabel
+            className="marketplace-compact-dropdown"
           />
+          <div className="marketplace-filter-divider" />
           <FilterSelect
             label={t("marketplace.labels.model")}
             value={filters.model}
             options={modelOptions}
             onChange={(value) => handleFilterChange("model", value)}
+            hideLabel
+            className="marketplace-compact-dropdown"
           />
+          <div className="marketplace-filter-divider" />
           <FilterSelect
             label={t("marketplace.labels.price_range")}
             value={filters.priceRange}
             options={priceRanges}
             onChange={(value) => handleFilterChange("priceRange", value)}
+            hideLabel
+            className="marketplace-compact-dropdown"
           />
+          <div className="marketplace-filter-divider" />
           <FilterSelect
             label={t("marketplace.labels.fuel_type")}
             value={filters.fuelType}
             options={fuelOptions}
             onChange={(value) => handleFilterChange("fuelType", value)}
+            hideLabel
+            className="marketplace-compact-dropdown"
           />
+          <div className="marketplace-filter-divider" />
           <LocationPickerButton
             label={t("marketplace.labels.location", { defaultValue: "Location" })}
             value={
@@ -1466,60 +1527,70 @@ function Marketplace() {
                 : t("marketplace.filters.all_locations", { defaultValue: "All Sri Lanka" })
             }
             onClick={() => setIsLocationPickerOpen(true)}
+            hideLabel
+            compact
           />
+          <div className="marketplace-results-pill">
+            {formatNumber(filteredCars.length, locale)} listings
+          </div>
         </div>
 
         {loadError && (
-          <div className="mt-5 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          <div className="mt-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
             {loadError}
           </div>
         )}
       </section>
 
       <section className="mt-4 animate-fade-in animate-delay-200">
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="marketplace-redesign-section-heading">
           <div>
-            <h2 className="text-2xl font-bold text-white">{t("marketplace.listings.title")}</h2>
-            <p className="mt-1 text-sm text-slate-400">
-              {t("marketplace.listings.description")}
-            </p>
+            <h2>{t("marketplace.redesigned.approved_title")}</h2>
+            <p>{t("marketplace.redesigned.approved_subtitle")}</p>
           </div>
-          <div className="rounded-full border border-slate-700/60 bg-slate-900/70 px-4 py-2 text-sm text-slate-300">
-            {t("marketplace.listings.showing", { filtered: filteredCars.length, total: approvedCars.length })}
-          </div>
+          <AppDropdown
+            label=""
+            value="newest"
+            options={[
+              { value: "newest", label: "Newest first" },
+              { value: "price_low", label: "Price: Low to high" },
+              { value: "price_high", label: "Price: High to low" },
+              { value: "most_viewed", label: "Most viewed" },
+            ]}
+            onChange={() => {}}
+            className="marketplace-sort-dropdown"
+          />
         </div>
 
         {filteredCars.length === 0 ? (
-          <div className="card flex min-h-[260px] flex-col items-center justify-center p-8 text-center">
-            <div className="rounded-full border border-slate-700/70 bg-slate-900/80 p-4">
-              <Sparkles className="h-7 w-7 text-cyan-300" />
-            </div>
-            <h3 className="mt-5 text-xl font-semibold text-white">{t("marketplace.empty.title")}</h3>
-            <p className="mt-2 max-w-md text-sm leading-6 text-slate-400">
-              {t("marketplace.empty.description")}
-            </p>
+          <div className="marketplace-redesign-empty">
+            <SearchX className="h-8 w-8" />
+            <h3>{t("marketplace.redesigned.no_listings_title")}</h3>
+            <p>{t("marketplace.redesigned.no_listings_subtitle")}</p>
+            <button type="button" onClick={handleSearchReset} className="marketplace-redesign-empty-button">
+              Clear filters
+            </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredCars.map((car) => (
+          <>
+          <div className="marketplace-redesign-grid">
+            {visibleCars.map((car) => (
               <article
                 key={car.id}
                 role="button"
                 tabIndex={0}
                 onClick={() => {
-                  setSelectedCar(car);
-                  setSelectedCarImage(getListingImages(car)[0] || "");
+                  openListingDetails(car);
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    setSelectedCar(car);
-                    setSelectedCarImage(getListingImages(car)[0] || "");
+                    openListingDetails(car);
                   }
                 }}
-                className="marketplace-listing-card group overflow-hidden rounded-[20px] border border-slate-700/60 bg-[linear-gradient(180deg,rgba(15,23,42,0.96),rgba(15,23,42,0.88))] shadow-xl shadow-slate-950/20 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-400/30 hover:shadow-[0_18px_45px_rgba(8,145,178,0.18)]"
+                className="marketplace-listing-card marketplace-redesign-card group"
               >
-                <div className="marketplace-listing-media relative h-36 overflow-hidden border-b border-slate-800/80 bg-[radial-gradient(circle_at_top_right,_rgba(34,211,238,0.18),_transparent_28%),linear-gradient(135deg,rgba(30,41,59,0.95),rgba(15,23,42,0.98))]">
+                <div className="marketplace-listing-media marketplace-redesign-card-media">
                   {getListingImages(car)[0] ? (
                     <img
                       src={getListingImages(car)[0]}
@@ -1527,22 +1598,27 @@ function Marketplace() {
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
-                      <ShieldCheck className="h-10 w-10 text-cyan-300/70" />
-                      <span className="text-sm text-slate-400">{t("marketplace.card.approved_listing")}</span>
+                    <div className="marketplace-redesign-card-fallback">
+                      <ShieldCheck className="h-9 w-9" />
                     </div>
                   )}
 
-                  <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-200">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    {t("marketplace.card.approved")}
+                  <div className="marketplace-redesign-status-badge">
+                    {t("marketplace.card.approved", { defaultValue: "Approved" })}
                   </div>
+                  {getBoostSticker(car) && (
+                    <img
+                      src={getBoostSticker(car).src}
+                      alt={getBoostSticker(car).alt}
+                      className="marketplace-redesign-boost-sticker"
+                    />
+                  )}
                 </div>
 
-                <div className="p-3.5">
-                  <div className="flex items-start justify-between gap-4">
+                <div className="marketplace-redesign-card-body">
+                  <div>
                     <div>
-                      <h3 className="text-base font-semibold text-white">
+                      <h3 title={`${car.brand} ${car.model}`}>
                         {car.brand} {car.model}
                       </h3>
                       <p className="mt-1 text-xs text-slate-400">
@@ -1554,19 +1630,10 @@ function Marketplace() {
                         {car.seller_name || t("marketplace.fallbacks.private_seller")} {" • "} {car.vehicle_location || t("marketplace.fallbacks.location_not_listed")}
                       </p>
                     </div>
-                    <div className="flex shrink-0 flex-col items-end gap-3">
-                      <p className="marketplace-price text-right text-sm font-bold text-cyan-300">
+                    <div>
+                      <p className="marketplace-price">
                         {formatCurrency(car.price, locale)}
                       </p>
-                      {getCardBoostSticker(car) && (
-                        <div className="marketplace-boost-sticker-wrap">
-                          <img
-                            src={getCardBoostSticker(car).src}
-                            alt={getCardBoostSticker(car).alt}
-                            className="marketplace-boost-sticker h-[4.75rem] w-auto max-w-[11rem] object-contain object-right"
-                          />
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -1587,34 +1654,43 @@ function Marketplace() {
                       value={translatedFuelLabels[car.fuel_type] || car.fuel_type || "-"}
                     />
                     <MarketplaceMeta
-                      icon={
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8.25 18.75h7.5m-7.5-13.5h7.5M9 7.5h6a2.25 2.25 0 012.25 2.25v4.5A2.25 2.25 0 0115 16.5H9a2.25 2.25 0 01-2.25-2.25v-4.5A2.25 2.25 0 019 7.5z" />
-                        </svg>
-                      }
+                      icon={<Settings2 className="h-4 w-4" />}
                       label={t("marketplace.labels.gearbox")}
                       value={translatedTransmissionLabels[car.transmission] || car.transmission || "-"}
                     />
                   </div>
 
-                  <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-3">
-                    <p className="text-xs text-slate-400">{t("marketplace.card.tap_to_expand")}</p>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSelectedCar(car);
-                        setSelectedCarImage(getListingImages(car)[0] || "");
-                      }}
-                      className="marketplace-secondary-button rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:bg-cyan-500/15"
-                    >
-                      {t("marketplace.card.view_details")}
-                    </button>
+                  <div className="marketplace-redesign-card-footer">
+                    <span className="marketplace-redesign-location">
+                      <MapPin className="h-3 w-3" />
+                      {car.vehicle_location || t("marketplace.fallbacks.location_not_listed")}
+                    </span>
+                    <span className="marketplace-redesign-views">
+                      <Eye className="h-3 w-3" />
+                      {formatNumber(getListingViewCount(car), locale)}
+                    </span>
                   </div>
                 </div>
               </article>
             ))}
           </div>
+          {hasMoreListings && (
+            <div className="marketplace-show-more-wrap">
+              <button
+                type="button"
+                className="marketplace-show-more-button"
+                onClick={() =>
+                  setVisibleListingCount((current) =>
+                    Math.min(current + MARKETPLACE_PAGE_SIZE, filteredCars.length)
+                  )
+                }
+              >
+                Show More
+                <span>{formatNumber(filteredCars.length - visibleCars.length, locale)} more ads</span>
+              </button>
+            </div>
+          )}
+          </>
         )}
       </section>
 
@@ -2122,7 +2198,8 @@ function Marketplace() {
                 />
                 <InputField
                   label={t("marketplace.labels.price_lkr")}
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={form.price}
                   onChange={(value) => handleInputChange("price", value)}
                   placeholder="7200000"
@@ -2376,6 +2453,7 @@ function DistrictCityPicker({
   onSelectCity,
   allowAll = true,
 }) {
+  const { t } = useTranslation();
   const selectedRegion = regions.find((region) => region.key === selectedRegionKey) || null;
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
@@ -2509,8 +2587,8 @@ function DistrictCityPicker({
     <section className="marketplace-district-picker rounded-[24px] border border-slate-800/80 bg-slate-950/55 p-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Districts and cities</p>
-          <h3 className="mt-1 text-base font-semibold text-white">Pick a district on the map, then choose a city</h3>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{t("marketplace.location_filter.map_eyebrow")}</p>
+          <h3 className="mt-1 text-base font-semibold text-white">{t("marketplace.location_filter.map_title")}</h3>
         </div>
         {allowAll && (
           <button
@@ -2571,10 +2649,10 @@ function DistrictCityPicker({
   );
 }
 
-function LocationPickerButton({ label, value, onClick }) {
+function LocationPickerButton({ label, value, onClick, hideLabel = false, compact = false }) {
   return (
-    <label className="marketplace-field block">
-      <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
+    <label className={`marketplace-field block ${compact ? "marketplace-compact-location" : ""}`}>
+      {!hideLabel && <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>}
       <button
         type="button"
         onClick={onClick}
@@ -2587,25 +2665,15 @@ function LocationPickerButton({ label, value, onClick }) {
   );
 }
 
-function FilterSelect({ label, value, options, onChange }) {
+function FilterSelect({ label, value, options, onChange, hideLabel = false, className = "" }) {
   return (
-    <label className="marketplace-field block">
-      <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
-      <div className="relative">
-        <select
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className="w-full appearance-none rounded-2xl border border-slate-700/70 bg-slate-900/90 px-4 py-3 pr-11 text-sm text-white outline-none transition duration-200 hover:border-slate-500/80 focus:border-cyan-400/60 focus:ring-2 focus:ring-cyan-500/20"
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-      </div>
-    </label>
+    <AppDropdown
+      label={hideLabel ? "" : label}
+      value={value}
+      options={options}
+      onChange={onChange}
+      className={className}
+    />
   );
 }
 
@@ -2613,12 +2681,14 @@ function SelectField({ label, value, options, onChange }) {
   return <FilterSelect label={label} value={value} options={options} onChange={onChange} />;
 }
 
-function InputField({ label, value, onChange, placeholder, type = "text" }) {
+function InputField({ label, value, onChange, placeholder, type = "text", inputMode, pattern }) {
   return (
     <label className="marketplace-field block">
       <span className="mb-2 block text-sm font-medium text-slate-300">{label}</span>
       <input
         type={type}
+        inputMode={inputMode}
+        pattern={pattern}
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

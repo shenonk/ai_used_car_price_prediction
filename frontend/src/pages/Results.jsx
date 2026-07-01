@@ -48,6 +48,9 @@ function Results() {
   const [loanPlans, setLoanPlans] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [dialog, setDialog] = useState(null)
+  const [isLightTheme, setIsLightTheme] = useState(() => (
+    typeof document !== "undefined" && document.documentElement.dataset.theme === "light"
+  ))
 
   const formattedPrice = predictedPrice.toLocaleString("en-LK")
   const resultVehicleCondition = String(vehicle?.condition || "").toLowerCase().includes("new")
@@ -56,6 +59,20 @@ function Results() {
 
   useEffect(() => {
     fetchBestRates()
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined
+
+    const syncTheme = () => {
+      setIsLightTheme(document.documentElement.dataset.theme === "light")
+    }
+
+    syncTheme()
+    const observer = new MutationObserver(syncTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] })
+
+    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
@@ -480,6 +497,23 @@ function Results() {
     return `LKR ${Math.round(numeric / 1000)}k`
   }
   const totalLoanAmount = loanPlans[0]?.total ? `LKR ${loanPlans[0].total}` : `LKR ${formattedPrice}`
+  const chartTheme = isLightTheme
+    ? {
+        tooltipBg: "#ffffff",
+        tooltipBorder: "rgba(148, 163, 184, 0.34)",
+        title: "#0f172a",
+        body: "#475569",
+        grid: "rgba(148, 163, 184, 0.28)",
+        tick: "#64748b",
+      }
+    : {
+        tooltipBg: "#161b22",
+        tooltipBorder: "#21262d",
+        title: "#e6edf3",
+        body: "#7d8590",
+        grid: "#21262d",
+        tick: "#7d8590",
+      }
   const pieLegend = pieData.map((item, index) => ({
     ...item,
     color: colors[index],
@@ -502,11 +536,11 @@ function Results() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "#161b22",
-        borderColor: "#21262d",
+        backgroundColor: chartTheme.tooltipBg,
+        borderColor: chartTheme.tooltipBorder,
         borderWidth: 0.5,
-        titleColor: "#e6edf3",
-        bodyColor: "#7d8590",
+        titleColor: chartTheme.title,
+        bodyColor: chartTheme.body,
       },
     },
   }
@@ -533,11 +567,11 @@ function Results() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "#161b22",
-        borderColor: "#21262d",
+        backgroundColor: chartTheme.tooltipBg,
+        borderColor: chartTheme.tooltipBorder,
         borderWidth: 0.5,
-        titleColor: "#e6edf3",
-        bodyColor: "#7d8590",
+        titleColor: chartTheme.title,
+        bodyColor: chartTheme.body,
         callbacks: {
           label: (context) => `${context.dataset.label}: ${formatChartCurrency(context.parsed.y)}`,
         },
@@ -545,13 +579,13 @@ function Results() {
     },
     scales: {
       x: {
-        grid: { color: "#21262d" },
-        ticks: { color: "#7d8590" },
+        grid: { color: chartTheme.grid },
+        ticks: { color: chartTheme.tick },
       },
       y: {
-        grid: { color: "#21262d" },
+        grid: { color: chartTheme.grid },
         ticks: {
-          color: "#7d8590",
+          color: chartTheme.tick,
           callback: (value) => formatChartCurrency(value),
         },
       },

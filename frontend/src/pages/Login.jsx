@@ -85,7 +85,7 @@ function Login() {
   };
 
   return (
-    <div className="auth-page">
+    <div className="auth-page auth-page--login">
       <LoadingOverlay isOpen={isLoading} message={loadingMessage} />
       <SuccessToast
         isOpen={showSuccess}
@@ -95,7 +95,7 @@ function Login() {
 
       <AuthLogo />
 
-      <div className="auth-card">
+      <div className="auth-card auth-card-accent auth-card-glow">
         <div className="auth-card-heading">
           <h1>Welcome back</h1>
           <p>Sign in to your AutoValueLK account</p>
@@ -155,7 +155,7 @@ function Login() {
             <Link to="/forgot-password" className="auth-link">Forgot password?</Link>
           </div>
 
-          <button type="submit" disabled={isLoading} className="auth-primary-button">
+          <button type="submit" disabled={isLoading} className="auth-primary-button auth-btn-neon">
             <span>Sign In</span>
             {isLoading ? <Loader2 className="spin" /> : <ArrowRight />}
           </button>

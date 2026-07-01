@@ -49,7 +49,7 @@ function ForgotPassword() {
   };
 
   return (
-    <div className="auth-page">
+    <div className="auth-page auth-page--forgot">
       <AuthLogo />
 
       {step === 1 ? (
@@ -60,7 +60,7 @@ function ForgotPassword() {
         </div>
       )}
 
-      <div className="auth-card">
+      <div className="auth-card auth-card-accent auth-card-accent-purple auth-card-glow-purple">
         <div className="auth-card-heading">
           <h1>{step === 1 ? "Reset your password" : "Check your inbox"}</h1>
           {step === 1 ? (
@@ -98,7 +98,7 @@ function ForgotPassword() {
               <span>We'll verify your email and send a secure reset link</span>
             </div>
 
-            <button type="submit" disabled={isLoading} className="auth-primary-button">
+            <button type="submit" disabled={isLoading} className="auth-primary-button auth-primary-button--purple auth-btn-neon-purple">
               <span>Send Reset Link</span>
               {isLoading ? <Loader2 className="spin" /> : <ArrowRight />}
             </button>
@@ -109,7 +109,7 @@ function ForgotPassword() {
               <CheckCircle />
               <span>Email sent successfully. Check your spam folder if not received.</span>
             </div>
-            <button type="button" onClick={() => navigate("/login")} className="auth-primary-button auth-primary-button--success">
+            <button type="button" onClick={() => navigate("/login")} className="auth-primary-button auth-primary-button--success auth-btn-neon-purple">
               <span>Go to Sign In</span>
               <ArrowRight />
             </button>

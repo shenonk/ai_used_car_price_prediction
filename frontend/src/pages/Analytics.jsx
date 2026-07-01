@@ -416,6 +416,9 @@ function Analytics() {
     message: "",
     subMessage: "",
   })
+  const [isLightTheme, setIsLightTheme] = useState(() => (
+    typeof document !== "undefined" && document.documentElement.dataset.theme === "light"
+  ))
   const depreciationAssumptionLabel = t("dashboard_page.depreciation_assumption_value")
 
   const showToast = (type, message, subMessage = "") => {
@@ -460,6 +463,20 @@ function Analytics() {
       isActive = false
       subscription.unsubscribe()
     }
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined
+
+    const syncTheme = () => {
+      setIsLightTheme(document.documentElement.dataset.theme === "light")
+    }
+
+    syncTheme()
+    const observer = new MutationObserver(syncTheme)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] })
+
+    return () => observer.disconnect()
   }, [])
 
   const selectedPrediction = useMemo(
@@ -542,13 +559,31 @@ function Analytics() {
         tension: 0.4,
         fill: true,
         pointBackgroundColor: "#d97706",
-        pointBorderColor: "#0d1117",
+        pointBorderColor: isLightTheme ? "#ffffff" : "#0d1117",
         pointBorderWidth: 2,
         pointRadius: 4,
         pointHoverRadius: 6,
       },
     ],
   }
+
+  const chartTheme = isLightTheme
+    ? {
+        tooltipBg: "#ffffff",
+        tooltipBorder: "rgba(148, 163, 184, 0.34)",
+        title: "#0f172a",
+        body: "#475569",
+        grid: "rgba(148, 163, 184, 0.28)",
+        tick: "#64748b",
+      }
+    : {
+        tooltipBg: "#161b22",
+        tooltipBorder: "#21262d",
+        title: "#e6edf3",
+        body: "#7d8590",
+        grid: "#21262d",
+        tick: "#7d8590",
+      }
 
   const options = {
     responsive: true,
@@ -560,10 +595,10 @@ function Analytics() {
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: "#161b22",
-        titleColor: "#e6edf3",
-        bodyColor: "#7d8590",
-        borderColor: "#21262d",
+        backgroundColor: chartTheme.tooltipBg,
+        titleColor: chartTheme.title,
+        bodyColor: chartTheme.body,
+        borderColor: chartTheme.tooltipBorder,
         borderWidth: 0.5,
         cornerRadius: 8,
         padding: 12,
@@ -574,9 +609,9 @@ function Analytics() {
     },
     scales: {
       x: {
-        grid: { color: "#21262d" },
+        grid: { color: chartTheme.grid },
         ticks: {
-          color: "#7d8590",
+          color: chartTheme.tick,
           font: { size: 11 },
           maxRotation: 0,
           autoSkip: true,
@@ -584,9 +619,9 @@ function Analytics() {
         },
       },
       y: {
-        grid: { color: "#21262d" },
+        grid: { color: chartTheme.grid },
         ticks: {
-          color: "#7d8590",
+          color: chartTheme.tick,
           font: { size: 11 },
           maxTicksLimit: 5,
           callback: (value) => `LKR ${CURRENCY_FORMATTER.format(value)}`,

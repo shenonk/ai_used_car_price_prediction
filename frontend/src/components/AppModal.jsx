@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom"
 import { AlertTriangle, Info, Trash2, X } from "lucide-react"
 
 const toneStyles = {
@@ -40,10 +41,14 @@ function AppModal({
     return null
   }
 
+  if (typeof document === "undefined") {
+    return null
+  }
+
   const styles = toneStyles[tone] || toneStyles.info
   const Icon = styles.defaultIcon
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
       <div className="w-full max-w-md overflow-hidden rounded-3xl border border-slate-700/70 bg-slate-950/95 shadow-[0_24px_80px_rgba(2,6,23,0.6)]">
         <div className="flex items-start justify-between gap-4 border-b border-slate-800 px-6 py-5">
@@ -96,7 +101,8 @@ function AppModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

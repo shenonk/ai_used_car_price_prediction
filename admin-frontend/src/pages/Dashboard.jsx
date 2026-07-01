@@ -85,6 +85,52 @@ const getInitials = (value) => {
 
 const normalizeTrend = (payload) => (Array.isArray(payload?.trend) ? payload.trend : []);
 
+const parseTrendDate = (value) => {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const getWeekdayLabel = (value) => {
+  const parsed = parseTrendDate(value);
+  if (!parsed) return 'Day';
+  return parsed.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+};
+
+const buildCurrentWeekTrend = (trend) => {
+  if (!trend.length) return [];
+
+  const trendMap = new Map(
+    trend.map((item) => [
+      item.date,
+      {
+        ...item,
+        count: Number(item.count || 0),
+      },
+    ])
+  );
+
+  const latestDate = parseTrendDate(trend[trend.length - 1]?.date);
+  if (!latestDate) return trend.slice(-7);
+
+  const monday = new Date(latestDate);
+  const dayOffset = (latestDate.getUTCDay() + 6) % 7;
+  monday.setUTCDate(latestDate.getUTCDate() - dayOffset);
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const nextDate = new Date(monday);
+    nextDate.setUTCDate(monday.getUTCDate() + index);
+    const dateKey = nextDate.toISOString().slice(0, 10);
+    const existingItem = trendMap.get(dateKey);
+
+    return {
+      date: dateKey,
+      label: getWeekdayLabel(dateKey),
+      count: existingItem?.count || 0,
+    };
+  });
+};
+
 const trendTotals = (trend) => {
   const current = trend.slice(-7).reduce((sum, item) => sum + Number(item.count || 0), 0);
   const previous = trend.slice(-14, -7).reduce((sum, item) => sum + Number(item.count || 0), 0);
@@ -330,7 +376,7 @@ function Dashboard() {
     },
   ];
 
-  const sevenDayTrend = useMemo(() => predictionTrend.slice(-7), [predictionTrend]);
+  const sevenDayTrend = useMemo(() => buildCurrentWeekTrend(predictionTrend), [predictionTrend]);
   const maxPredictions = Math.max(1, ...sevenDayTrend.map((item) => Number(item.count || 0)));
   const totalPredictionsThisWeek = sevenDayTrend.reduce((sum, item) => sum + Number(item.count || 0), 0);
   const maxBrandCount = Math.max(1, ...topBrands.map((item) => Number(item.count || 0)));
@@ -450,7 +496,7 @@ function Dashboard() {
         </article>
 
         <article className="admin-dashboard-panel">
-          <PanelHeader icon={Activity} color="#58a6ff" title="Prediction Activity" subtitle="Last 7 days" />
+          <PanelHeader icon={Activity} color="#58a6ff" title="Prediction Activity" subtitle="Monday to Sunday" />
           <div className="admin-dashboard-bars">
             {sevenDayTrend.length ? (
               sevenDayTrend.map((item) => {
@@ -458,7 +504,7 @@ function Dashboard() {
                 const width = `${Math.max(4, (count / maxPredictions) * 100)}%`;
                 return (
                   <div className="admin-dashboard-bar-row" key={item.date}>
-                    <span>{item.label?.slice(0, 3) || new Date(item.date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                    <span>{getWeekdayLabel(item.date)}</span>
                     <div>
                       <i style={{ width }} />
                     </div>

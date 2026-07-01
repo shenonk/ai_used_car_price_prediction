@@ -56,6 +56,14 @@ function normalizeModelSearch(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "")
 }
 
+function findCanonicalOption(options, value) {
+  const normalizedValue = normalizeModelSearch(value)
+  if (!normalizedValue) return ""
+
+  const matchedOption = (options || []).find((option) => normalizeModelSearch(option) === normalizedValue)
+  return matchedOption || ""
+}
+
 /* ------------------------------------------------------------------ */
 /*  Floating Particles                                                 */
 /* ------------------------------------------------------------------ */
@@ -480,9 +488,14 @@ function PriceCheck() {
       .slice(0, MAX_BRAND_SUGGESTIONS)
   }, [form.brand])
 
-  const availableModels = useMemo(
-    () => (form.brand ? (brandModelOptions[form.brand] || []) : []),
+  const canonicalBrand = useMemo(
+    () => findCanonicalOption(BRAND_OPTIONS, form.brand),
     [form.brand]
+  )
+
+  const availableModels = useMemo(
+    () => (canonicalBrand ? (brandModelOptions[canonicalBrand] || []) : []),
+    [canonicalBrand]
   )
   const modelSuggestions = useMemo(() => {
     const query = form.model.trim()
@@ -495,6 +508,10 @@ function PriceCheck() {
       })
       .slice(0, MAX_MODEL_SUGGESTIONS)
   }, [availableModels, form.model])
+  const canonicalModel = useMemo(
+    () => findCanonicalOption(availableModels, form.model),
+    [availableModels, form.model]
+  )
 
   // Compute progress step
   const completedFields = [form.brand, form.model, form.year, form.engine, form.fuel_type, form.gear_type].filter(Boolean).length
@@ -515,8 +532,18 @@ function PriceCheck() {
 
   const validate = () => {
     const errs = {}
-    if (!form.brand.trim()) errs.brand = t("price_check_page.errors.brand_required")
-    if (!form.model.trim()) errs.model = t("price_check_page.errors.model_required")
+    if (!form.brand.trim()) {
+      errs.brand = t("price_check_page.errors.brand_required")
+    } else if (!canonicalBrand) {
+      errs.brand = t("price_check_page.errors.brand_invalid", { defaultValue: "Select a valid brand from the list." })
+    }
+    if (!form.model.trim()) {
+      errs.model = t("price_check_page.errors.model_required")
+    } else if (!canonicalBrand) {
+      errs.model = t("price_check_page.errors.select_brand_first", { defaultValue: "Select a valid brand first." })
+    } else if (!canonicalModel) {
+      errs.model = t("price_check_page.errors.model_invalid", { defaultValue: "Select a valid model from the list." })
+    }
     if (!form.year) errs.year = t("price_check_page.errors.year_required")
     if (!form.engine) errs.engine = t("price_check_page.errors.engine_required")
     if (!form.fuel_type) errs.fuel_type = t("price_check_page.errors.fuel_required")
@@ -530,6 +557,8 @@ function PriceCheck() {
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setIsLoading(true)
     try {
+      const normalizedBrand = canonicalBrand || form.brand.trim().toUpperCase()
+      const normalizedModel = canonicalModel || form.model.trim().toUpperCase()
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`${API_BASE_URL}/predict`, {
         method: "POST",
@@ -538,8 +567,8 @@ function PriceCheck() {
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
         body: JSON.stringify({
-          brand: form.brand.trim().toUpperCase(),
-          model: form.model.trim().toUpperCase(),
+          brand: normalizedBrand,
+          model: normalizedModel,
           year: parseInt(form.year),
           engine_cc: parseFloat(form.engine),
           mileage_km: parseFloat(form.mileage) || 0,
@@ -551,14 +580,19 @@ function PriceCheck() {
           listing_year: MODEL_REFERENCE_LISTING_YEAR,
         }),
       })
-      if (!response.ok) throw new Error(`Server error: ${response.status}`)
       const data = await response.json()
+      if (!response.ok) {
+        if (data?.field && data?.error) {
+          setErrors((prev) => ({ ...prev, [data.field]: data.error }))
+        }
+        throw new Error(data?.error || `Server error: ${response.status}`)
+      }
       const predictedAt = Date.now()
       const predictionKey = `pred-${predictedAt}-${Math.random().toString(36).slice(2, 8)}`
       savePredictionHistoryEntry({
         id: predictionKey,
-        brand: form.brand.trim().toUpperCase(),
-        model: form.model.trim().toUpperCase(),
+        brand: normalizedBrand,
+        model: normalizedModel,
         year: parseInt(form.year),
         predictedPrice: data.predicted_price_lkr,
         predictedAt,
@@ -566,7 +600,7 @@ function PriceCheck() {
       setIsLoading(false)
       navigate("/results", {
         state: {
-          vehicle: { ...form, fuel: form.fuel_type, transmission: form.gear_type },
+          vehicle: { ...form, brand: normalizedBrand, model: normalizedModel, fuel: form.fuel_type, transmission: form.gear_type },
           predictedPrice: data.predicted_price_lkr,
           predictedAt,
           predictionKey,
@@ -672,9 +706,9 @@ function PriceCheck() {
                     value={form.model}
                     options={modelSuggestions}
                     onChange={(value) => handleChange('model', value)}
-                    placeholder={form.brand ? t("price_check_page.select_model_or_search") : t("price_check_page.select_brand_first")}
+                    placeholder={canonicalBrand ? t("price_check_page.select_model_or_search") : t("price_check_page.select_brand_first")}
                     searchable
-                    disabled={!form.brand}
+                    disabled={!canonicalBrand}
                     error={Boolean(errors.model)}
                   />
                   {errors.model && <p className="pc-error">{errors.model}</p>}

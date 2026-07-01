@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import api from '../services/api';
 
 function SupportTickets() {
@@ -10,6 +11,7 @@ function SupportTickets() {
   const [updatingId, setUpdatingId] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [replyingId, setReplyingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -87,6 +89,31 @@ function SupportTickets() {
       setError('Failed to save the admin reply.');
     } finally {
       setReplyingId(null);
+    }
+  };
+
+  const deleteTicket = async (ticketId) => {
+    if (!window.confirm('Delete this contact message from the admin inbox?')) return;
+
+    try {
+      setDeletingId(ticketId);
+      setError('');
+      setSuccess('');
+      await api.delete(`/api/admin/support-ticket/${ticketId}`);
+
+      const remainingTickets = tickets.filter((ticket) => ticket.id !== ticketId);
+      setTickets(remainingTickets);
+      if (selectedTicketId === ticketId) {
+        setSelectedTicketId(remainingTickets[0]?.id ?? null);
+      }
+
+      setSuccess('Message deleted from Contact Messages.');
+      window.setTimeout(() => setSuccess(''), 3000);
+    } catch (deleteError) {
+      console.error('Error deleting support ticket:', deleteError);
+      setError(deleteError.response?.data?.error || 'Failed to delete the message.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -287,14 +314,25 @@ function SupportTickets() {
                   <p className="text-xs text-slate-500">
                     Sending a reply automatically marks the message as closed.
                   </p>
-                  <button
-                    type="button"
-                    disabled={replyingId === selectedTicket.id || !replyText.trim()}
-                    onClick={submitAdminReply}
-                    className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {replyingId === selectedTicket.id ? 'Saving reply...' : 'Send admin reply'}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      disabled={deletingId === selectedTicket.id || updatingId === selectedTicket.id || replyingId === selectedTicket.id}
+                      onClick={() => deleteTicket(selectedTicket.id)}
+                      className="inline-flex items-center gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-300 transition hover:bg-red-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deletingId === selectedTicket.id ? 'Deleting...' : 'Delete message'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={replyingId === selectedTicket.id || !replyText.trim() || deletingId === selectedTicket.id}
+                      onClick={submitAdminReply}
+                      className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {replyingId === selectedTicket.id ? 'Saving reply...' : 'Send admin reply'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -305,7 +343,7 @@ function SupportTickets() {
                     <button
                       key={status}
                       type="button"
-                      disabled={updatingId === selectedTicket.id || selectedTicket.status === status}
+                      disabled={updatingId === selectedTicket.id || deletingId === selectedTicket.id || selectedTicket.status === status}
                       onClick={() => updateTicketStatus(selectedTicket.id, status)}
                       className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                         selectedTicket.status === status

@@ -92,13 +92,13 @@ function Register() {
   };
 
   return (
-    <div className="auth-page">
+    <div className="auth-page auth-page--register">
       <LoadingOverlay isOpen={isLoading} message={loadingMessage} />
       <SuccessToast isOpen={showSuccess} message="Account Created!" subMessage="Redirecting to login..." />
 
       <AuthLogo />
 
-      <div className="auth-card">
+      <div className="auth-card auth-card-accent auth-card-accent-emerald auth-card-glow-emerald">
         <div className="auth-card-heading">
           <h1>Create your account</h1>
           <p>Join AutoValueLK and start predicting car prices</p>
@@ -178,7 +178,7 @@ function Register() {
             </div>
           </div>
 
-          <button type="submit" disabled={isLoading} className="auth-primary-button">
+          <button type="submit" disabled={isLoading} className="auth-primary-button auth-primary-button--emerald auth-btn-neon-emerald">
             <span>Create Account</span>
             {isLoading ? <Loader2 className="spin" /> : <ArrowRight />}
           </button>

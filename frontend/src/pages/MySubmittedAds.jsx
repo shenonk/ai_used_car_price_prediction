@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { BarChart3, CheckCircle2, Clock3, Eye, Store, TrendingUp, XCircle } from "lucide-react";
+import { BarChart3, CheckCircle2, Clock3, Eye, Store, Trash2, TrendingUp, XCircle } from "lucide-react";
 
 import { supabase } from "../utils/supabaseClient";
+import AppModal from "../components/AppModal";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -70,52 +71,49 @@ function MySubmittedAds() {
   const [myListings, setMyListings] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionSuccess, setActionSuccess] = useState("");
+  const [isLightTheme, setIsLightTheme] = useState(
+    typeof document !== "undefined" && document.documentElement.dataset.theme === "light"
+  );
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deletingListingId, setDeletingListingId] = useState("");
+
+  const fetchMyListings = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setLoadError("");
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        setMyListings([]);
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/marketplace/my-listings`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || t("marketplace.errors.load_my_ads_failed"));
+      }
+
+      setMyListings(result.listings || []);
+    } catch (error) {
+      setMyListings([]);
+      setLoadError(error.message || t("marketplace.errors.load_my_ads_failed"));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [t]);
 
   useEffect(() => {
-    let isActive = true;
-
-    const fetchMyListings = async () => {
-      try {
-        setIsLoading(true);
-        setLoadError("");
-
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session?.access_token) {
-          if (isActive) {
-            setMyListings([]);
-          }
-          return;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/marketplace/my-listings`, {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        });
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(result.error || t("marketplace.errors.load_my_ads_failed"));
-        }
-
-        if (isActive) {
-          setMyListings(result.listings || []);
-        }
-      } catch (error) {
-        if (isActive) {
-          setMyListings([]);
-          setLoadError(error.message || t("marketplace.errors.load_my_ads_failed"));
-        }
-      } finally {
-        if (isActive) {
-          setIsLoading(false);
-        }
-      }
-    };
-
     fetchMyListings();
 
     const handleVisibilityRefresh = () => {
@@ -134,12 +132,34 @@ function MySubmittedAds() {
     document.addEventListener("visibilitychange", handleVisibilityRefresh);
 
     return () => {
-      isActive = false;
       window.clearInterval(intervalId);
       window.removeEventListener("focus", handleWindowFocus);
       document.removeEventListener("visibilitychange", handleVisibilityRefresh);
     };
-  }, [t]);
+  }, [fetchMyListings]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+
+    const syncTheme = () => {
+      setIsLightTheme(document.documentElement.dataset.theme === "light");
+    };
+
+    syncTheme();
+
+    const observer = new MutationObserver(syncTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+
+    window.addEventListener("carpriceai-theme-change", syncTheme);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("carpriceai-theme-change", syncTheme);
+    };
+  }, []);
 
   const summary = useMemo(() => {
     const statusCounts = myListings.reduce(
@@ -170,8 +190,52 @@ function MySubmittedAds() {
     };
   }, [myListings]);
 
+  const requestDeleteListing = (listing) => {
+    setActionError("");
+    setActionSuccess("");
+    setDeleteTarget(listing);
+  };
+
+  const confirmDeleteListing = async () => {
+    if (!deleteTarget?.id) return;
+
+    try {
+      setDeletingListingId(String(deleteTarget.id));
+      setActionError("");
+      setActionSuccess("");
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Please sign in before deleting your listing.");
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/marketplace/my-listings/${encodeURIComponent(deleteTarget.id)}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to delete this listing right now.");
+      }
+
+      setMyListings((current) => current.filter((listing) => String(listing.id) !== String(deleteTarget.id)));
+      setActionSuccess(result.message || "Listing deleted successfully.");
+      setDeleteTarget(null);
+    } catch (error) {
+      setActionError(error.message || "Unable to delete this listing right now.");
+    } finally {
+      setDeletingListingId("");
+    }
+  };
+
   return (
-    <div className="marketplace-page theme-app-bg min-h-screen px-6 py-8 md:px-8">
+    <div className="marketplace-page marketplace-my-ads-page theme-app-bg min-h-screen px-6 py-8 md:px-8">
       <section className="marketplace-panel card animate-fade-in overflow-hidden">
         <div className="relative p-6 md:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.12),_transparent_28%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.08),_transparent_24%)]" />
@@ -219,13 +283,14 @@ function MySubmittedAds() {
               </div>
             </div>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="my-ads-performance-grid mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <PerformanceCard
                 icon={<Store className="h-5 w-5" />}
                 label="Approved ads"
                 value={summary.approved}
                 meta="Visible in the public marketplace"
                 tone="text-emerald-300 bg-emerald-500/10"
+                isLightTheme={isLightTheme}
               />
               <PerformanceCard
                 icon={<Eye className="h-5 w-5" />}
@@ -233,6 +298,7 @@ function MySubmittedAds() {
                 value={summary.totalViews.toLocaleString("en-LK")}
                 meta="Buyer opens across your ads"
                 tone="text-cyan-300 bg-cyan-500/10"
+                isLightTheme={isLightTheme}
               />
               <PerformanceCard
                 icon={<Clock3 className="h-5 w-5" />}
@@ -240,6 +306,7 @@ function MySubmittedAds() {
                 value={summary.pending}
                 meta="Waiting for admin approval"
                 tone="text-amber-300 bg-amber-500/10"
+                isLightTheme={isLightTheme}
               />
               <PerformanceCard
                 icon={<TrendingUp className="h-5 w-5" />}
@@ -247,17 +314,31 @@ function MySubmittedAds() {
                 value={summary.topViewedAd ? `${summary.topViewedAd.brand} ${summary.topViewedAd.model}` : "No data"}
                 meta={summary.topViewedAd ? `${getListingViews(summary.topViewedAd).toLocaleString("en-LK")} views` : "Views appear after buyers open ads"}
                 tone="text-blue-300 bg-blue-500/10"
+                isLightTheme={isLightTheme}
               />
             </div>
 
             <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-[24px] border border-slate-800/80 bg-slate-950/35 p-5">
+              <div
+                className={`my-ads-detail-panel rounded-[24px] border p-5 ${
+                  isLightTheme
+                    ? "border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]"
+                    : "border-slate-800/80 bg-slate-950/35"
+                }`}
+              >
                 <h3 className="text-lg font-semibold text-white">{t("marketplace.my_ads.views_leaderboard", { defaultValue: "Views leaderboard" })}</h3>
                 <p className="mt-1 text-sm text-slate-500">{t("marketplace.my_ads.views_leaderboard_subtitle", { defaultValue: "Your strongest ads by buyer interest." })}</p>
                 <div className="mt-5 space-y-3">
                   {summary.leaderboard.length > 0 ? (
                     summary.leaderboard.map((listing) => (
-                      <div key={listing.id} className="rounded-2xl border border-slate-800/80 bg-slate-900/45 p-4">
+                      <div
+                        key={listing.id}
+                        className={`my-ads-leaderboard-card rounded-2xl border p-4 ${
+                          isLightTheme
+                            ? "border-slate-200 bg-slate-50"
+                            : "border-slate-800/80 bg-slate-900/45"
+                        }`}
+                      >
                         <div className="flex items-center justify-between gap-4">
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-white">
@@ -282,7 +363,13 @@ function MySubmittedAds() {
                 </div>
               </div>
 
-              <div className="rounded-[24px] border border-slate-800/80 bg-slate-950/35 p-5">
+              <div
+                className={`my-ads-detail-panel rounded-[24px] border p-5 ${
+                  isLightTheme
+                    ? "border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]"
+                    : "border-slate-800/80 bg-slate-950/35"
+                }`}
+              >
                 <h3 className="text-lg font-semibold text-white">{t("marketplace.my_ads.review_label")}</h3>
                 <p className="mt-1 text-sm text-slate-500">{t("marketplace.my_ads.review_subtitle", { defaultValue: "Submitted ads by current stage." })}</p>
                 <div className="mt-5 grid grid-cols-2 gap-3">
@@ -292,7 +379,14 @@ function MySubmittedAds() {
                     ["Rejected", summary.rejected, "text-rose-300"],
                     ["Sold", summary.sold || 0, "text-blue-300"],
                   ].map(([label, value, tone]) => (
-                    <div key={label} className="rounded-2xl border border-slate-800/80 bg-slate-900/45 p-4">
+                    <div
+                      key={label}
+                      className={`my-ads-status-card rounded-2xl border p-4 ${
+                        isLightTheme
+                          ? "border-slate-200 bg-slate-50"
+                          : "border-slate-800/80 bg-slate-900/45"
+                      }`}
+                    >
                       <p className={`text-2xl font-bold ${tone}`}>{value}</p>
                       <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">{label}</p>
                     </div>
@@ -307,6 +401,18 @@ function MySubmittedAds() {
       {loadError && (
         <div className="mt-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
           {loadError}
+        </div>
+      )}
+
+      {actionError && (
+        <div className="mt-6 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          {actionError}
+        </div>
+      )}
+
+      {actionSuccess && (
+        <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          {actionSuccess}
         </div>
       )}
 
@@ -336,15 +442,31 @@ function MySubmittedAds() {
               listing={listing}
               locale={locale}
               t={t}
+              onDelete={requestDeleteListing}
+              isDeleting={deletingListingId === String(listing.id)}
             />
           ))}
         </section>
       )}
+
+      <AppModal
+        isOpen={Boolean(deleteTarget)}
+        tone="danger"
+        eyebrow="My Ads"
+        title="Delete listing"
+        message={`Remove ${deleteTarget?.brand || "this"} ${deleteTarget?.model || "listing"} from your submitted ads? This cannot be undone.`}
+        confirmLabel={deletingListingId ? "Deleting..." : "Delete"}
+        cancelLabel="Cancel"
+        showCancel
+        isBusy={Boolean(deletingListingId)}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={confirmDeleteListing}
+      />
     </div>
   );
 }
 
-function MyListingCard({ listing, locale, t }) {
+function MyListingCard({ listing, locale, t, onDelete, isDeleting }) {
   const normalizedStatus = submissionStatusMeta[listing.status] ? listing.status : "pending";
   const statusMeta = submissionStatusMeta[normalizedStatus];
   const StatusIcon = statusMeta.icon;
@@ -400,6 +522,18 @@ function MyListingCard({ listing, locale, t }) {
         <span>{t("marketplace.my_ads.submitted_on", { date: formatSubmissionDate(listing.created_at, locale) })}</span>
         <span>{t("marketplace.my_ads.photos_count", { count: listingImages.length })}</span>
       </div>
+
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => onDelete(listing)}
+          disabled={isDeleting}
+          className="inline-flex items-center gap-2 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-2.5 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/15 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Trash2 className="h-4 w-4" />
+          {isDeleting ? "Deleting..." : "Delete ad"}
+        </button>
+      </div>
     </article>
   );
 }
@@ -413,9 +547,15 @@ function StatCard({ label, value }) {
   );
 }
 
-function PerformanceCard({ icon, label, value, meta, tone }) {
+function PerformanceCard({ icon, label, value, meta, tone, isLightTheme }) {
   return (
-    <div className="rounded-[24px] border border-slate-800/80 bg-slate-950/35 p-5">
+    <div
+      className={`my-ads-performance-card rounded-[24px] border p-5 ${
+        isLightTheme
+          ? "border-slate-200 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)]"
+          : "border-slate-800/80 bg-slate-950/35"
+      }`}
+    >
       <div className={`inline-flex rounded-2xl p-3 ${tone}`}>{icon}</div>
       <p className="mt-5 text-xs uppercase tracking-[0.2em] text-slate-500">{label}</p>
       <p className="mt-2 truncate text-2xl font-bold text-white">{value}</p>

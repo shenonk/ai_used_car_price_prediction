@@ -452,6 +452,7 @@ function Marketplace() {
   const [isBumped, setIsBumped] = useState(false);
   const [selectedCar, setSelectedCar] = useState(null);
   const [visibleListingCount, setVisibleListingCount] = useState(MARKETPLACE_PAGE_SIZE);
+  const [sortOrder, setSortOrder] = useState("newest");
   const [selectedCarImage, setSelectedCarImage] = useState("");
   const [lightboxImage, setLightboxImage] = useState("");
   const [lightboxZoom, setLightboxZoom] = useState(1);
@@ -982,11 +983,43 @@ function Marketplace() {
     });
   }, [appliedSearch, approvedCars, filters, selectedLocationRegion]);
 
+  const sortedFilteredCars = useMemo(() => {
+    const sortableCars = [...filteredCars];
+
+    sortableCars.sort((left, right) => {
+      if (sortOrder === "price_low") {
+        return Number(left.price || 0) - Number(right.price || 0);
+      }
+
+      if (sortOrder === "price_high") {
+        return Number(right.price || 0) - Number(left.price || 0);
+      }
+
+      if (sortOrder === "most_viewed") {
+        const viewDifference = getListingViewCount(right) - getListingViewCount(left);
+        if (viewDifference !== 0) {
+          return viewDifference;
+        }
+      }
+
+      const priorityDifference = getListingPriority(right) - getListingPriority(left);
+      if (priorityDifference !== 0) {
+        return priorityDifference;
+      }
+
+      const rightCreatedAt = new Date(right.created_at || 0).getTime();
+      const leftCreatedAt = new Date(left.created_at || 0).getTime();
+      return rightCreatedAt - leftCreatedAt;
+    });
+
+    return sortableCars;
+  }, [filteredCars, sortOrder]);
+
   const visibleCars = useMemo(
-    () => filteredCars.slice(0, visibleListingCount),
-    [filteredCars, visibleListingCount]
+    () => sortedFilteredCars.slice(0, visibleListingCount),
+    [sortedFilteredCars, visibleListingCount]
   );
-  const hasMoreListings = visibleListingCount < filteredCars.length;
+  const hasMoreListings = visibleListingCount < sortedFilteredCars.length;
 
   useEffect(() => {
     setVisibleListingCount(MARKETPLACE_PAGE_SIZE);
@@ -1531,7 +1564,7 @@ function Marketplace() {
             compact
           />
           <div className="marketplace-results-pill">
-            {formatNumber(filteredCars.length, locale)} listings
+            {formatNumber(sortedFilteredCars.length, locale)} listings
           </div>
         </div>
 
@@ -1550,19 +1583,19 @@ function Marketplace() {
           </div>
           <AppDropdown
             label=""
-            value="newest"
+            value={sortOrder}
             options={[
               { value: "newest", label: "Newest first" },
               { value: "price_low", label: "Price: Low to high" },
               { value: "price_high", label: "Price: High to low" },
               { value: "most_viewed", label: "Most viewed" },
             ]}
-            onChange={() => {}}
+            onChange={setSortOrder}
             className="marketplace-sort-dropdown"
           />
         </div>
 
-        {filteredCars.length === 0 ? (
+        {sortedFilteredCars.length === 0 ? (
           <div className="marketplace-redesign-empty">
             <SearchX className="h-8 w-8" />
             <h3>{t("marketplace.redesigned.no_listings_title")}</h3>

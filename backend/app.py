@@ -237,6 +237,34 @@ def normalize_reference_text(value: object) -> str:
     return str(value or "").strip().upper()
 
 
+def validate_prediction_vehicle_selection(payload: VehiclePredictionRequest) -> None:
+    reference_df = price_model_state.reference_df
+    if reference_df is None or reference_df.empty:
+        return
+
+    brand_norm = normalize_reference_text(payload.brand)
+    model_norm = normalize_reference_text(payload.model)
+    brand_matches = reference_df[reference_df["brand_norm"] == brand_norm]
+
+    if brand_matches.empty:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Select a valid vehicle brand from the list before running a prediction.",
+                "field": "brand",
+            },
+        )
+
+    if not (brand_matches["model_norm"] == model_norm).any():
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": f"'{payload.model}' is not a valid model for {payload.brand}. Please choose a matching model from the list.",
+                "field": "model",
+            },
+        )
+
+
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -1831,6 +1859,38 @@ def get_marketplace_listing_by_id(listing_id: str) -> dict[str, Any] | None:
     )
 
 
+def normalize_image_url_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item or "").strip()]
+
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+
+    return []
+
+
+def delete_marketplace_listing_images(listing: dict[str, Any]) -> None:
+    image_urls = normalize_image_url_list(listing.get("image_urls"))
+    primary_image = str(listing.get("image_url") or "").strip()
+    if primary_image:
+        image_urls.append(primary_image)
+
+    unique_urls: list[str] = []
+    seen_urls: set[str] = set()
+    for url in image_urls:
+        normalized_url = str(url or "").strip()
+        if not normalized_url or normalized_url in seen_urls:
+            continue
+        seen_urls.add(normalized_url)
+        unique_urls.append(normalized_url)
+
+    for image_url in unique_urls:
+        try:
+            delete_file_from_supabase_storage(image_url.split("?", 1)[0], "car_images")
+        except Exception as error:
+            log_warning(f"Failed to delete marketplace image for listing {listing.get('id')}: {error}")
+
+
 def normalize_selected_boosts(boost_type: str | None = None, boost_types: list[str] | None = None) -> list[str]:
     raw_values = boost_types or ([boost_type] if boost_type else [])
     normalized: list[str] = []
@@ -2561,6 +2621,33 @@ def get_my_marketplace_listings(requester: dict[str, Any] = Depends(get_requeste
     return {"listings": listings}
 
 
+@app.delete("/api/marketplace/my-listings/{listing_id}")
+def delete_my_marketplace_listing(
+    listing_id: str,
+    requester: dict[str, Any] = Depends(get_requester_identity),
+) -> dict[str, str]:
+    if not requester["is_authenticated"]:
+        raise admin_error("Please sign in before deleting your marketplace listing.", status_code=401)
+
+    with price_model_state.admin_lock:
+        listing = get_marketplace_listing_by_id(listing_id)
+        if listing is None:
+            raise admin_error("Marketplace listing not found.", status_code=404)
+        if str(listing.get("user_id") or "").strip() != requester["user_id"]:
+            raise admin_error("You can only delete your own marketplace listing.", status_code=403)
+
+        delete_marketplace_listing_images(listing)
+        price_model_state.admin_store["marketplace_listings"] = [
+            item
+            for item in price_model_state.admin_store["marketplace_listings"]
+            if str(item.get("id")) != listing_id
+        ]
+        persist_admin_store()
+
+    delete_marketplace_listing_from_supabase(listing_id)
+    return {"message": "Marketplace listing deleted successfully."}
+
+
 @app.post("/api/create-checkout-session")
 def create_checkout_session(
     payload: StripeCheckoutPayload,
@@ -2851,6 +2938,20 @@ def update_support_ticket(
     return {"message": "Support ticket updated successfully.", "ticket": ticket}
 
 
+@app.delete("/api/admin/support-ticket/{ticket_id}")
+def delete_support_ticket(ticket_id: int, _token: str = Depends(require_admin)) -> dict[str, str]:
+    with price_model_state.admin_lock:
+        tickets = price_model_state.admin_store["support_tickets"]
+        remaining = [item for item in tickets if item.get("id") != ticket_id]
+        if len(remaining) == len(tickets):
+            raise admin_error("Support ticket not found.", status_code=404)
+
+        price_model_state.admin_store["support_tickets"] = remaining
+        persist_admin_store()
+
+    return {"message": "Support ticket deleted successfully."}
+
+
 @app.get("/api/admin/marketplace/listings")
 def get_marketplace_listings(
     status: str = Query(default="all"),
@@ -3123,6 +3224,7 @@ def predict_price(
             detail=f"Price model is not available. {price_model_state.load_error or ''}".strip(),
         )
 
+    validate_prediction_vehicle_selection(payload)
     raw_features = normalize_input(payload.model_dump())
     listing_month, listing_year = resolve_reference_listing_period(payload)
     raw_features["listing_month"] = listing_month
